@@ -8,3 +8,9 @@ nul
 runtime/
 supabase/.temp/
 *.rar
+
+# Instaladores e builds distribuidos pelas Releases
+*.msi
+*.msix
+*.apk
+*.aab

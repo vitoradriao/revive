@@ -10,6 +10,8 @@ Antes de rodar os testes, garanta que:
 - as dependencias da raiz estejam instaladas com `npm install`;
 - as dependencias do painel estejam instaladas com `cd revive-painel` e `npm install`.
 
+A configuracao em `vitest.config.js` define valores ficticios de Supabase e JWT para os testes da API. A suite nao precisa de um arquivo `.env` nem de credenciais reais. Os testes de rotas validam as respostas anteriores ao acesso ao banco; o teste de sessoes mobile usa um banco simulado em memoria.
+
 ## 2. Estrutura da suite
 
 O projeto foi dividido em quatro grupos principais:

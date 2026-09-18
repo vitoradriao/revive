@@ -1,16 +1,38 @@
-# React + Vite
+# REVIVE — Painel web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface web responsiva do REVIVE, desenvolvida com React, Vite e Tailwind CSS. O painel consome a API Express para autenticação, acompanhamento de hábitos, registros diários, metas e relatórios.
 
-Currently, two official plugins are available:
+## Desenvolvimento
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Configure e inicie a API conforme o [README principal](../README.md). Depois, nesta pasta:
 
-## React Compiler
+```bash
+npm ci
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Abra o endereço exibido pelo Vite, normalmente `http://localhost:5173`.
 
-## Expanding the ESLint configuration
+## Endereço da API
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+A configuração fica em `src/config/env.js`:
+
+- Desenvolvimento: porta `3000` no mesmo host utilizado pelo navegador.
+- Produção: `/api` no mesmo domínio do painel.
+- Endereço personalizado: defina `VITE_API_URL` em `.env.local`, por exemplo `VITE_API_URL=http://localhost:3000/api`, e reinicie o Vite.
+
+Variáveis `VITE_*` são públicas no navegador. Não inclua chaves privilegiadas do Supabase nem segredos JWT.
+
+## Verificações
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+`npm test` executa os testes unitários e de integração. O build é gerado em `dist/`. Para validar API, painel e build juntos, execute `npm run validate` na raiz do repositório.
+
+## Contribuição
+
+Siga o [fluxo de Issues, branches e Pull Requests](../CONTRIBUTING.md). As instruções de hospedagem estão no [guia da Vercel](../docs/deploy-vercel.md).
