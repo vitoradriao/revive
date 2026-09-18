@@ -69,9 +69,9 @@
       "<rootDir>/src/test/setup.ts"
     ],
     "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/revive/",
-      "/e2e/"
+      "<rootDir>/node_modules/",
+      "<rootDir>/revive/",
+      "<rootDir>/e2e/"
     ]
   }
 }
