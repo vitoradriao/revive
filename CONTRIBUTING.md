@@ -33,13 +33,13 @@ O histórico deve refletir o trabalho realizado, com datas reais. Não divida al
 ## Validar e abrir o Pull Request
 
 1. Execute as verificações correspondentes à mudança. Para API ou painel, use `npm run validate` na raiz. Para mobile, use `npm run validate --prefix revive-mobile`.
-2. Para documentação, confira comandos, links relativos e consistência com os arquivos de configuração. Registre o que foi ou não executado.
+2. Para documentação, confira comandos e consistência com a configuração. Adicione os novos arquivos ao índice do Git e execute `npm run check:docs` para verificar os links locais. Registre o que foi ou não executado.
 3. Envie a branch com `git push -u origin nome-da-branch`.
 4. Abra um PR para `main`, descrevendo o problema, a solução e a validação. Relacione a Issue com `Closes #numero` quando o PR resolver toda a tarefa.
 5. Aguarde as verificações automáticas e solicite revisão de outro integrante quando disponível. Corrija os apontamentos antes de integrar.
 6. Na integração, prefira um merge commit quando os commits individuais forem úteis para acompanhar a evolução. Evite perder etapas relevantes em um único commit genérico.
 
-O workflow de testes executa a validação da API e do painel nos PRs. A validação do mobile deve ser registrada separadamente quando houver mudanças no aplicativo.
+O workflow executa a validação da API/painel, os links da documentação e, em um job separado, tipos, lint e testes do mobile. Verifique todos os jobs antes da integração. Testes em aparelho e banco real devem ser registrados separadamente quando aplicáveis.
 
 ## Distribuir instaladores e builds
 

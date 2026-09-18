@@ -1,22 +1,41 @@
-# Revive Mobile
+# REVIVE Mobile
 
-Aplicativo Expo/React Native do Revive. O cliente se comunica exclusivamente com a API Express existente; nenhuma chave privilegiada do Supabase deve ser adicionada ao bundle.
+Aplicativo Expo/React Native integrado à API do REVIVE, com acompanhamento de hábitos, metas, registros, indicadores e sincronização local.
 
-API de desenvolvimento publicada: `https://revive-beryl.vercel.app/api`.
+[Projeto principal](../README.md) · [Arquitetura](docs/adr-0001-mobile-architecture.md) · [Contratos da API](docs/api-contracts.md) · [Pendências](docs/implementation-status.md)
 
-## Android Studio e APK local
+## Desenvolvimento
 
-Use **Gerar APK.cmd** para gerar `output/revive-local.apk` neste computador, sem fila do Expo. **Testar no Android.cmd** instala o Revive Dev com atualização rápida de telas. **Abrir Android Studio.cmd** abre o projeto Android preparado.
+Use Node.js 22 e npm. Nesta pasta:
 
-Comandos equivalentes: `npm run android:apk`, `npm run android` e `npm run android:studio`. [Configuração, assinatura e instruções completas](docs/android-local.md).
+```bash
+npm ci
+```
 
-## APK de teste
+Copie `.env.example` para `.env.local` e preencha `EXPO_PUBLIC_API_URL` com a URL da API, incluindo `/api`. O ambiente de desenvolvimento publicado usa `https://revive-beryl.vercel.app/api`.
 
-[Baixar APK Android](https://expo.dev/artifacts/eas/mZSPfKgPRqC0dgrm5hFNJUZwZwVJEFyWKg6H-dHcHDQ.apk) — build concluído em 07/09/2026. Abra no celular Android para baixar e instalar. Se solicitado, permita que o navegador instale este aplicativo.
+Em um aparelho físico, `localhost` aponta para o próprio aparelho. Para uma API local, use o IP da máquina na rede. As variáveis `EXPO_PUBLIC_*` entram no aplicativo: nunca adicione chaves privilegiadas do Supabase.
 
-O projeto está vinculado a `@reviveapp/revive-mobile`. O perfil `preview` usa a API de desenvolvimento por HTTPS e gera um APK instalável, sem depender do Metro no computador.
+## Android local no Windows
 
-Para compilar apenas esta pasta a partir do monorepo, em PowerShell:
+Os comandos abaixo usam PowerShell, Android SDK e um JDK compatível. Consulte a [preparação do ambiente Android](docs/android-local.md), incluindo os requisitos de assinatura, antes de gerar o aplicativo.
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run android:setup` | Prepara o projeto Android local |
+| `npm run android` | Instala o Revive Dev e inicia o Metro |
+| `npm run android:studio` | Abre o projeto preparado no Android Studio |
+| `npm run android:apk` | Gera `output/revive-local.apk` |
+
+Os atalhos **Testar no Android.cmd**, **Abrir Android Studio.cmd** e **Gerar APK.cmd** executam os fluxos correspondentes. Após instalar uma versão de desenvolvimento, `npm start` inicia o servidor para atualizações de JavaScript.
+
+## APK de teste interno
+
+[Baixar o APK Android do EAS](https://expo.dev/artifacts/eas/mZSPfKgPRqC0dgrm5hFNJUZwZwVJEFyWKg6H-dHcHDQ.apk) · [Detalhes do build](https://expo.dev/accounts/reviveapp/projects/revive-mobile/builds/2a7c9894-bfa6-4f2a-8a0b-a631a33c403c)
+
+Esse build foi concluído em **07/09/2026** e pode não conter alterações posteriores da `main`. Usa a API de desenvolvimento e funciona sem Metro. A instalação e os testes de modo avião em aparelho físico são acompanhados na [Issue #7](https://github.com/VitorYunguiar/revive/issues/7).
+
+O projeto EAS é `@reviveapp/revive-mobile`. Para gerar um novo APK pelo perfil `preview`, execute nesta pasta, em PowerShell, com acesso autorizado ao projeto:
 
 ```powershell
 $env:EAS_NO_VCS = '1'
@@ -24,25 +43,21 @@ $env:EAS_PROJECT_ROOT = (Get-Location).Path
 npx eas-cli build --platform android --profile preview
 ```
 
-Execute na pasta `revive-mobile`. A assinatura Android é gerenciada pelo EAS. Instale o APK pelo link do build no celular; a instalação física e os testes de modo avião continuam necessários antes de um beta.
-
-## Desenvolvimento
-
-1. Copie `.env.example` para `.env.local` e informe a URL pública/local da API.
-2. Execute `npm install`.
-3. Execute `npm run android` ou `npm start`.
-
-Em aparelho físico, `localhost` aponta para o próprio aparelho. Use o IP da máquina na rede local ou uma API de desenvolvimento publicada por HTTPS.
+A assinatura desse fluxo é gerenciada pelo EAS. Consulte o [checklist de release](docs/release-checklist.md) antes de distribuir novas versões.
 
 ## Validação
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm test`
-- `npm run validate`
+```bash
+npm run validate
+```
 
-## Segurança
+O comando verifica tipos TypeScript, lint e testes Jest. Também é possível executar `npm run typecheck`, `npm run lint` e `npm test` separadamente. O mesmo fluxo é executado no job mobile do [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml).
 
-- O access token permanece apenas em memória; o refresh token fica no `expo-secure-store`.
-- Cache e fila offline são separados por usuário no SQLite.
-- Logs nunca devem incluir tokens, senhas ou conteúdo sensível dos registros.
+## Dados locais e limitações
+
+- Access token em memória e refresh token no SecureStore.
+- Cache SQLite e fila offline separados por usuário.
+- A atomicidade das mutações e respostas idempotentes ainda precisa ser concluída ([Issue #8](https://github.com/VitorYunguiar/revive/issues/8)).
+- Testes automatizados não substituem a validação em aparelho ou banco real.
+
+Veja o [estado da implementação](docs/implementation-status.md) e siga o [fluxo de contribuição](../CONTRIBUTING.md).

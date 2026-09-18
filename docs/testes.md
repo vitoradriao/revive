@@ -183,3 +183,17 @@ Esse passo garante que:
 3. antes de finalizar, rode `npm run validate`.
 
 Essa ordem reduz tempo de feedback e evita esperar build completo para descobrir erro simples.
+
+## 9. Aplicativo mobile
+
+Na raiz, instale as dependencias com `npm ci --prefix revive-mobile` e execute `npm run validate --prefix revive-mobile`. Esse comando verifica TypeScript, lint e os testes Jest do aplicativo.
+
+Os testes cobrem formularios, datas, funcoes de dominio, cliente HTTP e sincronizacao com dependencias simuladas. Nao equivalem a homologacao em aparelho, E2E completo ou validacao de concorrencia no banco. Consulte as [pendencias](roadmap.md).
+
+## 10. Documentacao e automacao
+
+`npm run check:docs` confere links locais Markdown e atributos HTML `src`/`href` contra os caminhos versionados. Detecta arquivos ausentes, nao versionados e diferencas de maiusculas/minusculas. Os novos arquivos precisam estar no indice do Git. O verificador nao valida URLs externas nem ancoras de secoes.
+
+O [workflow](../.github/workflows/tests.yml) executa dois jobs independentes: API/painel/documentacao e mobile. O CI usa Node.js 22, instalacao por lockfile e valores ficticios de ambiente para testes. Nao acessa o banco de desenvolvimento nem compila um APK.
+
+As [capturas antigas](evidencias-testes/README.md) sao evidencias historicas. Consulte o commit e os logs da execucao no [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml) para conhecer o resultado atual.

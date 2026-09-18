@@ -1,5 +1,7 @@
 # Publicação de desenvolvimento
 
+> Registro histórico da publicação e das verificações de setembro de 2026. IDs, branches e resultados abaixo se referem à execução registrada. Para instalar a versão atual, consulte o [README mobile](../README.md); para o estado atual do código, consulte o GitHub Actions.
+
 ## API e painel
 
 - URL: https://revive-beryl.vercel.app

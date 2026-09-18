@@ -19,7 +19,7 @@ A configuração fica em `src/config/env.js`:
 
 - Desenvolvimento: porta `3000` no mesmo host utilizado pelo navegador.
 - Produção: `/api` no mesmo domínio do painel.
-- Endereço personalizado: defina `VITE_API_URL` em `.env.local`, por exemplo `VITE_API_URL=http://localhost:3000/api`, e reinicie o Vite.
+- Endereço personalizado: copie [`.env.example`](.env.example) para `.env.local` e defina `VITE_API_URL`, por exemplo `VITE_API_URL=http://localhost:3000/api`, e reinicie o Vite.
 
 Variáveis `VITE_*` são públicas no navegador. Não inclua chaves privilegiadas do Supabase nem segredos JWT.
 
