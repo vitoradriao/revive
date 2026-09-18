@@ -1,124 +1,108 @@
-# REVIVE
+<p align="center">
+  <img src="revive-painel/public/icons/revive-512.svg" width="88" alt="Ícone do REVIVE">
+</p>
 
-Plataforma de apoio à recuperação de vícios, com API REST, painel web responsivo e aplicativo mobile. Permite acompanhar hábitos, registros diários, recaídas, metas e indicadores de progresso.
+<h1 align="center">REVIVE</h1>
 
-## Componentes
+<p align="center">Acompanhamento de hábitos, metas e progresso na jornada de recuperação.</p>
 
-| Componente | Tecnologias | Diretório |
-| --- | --- | --- |
-| API | Node.js, Express e Supabase | Raiz do repositório |
-| Painel web | React, Vite e Tailwind CSS | `revive-painel/` |
-| Aplicativo mobile | React Native e Expo | `revive-mobile/` |
+<p align="center">
+  <a href="https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml"><img src="https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml/badge.svg?branch=main" alt="Status dos testes na main"></a>
+</p>
 
-O painel e o aplicativo acessam os dados pela API. As credenciais privilegiadas do Supabase ficam somente no servidor.
+<p align="center">
+  <a href="https://revive-beryl.vercel.app">Demonstração web</a> ·
+  <a href="docs/guia-avaliacao.md">Roteiro de avaliação</a> ·
+  <a href="docs/README.md">Documentação</a> ·
+  <a href="revive-mobile/README.md">Aplicativo Android</a>
+</p>
 
-## Pré-requisitos
+## O projeto
 
-- Node.js 22 ou superior e npm.
-- Git para clonar o repositório.
-- Projeto Supabase configurado com o banco utilizado pela API.
+O REVIVE é um Projeto Integrador da UniEvangélica voltado ao acompanhamento da recuperação de vícios. Reúne um painel web responsivo e um aplicativo mobile conectados à mesma API, com registros diários, metas e visualização do progresso.
 
-O instalador Windows x64 do Node.js 22.20.0 está disponível na [Release de ferramentas](https://github.com/VitorYunguiar/revive/releases/tag/tools-node-v22.20.0), com origem e checksum para conferência. Outras versões e sistemas estão disponíveis no [site oficial do Node.js](https://nodejs.org/en/download). Instaladores e builds devem ser anexados às Releases, sem entrar nos commits do código-fonte.
+O objetivo é oferecer uma forma organizada de acompanhar a jornada pessoal. O aplicativo não substitui acompanhamento profissional.
 
-## Estrutura
+## Funcionalidades
 
-```text
-revive/
-├── index.js              # API Express
-├── mobile-api.js         # Rotas e serviços da API mobile
-├── .env.example          # Modelo de configuração da API
-├── revive-painel/        # Painel web
-├── revive-mobile/        # Aplicativo Expo/React Native
-├── supabase/migrations/  # Migrações do banco
-├── tests/                # Testes da API
-└── docs/                 # Documentação técnica
+| Área | Recursos implementados |
+| --- | --- |
+| Conta | Cadastro, login, perfil e encerramento de sessão |
+| Hábitos | Cadastro, acompanhamento de abstinência e estimativa de economia |
+| Registros | Check-ins, humor, observações e histórico de recaídas |
+| Metas | Criação, acompanhamento e conclusão de objetivos |
+| Progresso | Dashboard, indicadores, calendário e conquistas |
+| Mobile | Cache por usuário, fila de sincronização, lembretes locais e exportação de dados |
+
+A sincronização offline possui [limitações conhecidas](docs/roadmap.md). O APK é destinado a testes internos; a homologação em aparelho físico ainda está pendente.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    Web["Painel web<br/>React + Vite"] --> API["API REST<br/>Node.js + Express"]
+    Mobile["Aplicativo mobile<br/>React Native + Expo"] --> API
+    Mobile --- Local["SQLite + SecureStore<br/>Dados locais por usuário"]
+    API --> DB["Supabase<br/>PostgreSQL"]
 ```
 
-## Executar a API
+Os clientes acessam o banco pela API. Credenciais privilegiadas ficam no servidor. Veja as [decisões e os fluxos de arquitetura](docs/arquitetura-fluxograma.md).
 
-Clone o projeto e instale as dependências:
+## Começar pelo ambiente local
+
+Requisitos: **Node.js 22**, npm, Git e um projeto Supabase com o esquema base configurado.
 
 ```bash
 git clone https://github.com/VitorYunguiar/revive.git
 cd revive
 npm ci
-```
-
-Copie `.env.example` para `.env` na raiz e preencha:
-
-| Variável | Uso |
-| --- | --- |
-| `SUPABASE_URL` | URL do projeto Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Chave privilegiada usada exclusivamente pela API |
-| `JWT_SECRET` | Segredo de assinatura dos tokens; use um valor aleatório e privado |
-| `PORT` | Porta da API; padrão `3000` |
-| `NODE_ENV` | `development` localmente; `production` na hospedagem |
-| `ALLOWED_ORIGINS` | Opcional: origens permitidas, separadas por vírgula |
-
-`SUPABASE_KEY` é um fallback opcional se `SUPABASE_SERVICE_ROLE_KEY` não estiver definida. Não publique `.env` nem coloque essas chaves no painel ou no aplicativo.
-
-```bash
-npm run dev
-```
-
-- API local: `http://localhost:3000/api`
-- Verificação de disponibilidade: `http://localhost:3000/api/health`
-- Documentação das rotas: `http://localhost:3000/api/docs`
-
-Para executar sem recarga automática, use `npm start`.
-
-## Banco de dados
-
-A API depende das tabelas `usuarios`, `vicios`, `registros_diarios`, `historico_recaidas`, `metas` e `mensagens_motivacionais`. As migrações em [`supabase/migrations`](supabase/migrations) incluem alterações de metas, sessões mobile, idempotência e permissões.
-
-As migrações versionadas pressupõem a existência do esquema base: não constituem, sozinhas, uma instalação completa em banco vazio. Antes de configurar um novo ambiente, obtenha o esquema base com a equipe e revise as migrações em ordem cronológica.
-
-## Executar o painel web
-
-Em outro terminal, na raiz do repositório:
-
-```bash
 npm ci --prefix revive-painel
-npm run dev --prefix revive-painel
 ```
 
-Abra a URL informada pelo Vite, normalmente `http://localhost:5173`. Localmente, o painel usa a API na porta `3000`; em produção, usa `/api` no mesmo domínio. Para outro endereço, defina `VITE_API_URL` em `revive-painel/.env.local`, incluindo o sufixo `/api`, e reinicie o Vite.
-
-Após instalar as dependências da API e do painel, `npm run dev:stack` inicia os dois serviços em conjunto.
-
-## Executar o aplicativo mobile
-
-Consulte o [guia do aplicativo](revive-mobile/README.md) para configurar a URL da API, executar com Expo e baixar o APK de teste. A [documentação Android](revive-mobile/docs/android-local.md) descreve o uso do Android Studio e a geração local de APK.
-
-## Testes e build
-
-Na raiz, com as dependências da API e do painel instaladas:
+Copie `.env.example` para `.env`, preencha as credenciais da API conforme o [guia de instalação](docs/instalacao.md) e execute:
 
 ```bash
+npm run dev:stack
+```
+
+O painel abre normalmente em `http://localhost:5173`, com API em `http://localhost:3000/api`. Para o aplicativo, siga o [guia mobile](revive-mobile/README.md).
+
+**Banco novo:** as migrações atuais dependem de um esquema base ainda não versionado. A [Issue #6](https://github.com/VitorYunguiar/revive/issues/6) acompanha essa pendência. A suíte automatizada pode ser executada sem banco e sem credenciais reais.
+
+## Qualidade e validação
+
+```bash
+# API, painel e build web
 npm run validate
-```
 
-O comando executa os testes da API, os testes do painel e o build web. A validação do mobile é separada:
+# Links locais da documentação
+npm run check:docs
 
-```bash
+# Tipos, lint e testes do mobile
 npm ci --prefix revive-mobile
 npm run validate --prefix revive-mobile
 ```
 
-| Comando na raiz | Finalidade |
+O [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml) executa a validação da API/painel, a conferência dos links e a validação do mobile. Os comandos, o escopo e os limites de cada suíte estão no [guia de testes](docs/testes.md).
+
+## Organização do repositório
+
+| Caminho | Conteúdo |
 | --- | --- |
-| `npm run test:api` | Testes unitários e de integração da API |
-| `npm run test:web` | Testes unitários e de integração do painel |
-| `npm run build:web` | Build de produção do painel |
-| `npm run lint:web` | Análise estática do painel |
+| `index.js` e `mobile-api.js` | API e regras de acesso aos dados |
+| `revive-painel/` | Aplicação web e seus testes |
+| `revive-mobile/` | Aplicativo, testes e guias Android |
+| `supabase/` | Migrações e orientações sobre o banco |
+| `tests/` | Testes unitários e de integração da API |
+| `docs/` | Guias atuais, evidências e entregas acadêmicas |
+| `.github/` | Automação e modelos de Issues/PRs |
 
-Mais detalhes no [guia de testes](docs/testes.md).
+## Documentação e evolução
 
-## Contribuição e documentação
+- [Roteiro de avaliação](docs/guia-avaliacao.md): caminhos para explorar o produto e conferir evidências.
+- [Central de documentação](docs/README.md): instalação, arquitetura, publicação e entregas acadêmicas.
+- [Próximas melhorias](docs/roadmap.md): pendências reais vinculadas às Issues.
+- [Como contribuir](CONTRIBUTING.md): tarefas, branches, commits, validação e revisão.
+- [Releases](https://github.com/VitorYunguiar/revive/releases): distribuição de arquivos, incluindo o instalador Node.js, com origem e checksum.
 
-Registre a tarefa em uma Issue, desenvolva em uma branch e abra um Pull Request com as verificações realizadas. Consulte o [guia de contribuição](CONTRIBUTING.md).
-
-- [Publicação na Vercel](docs/deploy-vercel.md)
-- [Arquitetura](docs/arquitetura-fluxograma.md)
-- [Convenções de código](docs/coding-conventions.md)
-- [Contrato da API mobile](revive-mobile/docs/api-contracts.md)
+As alterações são registradas em [Issues](https://github.com/VitorYunguiar/revive/issues) e integradas por [Pull Requests](https://github.com/VitorYunguiar/revive/pulls?q=is%3Apr+is%3Amerged), preservando o histórico de desenvolvimento.

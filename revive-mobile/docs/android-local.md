@@ -1,6 +1,6 @@
 # Android local no Windows
 
-O Android Studio e o Gradle geram o aplicativo neste computador. Não há fila, crédito ou cooldown do EAS. A primeira execução baixa ferramentas e dependências; as próximas reutilizam o cache. É necessário acesso à internet para dependências ainda não baixadas e para a API do app.
+O Android Studio e o Gradle geram o aplicativo localmente no Windows. Não há fila, crédito ou cooldown do EAS. A primeira execução baixa ferramentas e dependências; as próximas reutilizam o cache. É necessário acesso à internet para dependências ainda não baixadas e para a API do app.
 
 ## Atalhos na pasta do aplicativo
 
@@ -12,9 +12,9 @@ Revive Dev usa `com.reviveapp.revive.dev` e pode coexistir com o aplicativo norm
 
 ## Pelo Android Studio
 
-1. Abra a pasta `C:\revive-claude\revive-mobile\android` (não a pasta aninhada `revive/`).
+1. Execute `npm run android:setup` na pasta do aplicativo e abra a pasta `revive-mobile/android` dentro do seu clone.
 2. Aguarde a sincronização do Gradle. O SDK está em `%LOCALAPPDATA%\Android\Sdk`.
-3. Em **Settings > Build, Execution, Deployment > Build Tools > Gradle**, use **GRADLE_LOCAL_JAVA_HOME**. O preparo grava esse caminho em `android/.gradle/config.properties`. Neste computador foi selecionado `C:\Program Files\Java\jdk-17`.
+3. Em **Settings > Build, Execution, Deployment > Build Tools > Gradle**, use **GRADLE_LOCAL_JAVA_HOME**. O preparo grava esse caminho em `android/.gradle/config.properties`. O script seleciona um JDK instalado; use `REVIVE_JAVA_HOME` para informar o caminho de uma instalação compatível quando necessário.
 4. Para desenvolver, selecione a variante **debug** e um emulador/celular. Deixe `npm start` rodando na pasta `revive-mobile`; por USB, `adb reverse tcp:8081 tcp:8081` permite acessar o servidor. O atalho de teste automatiza a compilação e o Metro.
 5. Para APK independente, use o atalho **Gerar APK.cmd**. No Studio também é possível executar a tarefa Gradle `:app:assembleRelease`; a saída original fica em `android/app/build/outputs/apk/release/app-release.apk`.
 
