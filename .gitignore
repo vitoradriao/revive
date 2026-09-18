@@ -14,3 +14,11 @@ supabase/.temp/
 *.msix
 *.apk
 *.aab
+
+# Configuracao local, cobertura e arquivos do sistema
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

@@ -2,51 +2,62 @@ name: Testes
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - develop
-      - 'feature/**'
-      - 'fix/**'
-      - 'docs/**'
-      - 'chore/**'
+    branches: [main, master, develop, 'feature/**', 'fix/**', 'docs/**', 'chore/**']
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
+    name: API, painel e documentação
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: |
             package-lock.json
             revive-painel/package-lock.json
-
-      - name: Install API dependencies
+      - name: Verificar links da documentação
+        run: npm run check:docs
+      - name: Instalar dependências da API
         run: npm ci
+      - name: Instalar dependências do painel
+        run: npm ci --prefix revive-painel
+      - name: Validar API, painel e build
+        run: npm run validate
 
-      - name: Install panel dependencies
+  mobile:
+    name: Mobile — tipos, lint e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: revive-mobile
+    env:
+      CI: 'true'
+      EXPO_PUBLIC_API_URL: https://revive-tests.invalid/api
+      EXPO_PUBLIC_APP_ENV: development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: revive-mobile/package-lock.json
+      - name: Instalar dependências do mobile
         run: npm ci
-        working-directory: revive-painel
-
-      - name: API unit tests
-        run: npm run test:api:unit
-
-      - name: API integration tests
-        run: npm run test:api:integration
-
-      - name: Panel unit tests
-        run: npm run test:web:unit
-
-      - name: Panel integration tests
-        run: npm run test:web:integration
-
-      - name: Panel production build
-        run: npm run build:web
+      - name: Validar tipos, lint e testes
+        run: npm run validate
