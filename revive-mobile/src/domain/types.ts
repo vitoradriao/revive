@@ -118,11 +118,12 @@ export type QueueOperationType =
 export type QueuedMutation = {
   id: string;
   userId: string;
-  type: QueueOperationType;
+  type: QueueOperationType | (string & {});
   payload: Record<string, unknown>;
   occurredAt: string;
   attempts: number;
   nextRetryAt: string;
   status: 'pending' | 'syncing' | 'failed';
   lastError?: string | null;
+  needsRecovery?: boolean;
 };

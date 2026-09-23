@@ -4,7 +4,7 @@ import type { BootstrapData, CreateGoalInput, DailyRecord, QueuedMutation } from
 export function withPendingMutations(snapshot: BootstrapData, mutations: QueuedMutation[]): BootstrapData {
   const result = { ...snapshot, registros: [...snapshot.registros], recaidas: [...snapshot.recaidas], metas: [...snapshot.metas], vicios: [...snapshot.vicios] };
   for (const mutation of mutations) {
-    if (mutation.userId !== snapshot.usuario.id) continue;
+    if (mutation.userId !== snapshot.usuario.id || mutation.needsRecovery) continue;
     const payload = mutation.payload;
     if (mutation.type === 'record.create' && !result.registros.some((item) => item.id === mutation.id)) {
       result.registros.unshift({ ...payload, id: mutation.id, pending: true } as DailyRecord);

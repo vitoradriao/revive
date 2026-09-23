@@ -31,6 +31,7 @@ export const syncPendingMutations = (userId: string) => {
     const mutations = await getPendingMutations(userId);
     let synced = 0;
     for (const mutation of mutations) {
+      if (mutation.needsRecovery) break;
       // Do not let later events overtake an earlier event waiting for retry.
       if (new Date(mutation.nextRetryAt).getTime() > Date.now()) break;
       await markMutationSyncing(mutation.id);
