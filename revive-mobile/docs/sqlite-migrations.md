@@ -1,0 +1,19 @@
+# Migração do SQLite local — issue #13
+
+O banco `revive.db` usa `PRAGMA user_version = 1`. A abertura é compartilhada por uma promessa: cache e fila aguardam a migração exclusiva terminar. A instalação nova e o banco legado v0 percorrem o mesmo passo transacional. O passo adiciona `payload_version`, encapsula JSON válido em `{ "version": 1, "data": ... }`, mantém IDs, usuário, tipo, ordem, timestamps, tentativas, status, erros e chave idempotente, e só então grava `user_version = 1`.
+
+Os dados ficam em `bootstrap_cache_v1` e `mutation_queue_v1`. Os nomes v0 permanecem como visões somente de leitura. Um APK anterior não consegue executar sua atualização inicial da fila nem gravar nelas; a saída é reinstalar a versão atual **sem limpar os dados do aplicativo**. Uma versão atual que encontre `user_version` maior que 1 interrompe a abertura antes de escrever. Não faça downgrade de APK sobre um banco mais novo.
+
+JSON legado inválido continua no banco com `payload_version = 0`. Uma operação com tipo, formato ou versão incompatível aparece na tela de sincronização com aviso de recuperação; ela e as operações posteriores não são enviadas automaticamente. O usuário pode descartá-la explicitamente. Um snapshot inválido é ignorado e pode ser reconstruído pelo servidor. A leitura de cache confere o ID da conta, e a fila é consultada por `user_id`.
+
+## Reprodução e recuperação
+
+Execute `npm ci`, `npm run validate` e, para o teste SQLite isolado, `npm run test:sqlite` em Node 22. O teste com arquivos SQLite reais cobre instalação vazia, segunda abertura, duas contas, quatro tipos de operação, tipo desconhecido, JSON corrompido, erro injetado depois de uma escrita, reabertura e versão futura. O erro faz rollback das colunas, payloads e `user_version`; a próxima abertura tenta novamente. O script usa apenas dados sintéticos e remove seus arquivos temporários.
+
+Se uma migração falhar no aparelho, mantenha o armazenamento do aplicativo, libere espaço se necessário e abra novamente a mesma versão atualizada. Se persistir, preserve uma cópia do `revive.db` e seus arquivos WAL/SHM para análise local, sem publicar conteúdo pessoal em logs ou issues. Não apague o banco nem a fila. A reversão do código exige reverter em conjunto `database.ts`, `migrations.ts`, `envelopes.ts`, `queue-row.ts` e os testes; bancos que já chegaram a v1 devem continuar com o APK compatível.
+
+## Validação física — 23/09/2026
+
+O teste automatizado exercita SQLite nativo do Node; a atualização também foi verificada em um moto g52 com Android 13 e o driver Android do Expo. Instalou-se o APK legado de 09/09/2026 (`0.1.1`, código 2, SHA-256 `AB2769BEB004F3491953FC362CD834D41234B4FC46285974AB00EC84D242D682`) em uma instalação vazia. Uma conta e um hábito sintéticos foram criados online. Com Wi-Fi e dados móveis desligados, foram enfileirados um check-in, uma recaída sem reiniciar o contador e uma meta. A tela de sincronização mostrou os três nessa ordem.
+
+O APK novo (`0.1.1`, código 2, SHA-256 `B917368421B0C3EC185D55F9F6CEF603FEAEF337DCEA26E5AB24C4538AD9F522`) foi instalado por cima com `adb install -r`, sem limpar dados. A primeira abertura offline e uma segunda abertura após encerrar o processo exibiram as mesmas três operações na mesma ordem. Após restaurar as duas conexões e usar **Tentar novamente** no primeiro item, a fila ficou vazia; a Jornada exibiu um registro e a meta apareceu vinculada ao hábito. A conta sintética foi excluída pelo aplicativo após a verificação, deixando a tela de login no aparelho. As chaves idempotentes não aparecem na interface do APK release; sua preservação é verificada na fixture SQLite real. A repetição com duas contas no aparelho e interrupção durante a migration permanecem cenários de homologação ampliada da issue #7. Nenhum dado pessoal foi usado ou anexado como evidência.

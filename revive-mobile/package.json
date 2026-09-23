@@ -11,8 +11,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
+    "test:sqlite": "node --no-warnings scripts/verify-sqlite-migrations.mjs",
     "test:watch": "jest --watch",
-    "validate": "npm run typecheck && npm run lint && npm test",
+    "validate": "npm run typecheck && npm run lint && npm test && npm run test:sqlite",
     "android:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-local.ps1 -Action setup",
     "android:studio": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-local.ps1 -Action studio",
     "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-local.ps1 -Action apk",
@@ -71,7 +72,8 @@
     "testPathIgnorePatterns": [
       "<rootDir>/node_modules/",
       "<rootDir>/revive/",
-      "<rootDir>/e2e/"
+      "<rootDir>/e2e/",
+      "<rootDir>/tmp/"
     ]
   }
 }

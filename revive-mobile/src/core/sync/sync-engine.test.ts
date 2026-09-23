@@ -24,6 +24,13 @@ it('does not overtake an earlier event waiting for retry', async () => {
   expect(reviveApi.createRecord).not.toHaveBeenCalled();
 });
 
+it('does not send an incompatible event or overtake it', async () => {
+  jest.mocked(getPendingMutations).mockResolvedValue([{ ...event('unknown'), needsRecovery: true }, event('second')]);
+  expect(await syncPendingMutations('user-a')).toBe(0);
+  expect(reviveApi.createRecord).not.toHaveBeenCalled();
+  expect(removeMutation).not.toHaveBeenCalled();
+});
+
 it('stops on a network failure without deleting or sending subsequent events', async () => {
   jest.mocked(getPendingMutations).mockResolvedValue([event('first'), event('second')]);
   jest.mocked(reviveApi.createRecord).mockRejectedValue(new ApiError('Offline', 0));
