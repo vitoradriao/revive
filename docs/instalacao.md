@@ -4,7 +4,7 @@
 
 - Node.js 22, versão usada no CI e indicada em `.nvmrc`.
 - npm e Git.
-- Para executar a aplicação com dados: projeto Supabase com o esquema base configurado.
+- Para executar a aplicação com dados: projeto Supabase com as migrations de `supabase/migrations` aplicadas.
 - Para desenvolver Android: ferramentas descritas no [guia Android](../revive-mobile/docs/android-local.md).
 
 O instalador Windows x64 do Node.js 22.20.0 está na [Release de ferramentas](https://github.com/VitorYunguiar/revive/releases/tag/tools-node-v22.20.0), com origem e checksum. Para outras versões ou sistemas, consulte o [site oficial](https://nodejs.org/en/download).
@@ -33,7 +33,7 @@ Copie `.env.example` para `.env` na raiz. No PowerShell, use `Copy-Item .env.exa
 | `NODE_ENV` | `development` localmente; `production` na hospedagem |
 | `ALLOWED_ORIGINS` | Opcional: origens permitidas, separadas por vírgula |
 
-`SUPABASE_KEY` é um fallback caso `SUPABASE_SERVICE_ROLE_KEY` não esteja definida. O `.env` não deve ser versionado. Para configurar um banco novo, consulte as [orientações do Supabase](../supabase/README.md): as migrações atuais dependem do esquema base.
+`SUPABASE_KEY` é um fallback caso `SUPABASE_SERVICE_ROLE_KEY` não esteja definida. O `.env` não deve ser versionado. Para configurar um banco vazio ou adotar um existente, siga o [guia de migração](../supabase/README.md). O baseline já está versionado e deve ser aplicado somente em banco vazio.
 
 ## 3. Iniciar API e painel
 
@@ -72,7 +72,7 @@ Instale as dependências com `npm ci --prefix revive-mobile` e siga o [README mo
 | API não inicia por falta de URL/chave | `.env` na raiz e variáveis do Supabase preenchidas |
 | Painel não encontra a API | API iniciada, porta correta e `VITE_API_URL` quando houver endereço personalizado |
 | Celular não acessa `localhost` | Use o IP da máquina na rede ou uma API HTTPS; `localhost` no aparelho aponta para ele mesmo |
-| Migração falha por tabela inexistente | O esquema base deve existir antes das migrações incrementais |
+| Migração falha por tabela inexistente | Confira se o baseline inicial foi aplicado antes das cinco migrações incrementais; em banco existente, execute primeiro a checagem de drift |
 | Browser bloqueia a origem | Confira `ALLOWED_ORIGINS` na API e reinicie o servidor após alterar o ambiente |
 
 ## Publicação
