@@ -31,13 +31,9 @@ supabase db push
 
 `supabase init` só é necessário uma vez. A CLI aplica as migrations em ordem e mantém o histórico de versões. Não use `db reset --linked` em um ambiente com dados.
 
-Para testar a cadeia sem instalar um servidor local, crie dois **bancos descartáveis** em ambiente isolado, um para instalação limpa e outro para upgrade sintético. Use os papéis Supabase `anon`, `authenticated` e `service_role`. Configure `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE` (nome terminando em `_revive_fixture`) e autenticação do `psql` por `PGPASSFILE` ou método equivalente fora do repositório. Na raiz do monorepositório, execute no PowerShell:
+Os dois cenários foram executados em 23/09/2026 **no próprio projeto REVIVE V2**, por meio da [migration de replay](migrations/20260923164304_verify_baseline_replay.sql) aplicada pelo MCP do Supabase. Ela criou dois esquemas temporários no mesmo PostgreSQL, reproduziu a instalação vazia e o upgrade com dados inteiramente fictícios, verificou a estrutura e as permissões e removeu os esquemas na mesma transação. A contagem de linhas das tabelas de aplicação em `public` permaneceu igual. O fluxo de cadastro, bootstrap, registros, metas, recaídas e exclusão de conta também foi validado pela API contra o projeto atual conforme o [guia de testes](../docs/testes.md).
 
-```powershell
-./supabase/verification/run_disposable.ps1 -Mode Fresh
-```
-
-O script recusa um alvo que já tenha tabelas REVIVE e executa o baseline, as seis migrations funcionais, o replay isolado e as [verificações de esquema](verification/assert_base_schema.sql) e [segurança](verification/assert_full_schema.sql). Aponte a API de teste a esse banco com credencial de servidor temporária e execute cadastro, bootstrap, registros, metas, recaídas e exclusão de conta conforme o [guia de testes](../docs/testes.md). Não configure o painel nem o mobile com a credencial de servidor.
+Para repetir a verificação num projeto novo, o [script PowerShell](verification/run_disposable.ps1) aceita `-Mode Fresh` ou `-Mode Legacy`. Ele exige um banco de teste vazio, com `PGDATABASE` terminado em `_revive_fixture`, e os papéis Supabase `anon`, `authenticated` e `service_role`. Configure `PGHOST`, `PGPORT`, `PGUSER` e a autenticação do `psql` fora do repositório. Esse script é uma ferramenta opcional para futuras instalações; a validação da issue #6 já foi feita no REVIVE V2.
 
 ## Atualização de banco legado
 
@@ -46,13 +42,7 @@ O script recusa um alvo que já tenha tabelas REVIVE e executa o baseline, as se
 3. Vincule a CLI ao projeto existente com `supabase login` e `supabase link --project-ref <referencia-do-projeto>`. Reconcilie o histórico Supabase apenas **depois** da verificação. Marque o baseline `20260615000000` como aplicado com `supabase migration repair 20260615000000 --status applied`. Se as cinco migrations antigas tiverem versões remotas diferentes, reconcilie a correspondência uma a uma no histórico, preservando os arquivos versionados e conferindo o SQL de cada versão. Nunca aplique o baseline DDL sobre tabelas existentes. Confira a proposta de `supabase db push --dry-run`, aplique apenas as migrations novas ainda ausentes e execute [`assert_full_schema.sql`](verification/assert_full_schema.sql).
 4. Verifique índices, constraints, RLS e grants com [`catalog_report.sql`](verification/catalog_report.sql). Só promova alterações após testar backup e recuperação no ambiente de homologação.
 
-O teste de upgrade usa o mesmo esquema legado reconstruído e linhas inteiramente fictícias. Em outro banco descartável vazio, configure as variáveis `PG*` acima e execute:
-
-```powershell
-./supabase/verification/run_disposable.ps1 -Mode Legacy
-```
-
-O script insere a [fixture legada](verification/legacy_fixture.sql) entre o baseline e as migrations. A [checagem após upgrade](verification/assert_synthetic_upgrade.sql) valida identificadores, relações, defaults e a cascata de exclusão de conta dentro de uma transação revertida. Ele nunca toca no projeto existente. O replay versionado também executa esses dois cenários em esquemas isolados no PostgreSQL conectado e remove os esquemas ao final; a execução de 23/09/2026 passou no projeto `REVIVE V2` sem alterar a contagem das tabelas de aplicação.
+O teste de upgrade usa o mesmo esquema legado reconstruído e linhas inteiramente fictícias. A [fixture legada](verification/legacy_fixture.sql) é inserida entre o baseline e as migrations. A [checagem após upgrade](verification/assert_synthetic_upgrade.sql) valida identificadores, relações, defaults e a cascata de exclusão de conta dentro de uma transação revertida. O replay versionado executou esse cenário no REVIVE V2 sem modificar as tabelas de aplicação.
 
 ## Recuperação
 
