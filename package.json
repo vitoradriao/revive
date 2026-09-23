@@ -22,7 +22,8 @@
     "test:web:integration": "npm run test:integration --prefix revive-painel",
     "build:web": "npm run build --prefix revive-painel",
     "lint:web": "npm run lint --prefix revive-painel",
-    "validate": "npm run test:api && npm run test:web && npm run build:web"
+    "audit:tooling": "npm audit --package-lock-only --audit-level=moderate",
+    "validate": "npm run check:docs && npm run test:api && npm run test:web && npm run build:web"
   },
   "keywords": [
     "revive",
@@ -52,6 +53,7 @@
     "postcss": "^8.5.6",
     "supertest": "^7.1.4",
     "tailwindcss": "^4.1.14",
-    "vitest": "^2.1.9"
+    "vite": "6.4.3",
+    "vitest": "4.1.11"
   }
 }
