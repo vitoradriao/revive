@@ -10,7 +10,18 @@ Antes de rodar os testes, garanta que:
 - as dependencias da raiz estejam instaladas com `npm install`;
 - as dependencias do painel estejam instaladas com `cd revive-painel` e `npm install`.
 
-A configuracao em `vitest.config.js` define valores ficticios de Supabase e JWT para os testes da API. A suite nao precisa de um arquivo `.env` nem de credenciais reais. Os testes de rotas validam as respostas anteriores ao acesso ao banco; o teste de sessoes mobile usa um banco simulado em memoria.
+A configuracao em `vitest.config.mjs` define valores ficticios de Supabase e JWT para os testes rapidos da API. A suite nao precisa de um arquivo `.env` nem de credenciais reais. Os testes de rotas validam as respostas anteriores ao acesso ao banco; o teste de sessoes mobile usa um banco simulado em memoria.
+
+O job `PostgreSQL 17 e API real` do CI complementa esses testes. Ele usa [PostgreSQL 17.6 e PostgREST 12.2.12](../docker-compose.ci.yml) em containers efemeros, aplica todas as migrations desde zero e repete o upgrade com uma fixture legada em outro banco do mesmo container. As [verificacoes de esquema](../supabase/verification/assert_full_schema.sql) e o [teste de API](../tests/db/real-postgres.mjs) cobrem grants, constraints, duas conexoes independentes, isolamento entre contas e exclusao em cascata. O job tambem exige que uma FK invalida e a leitura direta pelo papel `anon` falhem. Todos os dados e segredos do job sao sintéticos e descartados ao final; ele nao usa as chaves nem o banco do REVIVE V2.
+
+Para repetir o job em Linux, macOS ou WSL com Docker Compose e Node.js 22, execute na raiz:
+
+```sh
+npm ci
+npm run test:db
+```
+
+O script remove os volumes dos containers ao terminar, inclusive se um teste falhar. As portas locais `55432` a `55434` precisam estar livres. No Windows, nao e preciso instalar PostgreSQL: use o job do PR no GitHub Actions.
 
 ## 2. Estrutura da suite
 

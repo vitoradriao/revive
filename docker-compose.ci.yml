@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: revive_fixture
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: revive_ci_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d revive_fixture"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    environment:
+      PGRST_DB_URI: postgres://authenticator:revive_ci_only@postgres:5432/revive_fixture
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: revive-ci-only-jwt-secret-at-least-32-characters
+    ports:
+      - "127.0.0.1:55433:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy

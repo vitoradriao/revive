@@ -63,3 +63,20 @@ jobs:
         run: npm ci
       - name: Validar tipos, lint e testes
         run: npm run validate
+
+  postgres:
+    name: PostgreSQL 17 e API real
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Instalar dependências da API
+        run: npm ci
+      - name: Validar instalação, upgrade, transações e API
+        run: sh supabase/verification/run_ci.sh
