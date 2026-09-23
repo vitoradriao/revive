@@ -41,7 +41,8 @@ $incremental = @(
   '20260907002648_mobile_bootstrap_author.sql',
   '20260907002650_restrict_revive_tables_to_api.sql',
   '20260907004754_harden_modification_trigger_search_path.sql',
-  '20260923163030_restrict_modification_trigger_execute.sql'
+  '20260923163030_restrict_modification_trigger_execute.sql',
+  '20260923164304_verify_baseline_replay.sql'
 )
 foreach ($migration in $incremental) {
   Invoke-PsqlFile (Join-Path $migrationDirectory $migration)
