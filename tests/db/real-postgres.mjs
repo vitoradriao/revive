@@ -69,14 +69,14 @@ async function verifyApi(app, sql) {
   const suffix = randomUUID();
   const password = 'Senha!12345';
   const users = [];
-  for (const label of ['a', 'b']) {
+  for (const label of ['a', 'b', 'c']) {
     const email = `ci-${label}-${suffix}@example.invalid`;
     const registered = await request(app).post('/api/auth/cadastro')
       .send({ nome: `Synthetic ${label}`, email, senha: password });
     const body = bodyAt(registered, 201, `register ${label}`);
     users.push({ id: body.usuario.id, email, legacyToken: body.token });
   }
-  const [a, b] = users;
+  const [a, b, c] = users;
   for (const user of users) {
     const login = await request(app).post('/api/v2/auth/login').send({ email: user.email, senha: password });
     const session = bodyAt(login, 200, 'mobile login');
@@ -99,25 +99,25 @@ async function verifyApi(app, sql) {
   assert.equal(bootstrap.vicios.length, 0);
 
   const rotation = await Promise.all([1, 2].map(() => request(app).post('/api/v2/auth/refresh')
-    .send({ refresh_token: b.refreshToken })));
+    .send({ refresh_token: c.refreshToken })));
   assert.deepEqual(rotation.map(result => result.status).sort(), [200, 401]);
   const activeFamily = await sql.query(`select count(*) from public.app_sessions
-    where usuario_id=$1 and revoked_at is null`, [b.id]);
+    where usuario_id=$1 and revoked_at is null`, [c.id]);
   assert.equal(Number(activeFamily.rows[0].count), 0,
     'concurrent reuse is detected and revokes the rotated family');
   bodyAt(await request(app).get('/api/v2/bootstrap')
-    .set('Authorization', `Bearer ${b.mobileToken}`), 401, 'rotated family access token revoked');
+    .set('Authorization', `Bearer ${c.mobileToken}`), 401, 'rotated family access token revoked');
 
   const logoutSession = bodyAt(await request(app).post('/api/v2/auth/login')
-    .send({ email: b.email, senha: password }), 200, 'second mobile login');
+    .send({ email: c.email, senha: password }), 200, 'second mobile login');
   bodyAt(await request(app).post('/api/v2/auth/logout')
     .set('Authorization', `Bearer ${logoutSession.access_token}`), 204, 'mobile logout');
   bodyAt(await request(app).get('/api/v2/bootstrap')
     .set('Authorization', `Bearer ${logoutSession.access_token}`), 401, 'logged out access token revoked');
 
   const passwordSession = bodyAt(await request(app).post('/api/v2/auth/login')
-    .send({ email: b.email, senha: password }), 200, 'password-change mobile login');
-  await sql.query('update public.usuarios set senha_hash=$2 where id=$1', [b.id, 'synthetic-replaced-password-hash']);
+    .send({ email: c.email, senha: password }), 200, 'password-change mobile login');
+  await sql.query('update public.usuarios set senha_hash=$2 where id=$1', [c.id, 'synthetic-replaced-password-hash']);
   bodyAt(await request(app).get('/api/v2/bootstrap')
     .set('Authorization', `Bearer ${passwordSession.access_token}`), 401, 'password change revokes access token');
 
@@ -153,6 +153,7 @@ async function verifyApi(app, sql) {
   }
   assert.equal(Number((await sql.query('select count(*) from public.usuarios where id=$1', [b.id])).rows[0].count), 1);
   await sql.query('delete from public.usuarios where id=$1', [b.id]);
+  await sql.query('delete from public.usuarios where id=$1', [c.id]);
 }
 
 async function verifyPublicRoles() {
