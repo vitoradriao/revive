@@ -57,6 +57,7 @@ O comando verifica tipos TypeScript, lint e testes Jest. Também é possível ex
 
 - Access token em memória e refresh token no SecureStore.
 - Cache SQLite e fila offline separados por usuário.
+- Mutações duráveis, idempotência e recuperação: [sincronização mobile](../docs/mobile-sync.md).
 - Migração e recuperação do banco local: [guia SQLite](docs/sqlite-migrations.md).
 - A atomicidade das mutações e respostas idempotentes ainda precisa ser concluída ([Issue #8](https://github.com/VitorYunguiar/revive/issues/8)).
 - Testes automatizados não substituem a validação em aparelho ou banco real.

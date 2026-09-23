@@ -80,7 +80,7 @@ export const getPendingMutations = async (userId: string) => {
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT * FROM mutation_queue_v1
      WHERE user_id = ? AND status IN ('pending', 'failed', 'syncing')
-     ORDER BY occurred_at ASC, rowid ASC`,
+     ORDER BY rowid ASC`,
     userId,
   );
   return rows.map(mapQueueRow);
@@ -118,6 +118,23 @@ export const markMutationFailed = async (id: string, attempts: number, error: st
 export const removeMutation = async (id: string) => {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM mutation_queue_v1 WHERE id = ?', id);
+};
+
+/** Commit the canonical server snapshot and remove its acknowledged event together. */
+export const reconcileMutations = async (userId: string, ids: string[], data: BootstrapData) => {
+  if (!validBootstrap(data, userId)) throw new Error('Resposta de sincronização inválida.');
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO bootstrap_cache_v1(user_id, payload, updated_at, payload_version)
+       VALUES (?, ?, ?, 1)
+       ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, payload_version = 1`,
+      userId,
+      encodePayload(data),
+      new Date().toISOString(),
+    );
+    for (const id of ids) await db.runAsync('DELETE FROM mutation_queue_v1 WHERE user_id = ? AND id = ?', userId, id);
+  });
 };
 
 export const retryUserMutation = async (userId: string, id: string) => {

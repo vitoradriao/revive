@@ -186,6 +186,62 @@
  *         description: Registro criado ou resposta original repetida
  *       409:
  *         description: Chave usada com outro payload ou ainda em processamento
+ * /api/v2/vicios/{id}/recaida:
+ *   post:
+ *     tags: [Mobile Offline v2]
+ *     summary: Registra uma recaída com chave idempotente e gravação transacional
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: header
+ *         name: Idempotency-Key
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       201:
+ *         description: Recaída criada ou resposta original repetida
+ *       409:
+ *         description: Conteúdo diferente para a chave, ou recibo legado ainda em processamento
+ * /api/v2/metas:
+ *   post:
+ *     tags: [Mobile Offline v2]
+ *     summary: Cria uma meta com gravação e recibo idempotente na mesma transação
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Idempotency-Key
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       201:
+ *         description: Meta criada ou resposta original repetida
+ *       409:
+ *         description: Conteúdo diferente para a chave, ou recibo legado ainda em processamento
+ * /api/v2/metas/{id}:
+ *   patch:
+ *     tags: [Mobile Offline v2]
+ *     summary: Atualiza conclusão da meta com gravação e recibo idempotente na mesma transação
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: header
+ *         name: Idempotency-Key
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Meta atualizada ou resposta original repetida
+ *       409:
+ *         description: Conteúdo diferente para a chave, ou recibo legado ainda em processamento
  */
 
 /**

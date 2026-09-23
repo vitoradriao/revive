@@ -8,9 +8,20 @@ const MS_PER_DAY = 86_400_000;
 
 const clean = value => value == null ? value : String(value).trim();
 const tokenHash = token => crypto.createHash('sha256').update(token).digest('hex');
-const requestHash = req => crypto.createHash('sha256')
-    .update(`${req.method}:${req.path}:${JSON.stringify(req.body || {})}`)
-    .digest('hex');
+const stableStringify = value => {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+};
+const requestHashes = req => {
+    const prefix = `${req.method}:${req.path}:`;
+    return {
+        stable: crypto.createHash('sha256').update(prefix + stableStringify(req.body || {})).digest('hex'),
+        legacy: crypto.createHash('sha256').update(prefix + JSON.stringify(req.body || {})).digest('hex'),
+    };
+};
 
 function formatDuration(totalDays) {
     const years = Math.floor(totalDays / 365);
@@ -203,41 +214,25 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
         }
     });
 
-    const executeIdempotent = async (req, res, operation) => {
+    const executeIdempotent = async (req, res, operation, payload) => {
         const key = clean(req.get('Idempotency-Key'));
         if (!key || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
             return apiError(res, 422, 'IDEMPOTENCY_KEY_INVALIDA', 'Idempotency-Key UUID e obrigatoria.');
         }
-        const hash = requestHash(req);
-        const readExisting = () => supabase.from('api_idempotency').select('*')
-            .eq('usuario_id', req.usuarioId).eq('idempotency_key', key).maybeSingle();
-        const { data: existing, error: readError } = await readExisting();
-        if (readError) throw readError;
-        if (existing) {
-            if (existing.request_hash !== hash) return apiError(res, 409, 'IDEMPOTENCY_CONFLITO', 'A chave ja foi usada com outro conteudo.');
-            if (existing.response_body && existing.status_code) return res.status(existing.status_code).json(existing.response_body);
-            return apiError(res, 409, 'IDEMPOTENCY_EM_PROCESSAMENTO', 'Operacao ainda em processamento.');
-        }
-
-        const { error: reserveError } = await supabase.from('api_idempotency').insert([{
-            usuario_id: req.usuarioId, idempotency_key: key, request_hash: hash
-        }]);
-        if (reserveError) {
-            const { data: raced } = await readExisting();
-            if (raced?.request_hash === hash && raced.response_body && raced.status_code) return res.status(raced.status_code).json(raced.response_body);
-            return apiError(res, 409, 'IDEMPOTENCY_EM_PROCESSAMENTO', 'Operacao ainda em processamento.');
-        }
-
-        try {
-            const result = await operation();
-            const { error: storeError } = await supabase.from('api_idempotency').update({ status_code: result.status, response_body: result.body })
-                .eq('usuario_id', req.usuarioId).eq('idempotency_key', key);
-            if (storeError) throw storeError;
-            return res.status(result.status).json(result.body);
-        } catch (error) {
-            await supabase.from('api_idempotency').delete().eq('usuario_id', req.usuarioId).eq('idempotency_key', key);
-            throw error;
-        }
+        const hashes = requestHashes(req);
+        const { data, error } = await supabase.rpc('execute_mobile_mutation', {
+            p_usuario_id: req.usuarioId,
+            p_idempotency_key: key,
+            p_request_hash: hashes.stable,
+            p_legacy_request_hash: hashes.legacy,
+            p_operation: operation,
+            p_payload: payload,
+            p_request_id: res.locals.requestId,
+        });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result || !Number.isInteger(result.status_code) || !result.response_body) throw new Error('Invalid idempotent mutation response');
+        return res.status(result.status_code).json(result.response_body);
     };
 
     router.get('/bootstrap', authenticate, async (req, res) => {
@@ -322,25 +317,8 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
 
     router.post('/registros', authenticate, async (req, res) => {
         try {
-            return await executeIdempotent(req, res, async () => {
-                const vicioId = clean(req.body.vicio_id);
-                const date = clean(req.body.data_registro) || new Date().toISOString().slice(0, 10);
-                if (!vicioId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { status: 422, body: { codigo: 'DADOS_INVALIDOS', mensagem: 'Vicio e data valida sao obrigatorios.', request_id: res.locals.requestId } };
-                const nextDay = new Date(); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-                if (new Date(`${date}T00:00:00Z`) > nextDay) return { status: 422, body: { codigo: 'DATA_FUTURA', mensagem: 'A data do registro nao pode estar no futuro.', request_id: res.locals.requestId } };
-                const { data: addiction } = await supabase.from('vicios').select('id').eq('id', vicioId).eq('usuario_id', req.usuarioId).maybeSingle();
-                if (!addiction) return { status: 404, body: { codigo: 'VICIO_NAO_ENCONTRADO', mensagem: 'Vicio nao encontrado.', request_id: res.locals.requestId } };
-                const { data, error } = await supabase.from('registros_diarios').insert([{
-                    vicio_id: vicioId,
-                    data_registro: date,
-                    humor: clean(req.body.humor)?.slice(0, 100) || null,
-                    gatilhos: clean(req.body.gatilhos)?.slice(0, 500) || null,
-                    conquistas: clean(req.body.conquistas)?.slice(0, 500) || null,
-                    observacoes: clean(req.body.observacoes)?.slice(0, 1000) || null
-                }]).select().single();
-                if (error) throw error;
-                return { status: 201, body: { mensagem: 'Registro criado com sucesso', registro: data } };
-            });
+            const payload = { ...req.body, data_registro: clean(req.body.data_registro) || new Date().toISOString().slice(0, 10) };
+            return await executeIdempotent(req, res, 'record.create', payload);
         } catch (error) {
             console.error('mobile record failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel criar o registro.');
@@ -349,31 +327,8 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
 
     router.post('/vicios/:id/recaida', authenticate, async (req, res) => {
         try {
-            return await executeIdempotent(req, res, async () => {
-                const occurredAt = clean(req.body.occurred_at) || new Date().toISOString();
-                const eventTime = new Date(occurredAt);
-                if (!Number.isFinite(eventTime.getTime()) || eventTime.getTime() > Date.now() + 5 * 60 * 1000) {
-                    return { status: 422, body: { codigo: 'DATA_INVALIDA', mensagem: 'Momento da recaida invalido.', request_id: res.locals.requestId } };
-                }
-                const { data: addiction } = await supabase.from('vicios').select('*').eq('id', req.params.id).eq('usuario_id', req.usuarioId).maybeSingle();
-                if (!addiction) return { status: 404, body: { codigo: 'VICIO_NAO_ENCONTRADO', mensagem: 'Vicio nao encontrado.', request_id: res.locals.requestId } };
-                const base = new Date(addiction.data_ultima_recaida || addiction.data_inicio).getTime();
-                const lostDays = Math.max(0, Math.floor((eventTime.getTime() - base) / MS_PER_DAY));
-                const { data: relapse, error } = await supabase.from('historico_recaidas').insert([{
-                    vicio_id: addiction.id,
-                    data_recaida: eventTime.toISOString(),
-                    motivo: clean(req.body.motivo)?.slice(0, 1000) || null,
-                    dias_abstinencia_perdidos: lostDays
-                }]).select().single();
-                if (error) throw error;
-                let updated = addiction;
-                if (req.body.resetarContador === true) {
-                    const updateResult = await supabase.from('vicios').update({ data_ultima_recaida: eventTime.toISOString() }).eq('id', addiction.id).eq('usuario_id', req.usuarioId).select().single();
-                    if (updateResult.error) throw updateResult.error;
-                    updated = updateResult.data;
-                }
-                return { status: 201, body: { mensagem: 'Recaida registrada.', dias_abstinencia_anteriores: lostDays, recaida: relapse, vicio: updated } };
-            });
+            const payload = { ...req.body, addictionId: req.params.id, occurred_at: clean(req.body.occurred_at) || new Date().toISOString() };
+            return await executeIdempotent(req, res, 'relapse.create', payload);
         } catch (error) {
             console.error('mobile relapse failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel registrar a recaida.');
@@ -382,29 +337,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
 
     router.post('/metas', authenticate, async (req, res) => {
         try {
-            return await executeIdempotent(req, res, async () => {
-                const description = clean(req.body.descricao_meta);
-                const addictionId = clean(req.body.vicio_id);
-                if (!description || description.length > 240 || !addictionId) return { status: 422, body: { codigo: 'DADOS_INVALIDOS', mensagem: 'Descricao e vicio sao obrigatorios.', request_id: res.locals.requestId } };
-                const { data: addiction } = await supabase.from('vicios').select('*').eq('id', addictionId).eq('usuario_id', req.usuarioId).maybeSingle();
-                if (!addiction) return { status: 404, body: { codigo: 'VICIO_NAO_ENCONTRADO', mensagem: 'Vicio nao encontrado.', request_id: res.locals.requestId } };
-                const days = req.body.dias_objetivo == null ? null : Number(req.body.dias_objetivo);
-                const value = req.body.valor_objetivo == null ? null : Number(req.body.valor_objetivo);
-                if ((days != null && (!Number.isFinite(days) || days <= 0)) || (value != null && (!Number.isFinite(value) || value <= 0))) return { status: 422, body: { codigo: 'OBJETIVO_INVALIDO', mensagem: 'Objetivos devem ser numeros positivos.', request_id: res.locals.requestId } };
-                const stats = calculateStats(addiction);
-                const startToday = req.body.iniciar_hoje === true;
-                const payload = {
-                    usuario_id: req.usuarioId, vicio_id: addictionId, descricao_meta: description,
-                    dias_objetivo: days, valor_objetivo: value,
-                    iniciar_hoje: startToday,
-                    data_inicio_meta: startToday ? (clean(req.body.data_inicio_meta) || new Date().toISOString().slice(0, 10)) : null,
-                    dias_abstinencia_inicio: startToday ? stats.dias_abstinencia : 0,
-                    valor_economizado_inicio: startToday ? Number(stats.valor_economizado) : 0
-                };
-                const { data, error } = await supabase.from('metas').insert([payload]).select().single();
-                if (error) throw error;
-                return { status: 201, body: { mensagem: 'Meta criada com sucesso', meta: data } };
-            });
+            return await executeIdempotent(req, res, 'goal.create', req.body);
         } catch (error) {
             console.error('mobile goal failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel criar a meta.');
@@ -413,14 +346,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
 
     router.patch('/metas/:id', authenticate, async (req, res) => {
         try {
-            return await executeIdempotent(req, res, async () => {
-                if (typeof req.body.concluida !== 'boolean') return { status: 422, body: { codigo: 'DADOS_INVALIDOS', mensagem: 'Status de conclusao invalido.', request_id: res.locals.requestId } };
-                const { data: owned } = await supabase.from('metas').select('id').eq('id', req.params.id).eq('usuario_id', req.usuarioId).maybeSingle();
-                if (!owned) return { status: 404, body: { codigo: 'META_NAO_ENCONTRADA', mensagem: 'Meta nao encontrada.', request_id: res.locals.requestId } };
-                const { data, error } = await supabase.from('metas').update({ concluida: req.body.concluida }).eq('id', req.params.id).eq('usuario_id', req.usuarioId).select().single();
-                if (error) throw error;
-                return { status: 200, body: { mensagem: 'Meta atualizada com sucesso', meta: data } };
-            });
+            return await executeIdempotent(req, res, 'goal.complete', { ...req.body, goalId: req.params.id });
         } catch (error) {
             console.error('mobile goal update failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel atualizar a meta.');
