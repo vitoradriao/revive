@@ -173,7 +173,7 @@ begin
         v_status := 404;
         v_body := jsonb_build_object('codigo', 'VICIO_NAO_ENCONTRADO', 'mensagem', 'Vicio nao encontrado.', 'request_id', p_request_id);
       else
-        v_start_today := p_payload->'iniciar_hoje' = 'true'::jsonb;
+        v_start_today := coalesce(p_payload->'iniciar_hoje' = 'true'::jsonb, false);
         v_days := greatest(0, floor(extract(epoch from (now() - coalesce(v_addiction.data_ultima_recaida, v_addiction.data_inicio)::timestamptz)) / 86400)::integer);
         insert into public.metas(usuario_id, vicio_id, descricao_meta, dias_objetivo, valor_objetivo,
           iniciar_hoje, data_inicio_meta, dias_abstinencia_inicio, valor_economizado_inicio)
