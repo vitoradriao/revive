@@ -275,47 +275,47 @@ export default function AnalyticsPage() {
         <Card title="Insights e recomendações">
           <div className="space-y-3">
             {diasUltimoRegistro !== '-' && !diasUltimoRegistro.includes('Hoje') && (
-              <div className="flex items-start gap-3 p-4 bg-yellow-500/20 border border-yellow-400/30 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="insight-card insight-warning flex items-start gap-3 p-4 bg-yellow-500/20 border border-yellow-400/30 rounded-lg">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-yellow-300 font-semibold">Aumente seu Engajamento</p>
-                  <p className="text-sm text-yellow-200/80">Você não registra há {diasUltimoRegistro}. Reflexões diárias fortalecem a recuperação!</p>
+                  <p className="font-semibold">Aumente seu Engajamento</p>
+                  <p className="text-sm">Você não registra há {diasUltimoRegistro}. Reflexões diárias fortalecem a recuperação!</p>
                 </div>
               </div>
             )}
             {tendenciaRecaidas > 0 && (
-              <div className="flex items-start gap-3 p-4 bg-red-500/20 border border-red-400/30 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="insight-card insight-danger flex items-start gap-3 p-4 bg-red-500/20 border border-red-400/30 rounded-lg">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-red-300 font-semibold">Aumento de Risco Detectado</p>
-                  <p className="text-sm text-red-200/80">Recaídas aumentaram {tendenciaRecaidas.toFixed(0)}% nos últimos 30 dias. Identifique gatilhos e procure apoio.</p>
+                  <p className="font-semibold">Aumento de Risco Detectado</p>
+                  <p className="text-sm">Recaídas aumentaram {tendenciaRecaidas.toFixed(0)}% nos últimos 30 dias. Identifique gatilhos e procure apoio.</p>
                 </div>
               </div>
             )}
             {tendenciaRecaidas < 0 && relapses.length > 0 && (
-              <div className="flex items-start gap-3 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div className="insight-card insight-success flex items-start gap-3 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-lg">
+                <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-emerald-300 font-semibold">Você está melhorando!</p>
-                  <p className="text-sm text-emerald-200/80">Recaídas diminuíram {Math.abs(tendenciaRecaidas).toFixed(0)}% nos últimos 30 dias. Continue assim!</p>
+                  <p className="font-semibold">Você está melhorando!</p>
+                  <p className="text-sm">Recaídas diminuíram {Math.abs(tendenciaRecaidas).toFixed(0)}% nos últimos 30 dias. Continue assim!</p>
                 </div>
               </div>
             )}
             {topGatilhosRecaidas.length > 0 && (
-              <div className="flex items-start gap-3 p-4 bg-blue-500/20 border border-blue-400/30 rounded-lg">
-                <BookOpen className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="insight-card insight-info flex items-start gap-3 p-4 bg-blue-500/20 border border-blue-400/30 rounded-lg">
+                <BookOpen className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-blue-300 font-semibold">Foco em Gatilhos</p>
-                  <p className="text-sm text-blue-200/80">O gatilho "{topGatilhosRecaidas[0][0]}" aparece antes de recaídas. Desenvolva estratégias para lidar com isso.</p>
+                  <p className="font-semibold">Foco em Gatilhos</p>
+                  <p className="text-sm">O gatilho "{topGatilhosRecaidas[0][0]}" aparece antes de recaídas. Desenvolva estratégias para lidar com isso.</p>
                 </div>
               </div>
             )}
             {addictions.length > 0 && (
-              <div className="flex items-start gap-3 p-4 bg-purple-500/20 border border-purple-400/30 rounded-lg">
-                <Heart className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+              <div className="insight-card insight-journey flex items-start gap-3 p-4 bg-purple-500/20 border border-purple-400/30 rounded-lg">
+                <Heart className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-purple-300 font-semibold">Sua Jornada</p>
-                  <p className="text-sm text-purple-200/80">Você já investiu <strong>R$ {totalEconomizado.toFixed(2)}</strong> em sua saúde. Cada dia é uma vitória!</p>
+                  <p className="font-semibold">Sua Jornada</p>
+                  <p className="text-sm">Você já investiu <strong>R$ {totalEconomizado.toFixed(2)}</strong> em sua saúde. Cada dia é uma vitória!</p>
                 </div>
               </div>
             )}

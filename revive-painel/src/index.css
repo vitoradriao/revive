@@ -186,6 +186,22 @@
     box-shadow: var(--shadow-soft);
   }
 
+  .insight-card {
+    color: var(--insight-text);
+  }
+
+  .insight-warning { --insight-text: #78350f; }
+  .insight-danger { --insight-text: #991b1b; }
+  .insight-success { --insight-text: #065f46; }
+  .insight-info { --insight-text: #1e40af; }
+  .insight-journey { --insight-text: #6b21a8; }
+
+  [data-theme="dark"] .insight-warning { --insight-text: #fde047; }
+  [data-theme="dark"] .insight-danger { --insight-text: #fca5a5; }
+  [data-theme="dark"] .insight-success { --insight-text: #6ee7b7; }
+  [data-theme="dark"] .insight-info { --insight-text: #93c5fd; }
+  [data-theme="dark"] .insight-journey { --insight-text: #d8b4fe; }
+
   .field-control {
     width: 100%;
     min-height: 54px;
