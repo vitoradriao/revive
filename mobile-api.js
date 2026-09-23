@@ -52,18 +52,29 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
         next();
     });
 
-    const authenticate = (req, res, next) => {
+    const authenticate = async (req, res, next) => {
         const [scheme, token] = (req.get('Authorization') || '').split(' ');
         if (scheme !== 'Bearer' || !token) return apiError(res, 401, 'TOKEN_AUSENTE', 'Sessao nao fornecida.');
+        let decoded;
         try {
-            const decoded = jwt.verify(token, jwtSecret);
-            if (!decoded.id || decoded.token_type !== 'access') throw new Error('invalid token type');
-            req.usuarioId = decoded.id;
-            req.sessionId = decoded.sid;
-            return next();
+            decoded = jwt.verify(token, jwtSecret);
+            if (!decoded.id || !decoded.sid || decoded.token_type !== 'access') throw new Error('invalid token type');
         } catch {
             return apiError(res, 401, 'TOKEN_INVALIDO', 'Sessao expirada ou invalida.');
         }
+        let result;
+        try {
+            result = await supabase.from('app_sessions').select('id').eq('id', decoded.sid)
+                .eq('usuario_id', decoded.id).is('revoked_at', null).gt('expires_at', new Date().toISOString())
+                .maybeSingle();
+        } catch {
+            return apiError(res, 503, 'SESSAO_INDISPONIVEL', 'Nao foi possivel validar a sessao.');
+        }
+        if (result.error) return apiError(res, 503, 'SESSAO_INDISPONIVEL', 'Nao foi possivel validar a sessao.');
+        if (!result.data) return apiError(res, 401, 'SESSAO_REVOGADA', 'Sessao encerrada. Entre novamente.');
+        req.usuarioId = decoded.id;
+        req.sessionId = decoded.sid;
+        return next();
     };
 
     const issueAccessToken = (usuario, sessionId) => jwt.sign(
@@ -154,34 +165,26 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
         if (!refreshToken) return apiError(res, 422, 'REFRESH_AUSENTE', 'Refresh token obrigatorio.');
         try {
             const hash = tokenHash(refreshToken);
-            const { data: current, error } = await supabase.from('app_sessions').select('*').eq('refresh_token_hash', hash).maybeSingle();
-            if (error) throw error;
-            if (!current) return apiError(res, 401, 'REFRESH_INVALIDO', 'Sessao invalida.');
-            if (current.revoked_at) {
-                if (current.replaced_by) {
-                    await supabase.from('app_sessions').update({ revoked_at: new Date().toISOString() }).eq('family_id', current.family_id).is('revoked_at', null);
-                }
-                return apiError(res, 401, 'REFRESH_REUTILIZADO', 'Sessao revogada por seguranca.');
-            }
-            if (new Date(current.expires_at).getTime() <= Date.now()) {
-                await supabase.from('app_sessions').update({ revoked_at: new Date().toISOString() }).eq('id', current.id);
-                return apiError(res, 401, 'REFRESH_EXPIRADO', 'Sessao expirada.');
-            }
-
-            const { data: usuario, error: userError } = await supabase.from('usuarios').select('id, nome, email').eq('id', current.usuario_id).single();
-            if (userError || !usuario) return apiError(res, 401, 'USUARIO_INVALIDO', 'Usuario nao encontrado.');
-
             const replacementId = crypto.randomUUID();
-            const replacement = await createSession(usuario, req, current.family_id, replacementId);
-            const now = new Date().toISOString();
-            const { data: rotated, error: rotateError } = await supabase.from('app_sessions')
-                .update({ revoked_at: now, replaced_by: replacementId, last_used_at: now })
-                .eq('id', current.id).is('revoked_at', null).select('id').maybeSingle();
-            if (rotateError || !rotated) {
-                await supabase.from('app_sessions').update({ revoked_at: now }).eq('family_id', current.family_id).is('revoked_at', null);
-                return apiError(res, 401, 'REFRESH_REUTILIZADO', 'Sessao revogada por seguranca.');
+            const replacementToken = crypto.randomBytes(48).toString('base64url');
+            const { data: rotated, error } = await supabase.rpc('rotate_mobile_session', {
+                p_refresh_token_hash: hash,
+                p_replacement_id: replacementId,
+                p_replacement_hash: tokenHash(replacementToken),
+                p_user_agent: clean(req.get('User-Agent'))?.slice(0, 500) || null
+            });
+            if (error) throw error;
+            if (rotated?.status !== 'rotated') {
+                const codes = { reused: 'REFRESH_REUTILIZADO', expired: 'REFRESH_EXPIRADO', invalid: 'REFRESH_INVALIDO' };
+                return apiError(res, 401, codes[rotated?.status] || 'REFRESH_INVALIDO', 'Sessao invalida ou encerrada.');
             }
-            return respondSession(res, replacement);
+            const usuario = { id: rotated.usuario_id, nome: rotated.nome, email: rotated.email };
+            return respondSession(res, {
+                access_token: issueAccessToken(usuario, replacementId),
+                refresh_token: replacementToken,
+                expires_in: ACCESS_TOKEN_TTL_SECONDS,
+                usuario
+            });
         } catch (error) {
             console.error('mobile refresh failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel renovar a sessao.');
@@ -190,14 +193,9 @@ function createMobileApi({ supabase, bcrypt, jwtSecret }) {
 
     router.post('/auth/logout', authenticate, async (req, res) => {
         try {
-            const refreshToken = clean(req.body.refresh_token);
-            if (refreshToken) {
-                await supabase.from('app_sessions').update({ revoked_at: new Date().toISOString() })
-                    .eq('usuario_id', req.usuarioId).eq('refresh_token_hash', tokenHash(refreshToken)).is('revoked_at', null);
-            } else if (req.sessionId) {
-                await supabase.from('app_sessions').update({ revoked_at: new Date().toISOString() })
-                    .eq('id', req.sessionId).eq('usuario_id', req.usuarioId).is('revoked_at', null);
-            }
+            const { error } = await supabase.from('app_sessions').update({ revoked_at: new Date().toISOString() })
+                .eq('id', req.sessionId).eq('usuario_id', req.usuarioId).is('revoked_at', null);
+            if (error) throw error;
             return res.status(204).send();
         } catch (error) {
             console.error('mobile logout failed', { code: error?.code, message: error?.message });

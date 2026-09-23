@@ -10,6 +10,7 @@ function fakeSupabase(initial) {
         select() { return this; }
         eq(field, value) { this.filters.push(row => row[field] === value); return this; }
         is(field, value) { this.filters.push(row => row[field] === value); return this; }
+        gt(field, value) { this.filters.push(row => row[field] > value); return this; }
         insert(rows) { this.mode = 'insert'; this.payload = rows; return this; }
         update(values) { this.mode = 'update'; this.payload = values; return this; }
         delete() { this.mode = 'delete'; return this; }
@@ -35,11 +36,46 @@ function fakeSupabase(initial) {
             }
             return { data: matched, error: null };
         }
-        async maybeSingle() { const result = this.execute(); return { ...result, data: result.data?.[0] || null }; }
+        async maybeSingle() {
+            if (this.table === 'app_sessions' && state.failSessionLookup) return { data: null, error: new Error('database unavailable') };
+            const result = this.execute(); return { ...result, data: result.data?.[0] || null };
+        }
         async single() { const result = this.execute(); return { ...result, data: result.data?.[0] || null }; }
         then(resolve, reject) { return Promise.resolve(this.execute()).then(resolve, reject); }
     }
-    return { tables, client: { from: table => new Query(table) } };
+    const state = { failSessionLookup: false };
+    const client = {
+        from: table => new Query(table),
+        rpc: async (name, args) => {
+            if (name !== 'rotate_mobile_session') return { data: null, error: new Error(`unknown function ${name}`) };
+            const current = tables.app_sessions.find(row => row.refresh_token_hash === args.p_refresh_token_hash);
+            if (!current) return { data: { status: 'invalid' }, error: null };
+            if (current.revoked_at) {
+                if (current.replaced_by) {
+                    tables.app_sessions.filter(row => row.family_id === current.family_id && !row.revoked_at)
+                        .forEach(row => { row.revoked_at = new Date().toISOString(); });
+                    return { data: { status: 'reused' }, error: null };
+                }
+                return { data: { status: 'invalid' }, error: null };
+            }
+            if (new Date(current.expires_at).getTime() <= Date.now()) {
+                current.revoked_at = new Date().toISOString();
+                return { data: { status: 'expired' }, error: null };
+            }
+            const usuario = tables.usuarios.find(row => row.id === current.usuario_id);
+            if (!usuario) return { data: { status: 'invalid' }, error: null };
+            tables.app_sessions.push({
+                id: args.p_replacement_id, usuario_id: current.usuario_id,
+                refresh_token_hash: args.p_replacement_hash, family_id: current.family_id,
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                user_agent: args.p_user_agent, revoked_at: null, replaced_by: null,
+            });
+            current.revoked_at = new Date().toISOString();
+            current.replaced_by = args.p_replacement_id;
+            return { data: { status: 'rotated', usuario_id: usuario.id, nome: usuario.nome, email: usuario.email }, error: null };
+        },
+    };
+    return { tables, client, state };
 }
 
 describe('mobile refresh-token lifecycle', () => {
@@ -76,5 +112,16 @@ describe('mobile refresh-token lifecycle', () => {
         expect(reused.status).toBe(401);
         expect(reused.body.codigo).toBe('REFRESH_REUTILIZADO');
         expect(database.tables.app_sessions.every(session => session.revoked_at)).toBe(true);
+
+        const revokedAccess = await request(app).get('/api/v2/bootstrap')
+            .set('Authorization', `Bearer ${refreshed.body.access_token}`);
+        expect(revokedAccess.status).toBe(401);
+        expect(revokedAccess.body.codigo).toBe('SESSAO_REVOGADA');
+
+        database.state.failSessionLookup = true;
+        const unavailable = await request(app).get('/api/v2/bootstrap')
+            .set('Authorization', `Bearer ${login.body.access_token}`);
+        expect(unavailable.status).toBe(503);
+        expect(unavailable.body.codigo).toBe('SESSAO_INDISPONIVEL');
     });
 });

@@ -4,7 +4,7 @@ import { reviveApi } from '@/core/api/repositories';
 import { tokenStore } from '@/core/auth/token-store';
 import { clearUserData, countPendingMutations } from '@/core/storage/database';
 import { queryClient } from '@/core/query/client';
-import type { AuthSession, User } from '@/domain/types';
+import type { User } from '@/domain/types';
 
 type SessionContextValue = {
   user: User | null;
@@ -17,41 +17,39 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-const saveSession = async (session: AuthSession) => {
-  tokenStore.setAccessToken(session.access_token);
-  await tokenStore.setRefreshToken(session.refresh_token);
-  await tokenStore.setUser(session.usuario);
-};
-
 export function SessionProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
 
-  const clearSession = useCallback(async () => {
-    tokenStore.setAccessToken(null);
+  const clearSession = useCallback(async (expected = tokenStore.getGeneration()) => {
+    if (!tokenStore.isCurrent(expected)) return false;
+    const cleared = await tokenStore.clear(expected);
+    if (!cleared || tokenStore.getGeneration() !== expected + 1) return false;
     setUser(null);
     queryClient.clear();
-    await tokenStore.clear();
+    return true;
   }, []);
 
   useEffect(() => {
-    setSessionExpiredHandler(clearSession);
+    setSessionExpiredHandler(() => clearSession().then(() => undefined));
     return () => setSessionExpiredHandler(null);
   }, [clearSession]);
 
   useEffect(() => {
     let active = true;
+    const generation = tokenStore.getGeneration();
     (async () => {
       try {
         const refreshToken = await tokenStore.getRefreshToken();
+        if (!tokenStore.isCurrent(generation)) return;
         if (!refreshToken) return;
-        await refreshAccessToken();
+        await refreshAccessToken(generation);
         const restoredUser = await tokenStore.getUser();
-        if (active) setUser(restoredUser);
+        if (active && tokenStore.isCurrent(generation)) setUser(restoredUser);
       } catch {
         // A network outage must not destroy the locally authenticated session.
         const offlineUser = await tokenStore.getUser();
-        if (active) setUser(offlineUser);
+        if (active && tokenStore.isCurrent(generation)) setUser(offlineUser);
       } finally {
         if (active) setIsRestoring(false);
       }
@@ -61,37 +59,42 @@ export function SessionProvider({ children }: React.PropsWithChildren) {
     };
   }, []);
 
-  const completeAuth = useCallback(async (session: AuthSession) => {
-    await saveSession(session);
-    setUser(session.usuario);
+  const signIn = useCallback(async (email: string, password: string) => {
+    const generation = tokenStore.beginSessionChange();
+    setUser(null);
+    queryClient.clear();
+    const session = await authRequest('/v2/auth/login', { email, senha: password });
+    if (await tokenStore.saveSession(generation, session)) setUser(session.usuario);
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const session = await authRequest('/v2/auth/login', { email, senha: password });
-    await completeAuth(session);
-  }, [completeAuth]);
-
   const signUp = useCallback(async (name: string, email: string, password: string) => {
+    const generation = tokenStore.beginSessionChange();
+    setUser(null);
+    queryClient.clear();
     const session = await authRequest('/v2/auth/cadastro', { nome: name, email, senha: password });
-    await completeAuth(session);
-  }, [completeAuth]);
+    if (await tokenStore.saveSession(generation, session)) setUser(session.usuario);
+  }, []);
 
   const signOut = useCallback(async (discardPending = false) => {
     const currentUser = user;
+    const generation = tokenStore.getGeneration();
     const pending = currentUser ? await countPendingMutations(currentUser.id) : 0;
+    if (!tokenStore.isCurrent(generation)) return { pending };
     if (pending > 0 && !discardPending) return { pending };
-    const refreshToken = await tokenStore.getRefreshToken();
-    if (refreshToken) await reviveApi.logout(refreshToken).catch(() => undefined);
+    await reviveApi.logout().catch(() => undefined);
+    if (!tokenStore.isCurrent(generation)) return { pending };
     if (currentUser) await clearUserData(currentUser.id);
-    await clearSession();
+    await clearSession(generation);
     return { pending: 0 };
   }, [clearSession, user]);
 
   const deleteAccount = useCallback(async () => {
     const currentUser = user;
+    const generation = tokenStore.getGeneration();
     await reviveApi.deleteAccount();
+    if (!tokenStore.isCurrent(generation)) return;
     if (currentUser) await clearUserData(currentUser.id);
-    await clearSession();
+    await clearSession(generation);
   }, [clearSession, user]);
 
   const value = useMemo(() => ({ user, isRestoring, signIn, signUp, signOut, deleteAccount }), [user, isRestoring, signIn, signUp, signOut, deleteAccount]);

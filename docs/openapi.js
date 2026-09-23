@@ -126,7 +126,9 @@
  *       200:
  *         description: Sessao renovada
  *       401:
- *         description: Token expirado, invalido ou reutilizado
+ *         description: Token expirado, invalido ou reutilizado; reutilizacao revoga a familia
+ *       503:
+ *         description: Servico temporariamente indisponivel
  * /api/v2/auth/logout:
  *   post:
  *     tags: [Mobile Auth v2]
@@ -136,6 +138,10 @@
  *     responses:
  *       204:
  *         description: Sessao encerrada
+ *       401:
+ *         description: Access token ausente, expirado ou revogado
+ *       503:
+ *         description: Servico temporariamente indisponivel
  */
 
 /**
