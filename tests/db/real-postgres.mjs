@@ -125,18 +125,76 @@ async function verifyApi(app, sql) {
     .set('Authorization', `Bearer ${b.mobileToken}`)
     .set('Idempotency-Key', randomUUID())
     .send({ vicio_id: habitId, data_registro: '2026-09-01' }), 404, 'foreign record denied');
+  const recordKey = randomUUID();
+  const recordPayload = { vicio_id: habitId, data_registro: '2026-09-01', humor: 'synthetic' };
+  const concurrentRecords = await Promise.all(Array.from({ length: 5 }, () => request(app).post('/api/v2/registros')
+    .set('Authorization', `Bearer ${a.mobileToken}`)
+    .set('Idempotency-Key', recordKey)
+    .send(recordPayload)));
+  for (const response of concurrentRecords) bodyAt(response, 201, 'concurrent idempotent record');
+  assert.equal(new Set(concurrentRecords.map(response => response.body.registro.id)).size, 1,
+    'concurrent retries return the first committed record');
+  const reorderedReplay = await request(app).post('/api/v2/registros')
+    .set('Authorization', `Bearer ${a.mobileToken}`)
+    .set('Idempotency-Key', recordKey)
+    .send({ humor: 'synthetic', data_registro: '2026-09-01', vicio_id: habitId });
+  bodyAt(reorderedReplay, 201, 'stable-hash replay');
+  assert.equal(reorderedReplay.body.registro.id, concurrentRecords[0].body.registro.id);
+  const contentConflict = await request(app).post('/api/v2/registros')
+    .set('Authorization', `Bearer ${a.mobileToken}`)
+    .set('Idempotency-Key', recordKey)
+    .send({ ...recordPayload, humor: 'different' });
+  bodyAt(contentConflict, 409, 'idempotency content conflict');
+  assert.equal(contentConflict.body.codigo, 'IDEMPOTENCY_CONFLITO');
+  const receipt = await sql.query('select expires_at::text from public.api_idempotency where usuario_id=$1 and idempotency_key=$2', [a.id, recordKey]);
+  assert.equal(receipt.rows[0].expires_at.startsWith('infinity'), true, 'receipt is not allowed to expire while queued events may replay');
+
+  await sql.query(`create function public.test_fail_mobile_record_insert() returns trigger language plpgsql as $$
+    begin
+      if new.observacoes = 'synthetic-trigger-failure' then raise exception 'synthetic transaction failure'; end if;
+      return new;
+    end $$`);
+  await sql.query(`create trigger test_fail_mobile_record_insert after insert on public.registros_diarios
+    for each row execute function public.test_fail_mobile_record_insert()`);
+  const rollbackKey = randomUUID();
+  const rollbackPayload = { vicio_id: habitId, data_registro: '2026-09-03', observacoes: 'synthetic-trigger-failure' };
+  const failedWrite = await request(app).post('/api/v2/registros')
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', rollbackKey).send(rollbackPayload);
+  bodyAt(failedWrite, 500, 'injected failure after idempotency reservation');
+  const rolledBack = await sql.query(`select
+    (select count(*) from public.registros_diarios where vicio_id=$1 and data_registro='2026-09-03') as records,
+    (select count(*) from public.api_idempotency where usuario_id=$2 and idempotency_key=$3) as receipts`, [habitId, a.id, rollbackKey]);
+  assert.equal(Number(rolledBack.rows[0].records), 0, 'business write must roll back');
+  assert.equal(Number(rolledBack.rows[0].receipts), 0, 'idempotency reservation must roll back with business write');
+  await sql.query('drop trigger test_fail_mobile_record_insert on public.registros_diarios');
+  await sql.query('drop function public.test_fail_mobile_record_insert()');
   bodyAt(await request(app).post('/api/v2/registros')
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', rollbackKey).send(rollbackPayload), 201,
+  'retry after complete rollback');
+
+  const goalKey = randomUUID();
+  const goalPayload = { vicio_id: habitId, descricao_meta: 'Synthetic goal', dias_objetivo: 7 };
+  const goal = bodyAt(await request(app).post('/api/v2/metas')
     .set('Authorization', `Bearer ${a.mobileToken}`)
-    .set('Idempotency-Key', randomUUID())
-    .send({ vicio_id: habitId, data_registro: '2026-09-01', humor: 'synthetic' }), 201, 'record');
-  bodyAt(await request(app).post('/api/v2/metas')
+    .set('Idempotency-Key', goalKey).send(goalPayload), 201, 'goal');
+  const goalReplay = bodyAt(await request(app).post('/api/v2/metas')
     .set('Authorization', `Bearer ${a.mobileToken}`)
-    .set('Idempotency-Key', randomUUID())
-    .send({ vicio_id: habitId, descricao_meta: 'Synthetic goal', dias_objetivo: 7 }), 201, 'goal');
-  bodyAt(await request(app).post(`/api/v2/vicios/${habitId}/recaida`)
+    .set('Idempotency-Key', goalKey).send(goalPayload), 201, 'goal replay');
+  assert.equal(goalReplay.meta.id, goal.meta.id, 'goal replay returns the first goal');
+  const completionKey = randomUUID();
+  const completions = await Promise.all(Array.from({ length: 2 }, () => request(app).patch(`/api/v2/metas/${goal.meta.id}`)
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', completionKey).send({ concluida: true })));
+  for (const response of completions) bodyAt(response, 200, 'idempotent goal completion');
+  assert.equal(completions[0].body.meta.id, completions[1].body.meta.id);
+  const relapseKey = randomUUID();
+  const relapsePayload = { occurred_at: '2026-09-02T00:00:00Z', motivo: 'synthetic' };
+  const relapse = bodyAt(await request(app).post(`/api/v2/vicios/${habitId}/recaida`)
     .set('Authorization', `Bearer ${a.mobileToken}`)
-    .set('Idempotency-Key', randomUUID())
-    .send({ occurred_at: '2026-09-02T00:00:00Z', motivo: 'synthetic' }), 201, 'relapse');
+    .set('Idempotency-Key', relapseKey).send(relapsePayload), 201, 'relapse');
+  const relapseReplay = bodyAt(await request(app).post(`/api/v2/vicios/${habitId}/recaida`)
+    .set('Authorization', `Bearer ${a.mobileToken}`)
+    .set('Idempotency-Key', relapseKey).send(relapsePayload), 201, 'relapse replay');
+  assert.equal(relapseReplay.recaida.id, relapse.recaida.id, 'relapse replay returns the first event');
 
   bodyAt(await request(app).delete('/api/v2/account')
     .set('Authorization', `Bearer ${a.mobileToken}`), 204, 'account deletion');

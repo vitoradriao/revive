@@ -11,7 +11,8 @@ export class ApiError extends Error {
   }
 
   get isRetryable() {
-    return this.status === 0 || this.status === 429 || this.status >= 500;
+    return this.status === 0 || this.status === 408 || this.status === 429 || this.status >= 500
+      || this.code === 'IDEMPOTENCY_EM_PROCESSAMENTO';
   }
 }
 

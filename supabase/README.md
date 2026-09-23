@@ -14,6 +14,7 @@ O REVIVE usa PostgreSQL no Supabase. A API Express acessa as tabelas privadas co
 | 6 | [20260907004754](migrations/20260907004754_harden_modification_trigger_search_path.sql) | `search_path` explícito da função de trigger |
 | 7 | [20260923163030](migrations/20260923163030_restrict_modification_trigger_execute.sql) | Revogação de `EXECUTE` direto para os papéis cliente |
 | 8 | [20260923164304](migrations/20260923164304_verify_baseline_replay.sql) | Replay verificável em dois esquemas isolados, removidos ao final |
+| 9 | [20260923200000](migrations/20260923200000_atomic_mobile_mutations.sql) | Transação única para mutações mobile e recibos idempotentes, com retenção sem expiração |
 
 Não renumere migrations já aplicadas. Os identificadores das cinco migrations antigas no projeto de desenvolvimento são diferentes dos nomes versionados neste repositório; compare o histórico antes de reparar qualquer versão. O baseline só deve executar em banco vazio.
 
