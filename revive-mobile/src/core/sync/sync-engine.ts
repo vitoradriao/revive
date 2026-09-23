@@ -7,8 +7,9 @@ import {
   removeMutation,
 } from '@/core/storage/database';
 import type { CreateGoalInput, CreateRecordInput, CreateRelapseInput, QueuedMutation } from '@/domain/types';
+import { tokenStore } from '@/core/auth/token-store';
 
-let activeSync: Promise<number> | null = null;
+const activeSync = new Map<string, Promise<number>>();
 
 const replay = async (mutation: QueuedMutation) => {
   switch (mutation.type) {
@@ -26,17 +27,29 @@ const replay = async (mutation: QueuedMutation) => {
 };
 
 export const syncPendingMutations = (userId: string) => {
-  if (activeSync) return activeSync;
-  activeSync = (async () => {
+  const generation = tokenStore.getGeneration();
+  const key = `${userId}:${generation}`;
+  const running = activeSync.get(key);
+  if (running) return running;
+  const promise = (async () => {
     const mutations = await getPendingMutations(userId);
     let synced = 0;
     for (const mutation of mutations) {
+      if (!tokenStore.isCurrent(generation)) break;
       if (mutation.needsRecovery) break;
       // Do not let later events overtake an earlier event waiting for retry.
       if (new Date(mutation.nextRetryAt).getTime() > Date.now()) break;
       await markMutationSyncing(mutation.id);
       try {
+        if (!tokenStore.isCurrent(generation)) {
+          await markMutationFailed(mutation.id, mutation.attempts + 1, 'A sessão mudou antes do envio.', true);
+          break;
+        }
         await replay(mutation);
+        if (!tokenStore.isCurrent(generation)) {
+          await markMutationFailed(mutation.id, mutation.attempts + 1, 'A sessão mudou antes da confirmação da sincronização.', true);
+          break;
+        }
         await removeMutation(mutation.id);
         synced += 1;
       } catch (error) {
@@ -47,7 +60,8 @@ export const syncPendingMutations = (userId: string) => {
     }
     return synced;
   })().finally(() => {
-    activeSync = null;
+    activeSync.delete(key);
   });
-  return activeSync;
+  activeSync.set(key, promise);
+  return promise;
 };

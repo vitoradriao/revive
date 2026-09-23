@@ -37,10 +37,9 @@ export const reviveApi = {
       idempotencyKey,
     }),
   deleteGoal: (goalId: string) => apiFetch(`/metas/${goalId}`, { method: 'DELETE' }),
-  logout: (refreshToken: string) =>
+  logout: () =>
     apiFetch<void>('/v2/auth/logout', {
       method: 'POST',
-      body: JSON.stringify({ refresh_token: refreshToken }),
       retryAuth: false,
     }),
   deleteAccount: () => apiFetch<void>('/v2/account', { method: 'DELETE' }),

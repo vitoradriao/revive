@@ -9,7 +9,7 @@ type ApiOptions = RequestInit & {
   idempotencyKey?: string;
 };
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: { generation: number; promise: Promise<string | null> } | null = null;
 let sessionExpiredHandler: (() => void | Promise<void>) | null = null;
 
 export const setSessionExpiredHandler = (handler: (() => void | Promise<void>) | null) => {
@@ -26,11 +26,11 @@ const parseResponse = async (response: Response) => {
   }
 };
 
-export const refreshAccessToken = async () => {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
+export const refreshAccessToken = async (expectedGeneration = tokenStore.getGeneration()) => {
+  if (refreshPromise?.generation === expectedGeneration) return refreshPromise.promise;
+  const promise = (async () => {
     const refreshToken = await tokenStore.getRefreshToken();
-    if (!refreshToken) return null;
+    if (!tokenStore.isCurrent(expectedGeneration) || !refreshToken) return null;
 
     let response: Response;
     try { response = await fetch(`${env.apiUrl}/v2/auth/refresh`, {
@@ -39,8 +39,10 @@ export const refreshAccessToken = async () => {
       body: JSON.stringify({ refresh_token: refreshToken }),
     }); } catch { throw new ApiError('Sem conexão com o servidor.', 0, 'NETWORK_ERROR'); }
     const data = (await parseResponse(response)) as Partial<AuthSession> | null;
+    if (!tokenStore.isCurrent(expectedGeneration)) return null;
     if (response.status === 401) {
-      await tokenStore.clear();
+      if (sessionExpiredHandler) await sessionExpiredHandler();
+      else await tokenStore.clear(expectedGeneration);
       return null;
     }
     if (!response.ok) throw new ApiError('Não foi possível renovar a sessão. Tente novamente.', response.status);
@@ -48,14 +50,13 @@ export const refreshAccessToken = async () => {
       throw new ApiError('Resposta de sessão inválida.', 502, 'INVALID_SESSION_RESPONSE');
     }
 
-    tokenStore.setAccessToken(data.access_token);
-    await tokenStore.setRefreshToken(data.refresh_token);
-    await tokenStore.setUser(data.usuario);
-    return data.access_token;
+    const saved = await tokenStore.saveSession(expectedGeneration, data as AuthSession);
+    return saved ? data.access_token : null;
   })().finally(() => {
-    refreshPromise = null;
+    if (refreshPromise?.promise === promise) refreshPromise = null;
   });
-  return refreshPromise;
+  refreshPromise = { generation: expectedGeneration, promise };
+  return promise;
 };
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -69,6 +70,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   const headers = new Headers(optionHeaders);
   headers.set('Accept', 'application/json');
   if (requestOptions.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const requestGeneration = tokenStore.getGeneration();
   const accessToken = tokenStore.getAccessToken();
   if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
@@ -80,12 +82,19 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     throw new ApiError('Sem conexão com o servidor.', 0, 'NETWORK_ERROR');
   }
 
+  if (authenticated && !tokenStore.isCurrent(requestGeneration)) {
+    throw new ApiError('A sessão mudou durante a requisição.', 0, 'SESSION_CHANGED');
+  }
+
   if (response.status === 401 && authenticated && retryAuth) {
-    const refreshedToken = await refreshAccessToken();
+    const refreshedToken = await refreshAccessToken(requestGeneration);
+    if (!tokenStore.isCurrent(requestGeneration)) {
+      throw new ApiError('A sessão mudou durante a renovação.', 0, 'SESSION_CHANGED');
+    }
     if (refreshedToken) return apiFetch<T>(path, { ...options, retryAuth: false });
     await sessionExpiredHandler?.();
   }
-  if (response.status === 401 && authenticated && !retryAuth) await sessionExpiredHandler?.();
+  if (response.status === 401 && authenticated && !retryAuth && tokenStore.isCurrent(requestGeneration)) await sessionExpiredHandler?.();
 
   const data = (await parseResponse(response)) as Record<string, unknown> | null;
   if (!response.ok) {

@@ -79,7 +79,9 @@ async function verifyApi(app, sql) {
   const [a, b] = users;
   for (const user of users) {
     const login = await request(app).post('/api/v2/auth/login').send({ email: user.email, senha: password });
-    user.mobileToken = bodyAt(login, 200, 'mobile login').access_token;
+    const session = bodyAt(login, 200, 'mobile login');
+    user.mobileToken = session.access_token;
+    user.refreshToken = session.refresh_token;
     assert.ok(user.mobileToken);
   }
 
@@ -95,6 +97,29 @@ async function verifyApi(app, sql) {
   const bootstrap = bodyAt(await request(app).get('/api/v2/bootstrap')
     .set('Authorization', `Bearer ${b.mobileToken}`), 200, 'other user bootstrap');
   assert.equal(bootstrap.vicios.length, 0);
+
+  const rotation = await Promise.all([1, 2].map(() => request(app).post('/api/v2/auth/refresh')
+    .send({ refresh_token: b.refreshToken })));
+  assert.deepEqual(rotation.map(result => result.status).sort(), [200, 401]);
+  const activeFamily = await sql.query(`select count(*) from public.app_sessions
+    where usuario_id=$1 and revoked_at is null`, [b.id]);
+  assert.equal(Number(activeFamily.rows[0].count), 0,
+    'concurrent reuse is detected and revokes the rotated family');
+  bodyAt(await request(app).get('/api/v2/bootstrap')
+    .set('Authorization', `Bearer ${b.mobileToken}`), 401, 'rotated family access token revoked');
+
+  const logoutSession = bodyAt(await request(app).post('/api/v2/auth/login')
+    .send({ email: b.email, senha: password }), 200, 'second mobile login');
+  bodyAt(await request(app).post('/api/v2/auth/logout')
+    .set('Authorization', `Bearer ${logoutSession.access_token}`), 204, 'mobile logout');
+  bodyAt(await request(app).get('/api/v2/bootstrap')
+    .set('Authorization', `Bearer ${logoutSession.access_token}`), 401, 'logged out access token revoked');
+
+  const passwordSession = bodyAt(await request(app).post('/api/v2/auth/login')
+    .send({ email: b.email, senha: password }), 200, 'password-change mobile login');
+  await sql.query('update public.usuarios set senha_hash=$2 where id=$1', [b.id, 'synthetic-replaced-password-hash']);
+  bodyAt(await request(app).get('/api/v2/bootstrap')
+    .set('Authorization', `Bearer ${passwordSession.access_token}`), 401, 'password change revokes access token');
 
   bodyAt(await request(app).post('/api/v2/registros')
     .set('Authorization', `Bearer ${b.mobileToken}`)
