@@ -28,13 +28,15 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             revive-painel/package-lock.json
-      - name: Verificar links da documentação
-        run: npm run check:docs
       - name: Instalar dependências da API
         run: npm ci
       - name: Instalar dependências do painel
         run: npm ci --prefix revive-painel
-      - name: Validar API, painel e build
+      - name: Auditar dependências da API e do painel
+        run: |
+          npm run audit:tooling
+          npm run audit:tooling --prefix revive-painel
+      - name: Validar API, painel, documentação e build
         run: npm run validate
 
   mobile:

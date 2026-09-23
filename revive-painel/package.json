@@ -12,7 +12,8 @@
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run src/utils src/services",
     "test:integration": "vitest run src/contexts src/pages src/components",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:tooling": "npm audit --package-lock-only --audit-level=moderate"
   },
   "dependencies": {
     "framer-motion": "^12.23.24",
@@ -28,7 +29,7 @@
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "4.7.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -37,7 +38,7 @@
     "jsdom": "^25.0.1",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.1.14",
-    "vite": "^5.3.1",
-    "vitest": "^2.1.9"
+    "vite": "6.4.3",
+    "vitest": "4.1.11"
   }
 }
