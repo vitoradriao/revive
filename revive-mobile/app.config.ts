@@ -34,9 +34,11 @@ const config: ExpoConfig = {
   plugins: [
     './plugins/with-local-android.cjs',
     'expo-router',
+    'expo-localization',
     'expo-secure-store',
     'expo-sqlite',
     'expo-sharing',
+    'expo-splash-screen',
     [
       'expo-build-properties',
       { android: { usesCleartextTraffic: appEnvironment === 'development' } },
