@@ -53,3 +53,7 @@ Os registros de publicação citados acima são evidências datadas. Para a vali
 ## Diario completo e correcao (#22)
 
 Consulta por habito/periodo com paginacao, detalhe completo, correcao offline dependente, revision/updated_at e conflito com reaplicacao manual. [Contratos, evidencias e rollout](diary-validation.md). SQL remoto e homologacao Android complementar nao executados nesta entrega.
+
+## Vontades no mobile (#25)
+
+Formulário descritivo com intensidade 0–10, gatilhos e campos opcionais; criação durável, recibos locais e consulta paginada por hábito/período/fuso. O calendário distingue check-ins, vontades e recaídas por texto. [Contrato, validação e roteiro Android](urge-events-validation.md). A homologação física permanece no gate #7; não houve SQL remoto nesta entrega.

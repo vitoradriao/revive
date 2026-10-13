@@ -3,6 +3,7 @@ import { reviveApi } from '@/core/api/repositories';
 import {
   getPendingMutations,
   bindRecordEdits,
+  cacheUrgeReceipt,
   markMutationFailed,
   markMutationSyncing,
   reconcileMutations,
@@ -63,6 +64,11 @@ export const syncPendingMutations = (userId: string) => {
         if (mutation.type === 'record.create' && tokenStore.isCurrent(generation)) {
           const record = (response as { registro?: import('@/domain/types').DailyRecord })?.registro;
           if (record?.id) await bindRecordEdits(userId, mutation.id, record);
+        }
+        if (mutation.type === 'urge.create' && tokenStore.isCurrent(generation)) {
+          const event = (response as { vontade?: import('@/domain/types').UrgeEvent })?.vontade;
+          if (!event?.id || event.usuario_id !== userId) throw new Error('Resposta de vontade inválida.');
+          await cacheUrgeReceipt(userId, mutation.id, event);
         }
         if (!tokenStore.isCurrent(generation)) {
           await markMutationFailed(mutation.id, mutation.attempts + 1, 'A sessão mudou antes da confirmação da sincronização.', true);

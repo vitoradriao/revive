@@ -40,7 +40,7 @@ export const reviveApi = {
       idempotencyKey,
     }),
   createUrgeEvent: (input: CreateUrgeEventInput, idempotencyKey?: string) =>
-    apiFetch<{ vontade: UrgeEvent }>('/vontades', {
+    apiFetch<{ vontade: UrgeEvent }>('/v2/vontades', {
       method: 'POST',
       body: JSON.stringify(input),
       idempotencyKey,
@@ -54,7 +54,7 @@ export const reviveApi = {
       limit: String(input.limit ?? 50),
     });
     if (input.cursor) params.set('cursor', input.cursor);
-    return apiFetch<UrgeEventPage>(`/vontades?${params.toString()}`);
+    return apiFetch<UrgeEventPage>(`/v2/vontades?${params.toString()}`);
   },
   createGoal: (input: CreateGoalInput, idempotencyKey?: string) =>
     apiFetch<{ meta: Goal }>('/v2/metas', {

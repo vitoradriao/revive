@@ -10,11 +10,11 @@ const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 const week = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const minDate = '1900-01-01';
 
-export function DateCalendar({ selected, onSelect, maxDate = localDateKey(), activity }: { selected: string; onSelect: (iso: string) => void; maxDate?: string; activity?: Set<string> }) {
+export function DateCalendar({ selected, onSelect, maxDate = localDateKey(), todayKey = localDateKey(), activity }: { selected: string; onSelect: (iso: string) => void; maxDate?: string; todayKey?: string; activity?: Set<string> }) {
   const [page, setPage] = useState(() => dateFromKey(selected >= minDate && selected <= maxDate ? selected : maxDate));
   const [mode, setMode] = useState<'days' | 'months' | 'years'>('days');
   const year = page.getFullYear(), month = page.getMonth();
-  const today = localDateKey();
+  const today = todayKey;
   const maximumYear = dateFromKey(maxDate).getFullYear();
   const heading = mode === 'days' ? `${months[month]} ${year}` : mode === 'months' ? `${year}` : 'Escolha o ano';
   const changePage = (direction: number) => setPage(new Date(year + (mode === 'months' ? direction : 0), month + (mode === 'days' ? direction : 0), 1, 12));
@@ -57,7 +57,7 @@ export function DateCalendar({ selected, onSelect, maxDate = localDateKey(), act
   </View>;
 }
 
-export const DateField = forwardRef<TextInput, { label: string; value: string; onChangeText: (text: string) => void; onBlur?: () => void; error?: string; maxDate?: string; editable?: boolean }>(function DateField({ label, value, onChangeText, onBlur, error, maxDate = localDateKey(), editable = true }, ref) {
+export const DateField = forwardRef<TextInput, { label: string; value: string; onChangeText: (text: string) => void; onBlur?: () => void; error?: string; maxDate?: string; todayKey?: string; editable?: boolean }>(function DateField({ label, value, onChangeText, onBlur, error, maxDate = localDateKey(), todayKey, editable = true }, ref) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(maxDate);
   const insets = useSafeAreaInsets();
@@ -79,7 +79,7 @@ export const DateField = forwardRef<TextInput, { label: string; value: string; o
           <View style={styles.sheetHeader}><View style={{ flex: 1 }}><Text style={styles.eyebrow}>ESCOLHA UMA DATA</Text><Text style={textStyles.heading}>{label}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cancelar seleção de data" style={styles.icon} onPress={dismiss}><X color={colors.muted} size={22} /></Pressable></View>
           <ScrollView bounces={false} keyboardShouldPersistTaps="handled">
             <View style={styles.datePreview}><CalendarDays size={24} color={colors.primary} /><View><Text style={styles.previewText}>{displayDate(draft)}</Text><Text style={styles.legend}>{dateFromKey(draft).toLocaleDateString('pt-BR', { weekday: 'long' })}</Text></View></View>
-            {open ? <DateCalendar selected={draft} onSelect={setDraft} maxDate={maxDate} /> : null}
+            {open ? <DateCalendar selected={draft} onSelect={setDraft} maxDate={maxDate} todayKey={todayKey} /> : null}
           </ScrollView>
           <AppButton title="Usar esta data" onPress={() => { onChangeText(displayDate(draft)); dismiss(); }} />
         </View>

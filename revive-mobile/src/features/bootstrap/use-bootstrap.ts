@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useQuery } from '@tanstack/react-query';
 import { reviveApi } from '@/core/api/repositories';
+import { queryClient } from '@/core/query/client';
 import { cacheBootstrap, getCachedBootstrap, getPendingMutations } from '@/core/storage/database';
 import { withPendingMutations } from '@/domain/pending-snapshot';
 import { syncPendingMutations } from '@/core/sync/sync-engine';
@@ -19,7 +20,8 @@ export function useBootstrap() {
     queryFn: async () => {
       if (!user) throw new Error('Sessão ausente.');
       try {
-        await syncPendingMutations(user.id);
+        const synced = await syncPendingMutations(user.id);
+        if (synced) await queryClient.invalidateQueries({ queryKey: ['urges', user.id] });
         const data = await reviveApi.bootstrap();
         await cacheBootstrap(user.id, data);
         return withPendingMutations(data, await getPendingMutations(user.id));
