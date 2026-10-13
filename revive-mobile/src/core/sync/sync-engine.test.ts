@@ -7,10 +7,10 @@ import type { QueuedMutation } from '@/domain/types';
 import { syncPendingMutations } from './sync-engine';
 
 jest.mock('@/core/api/repositories', () => ({ reviveApi: {
-  createRecord: jest.fn(), createRelapse: jest.fn(), createUrgeEvent: jest.fn(), bootstrap: jest.fn(),
+  updateRecord: jest.fn(), createRecord: jest.fn(), createRelapse: jest.fn(), createUrgeEvent: jest.fn(), bootstrap: jest.fn(),
 } }));
 jest.mock('@/core/storage/database', () => ({
-  getPendingMutations: jest.fn(), markMutationSyncing: jest.fn(),
+  bindRecordEdits: jest.fn(), getPendingMutations: jest.fn(), markMutationSyncing: jest.fn(),
   markMutationFailed: jest.fn(), reconcileMutations: jest.fn(),
 }));
 jest.mock('@/core/auth/token-store', () => ({ tokenStore: { getUser: jest.fn(), getGeneration: jest.fn(), isCurrent: jest.fn() } }));
@@ -122,4 +122,19 @@ it('does not replay after logout or a session change during account lookup', asy
   expect(await syncPendingMutations('user-a')).toBe(0);
   expect(getPendingMutations).not.toHaveBeenCalled();
   expect(reviveApi.createRecord).not.toHaveBeenCalled();
+});
+
+it('never sends an edit while its original creation is unresolved', async () => {
+  jest.mocked(getPendingMutations).mockResolvedValue([{ ...event('edit'), type: 'record.update', payload: { recordId: 'creation', dependsOn: 'creation', expected_version: 1, humor: 'Corrected' } }]);
+  expect(await syncPendingMutations('user-a')).toBe(0);
+  expect(reviveApi.updateRecord).not.toHaveBeenCalled();
+});
+it('sends a correction with a stable key and leaves conflict text queued', async () => {
+  const payload = { recordId: 'record', expected_version: 1, observacoes: 'Local preserved' };
+  jest.mocked(getPendingMutations).mockResolvedValue([{ ...event('edit-key'), type: 'record.update', payload }]);
+  jest.mocked(reviveApi.updateRecord).mockRejectedValue(new ApiError('Remote changed', 409, 'REVISAO_CONFLITO'));
+  expect(await syncPendingMutations('user-a')).toBe(0);
+  expect(reviveApi.updateRecord).toHaveBeenCalledWith('record', { expected_version: 1, observacoes: 'Local preserved' }, 'edit-key');
+  expect(markMutationFailed).toHaveBeenCalledWith('edit-key', 1, 'REVISAO_CONFLITO: Remote changed', false);
+  expect(reconcileMutations).not.toHaveBeenCalled();
 });

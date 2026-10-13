@@ -96,3 +96,14 @@ describe('pending snapshot', () => {
     expect(projected.conquistas).toBeUndefined();
   });
 });
+
+it('projects a failed correction over a pending creation without dropping fields or changing counters', () => {
+  const creation = { ...event, payload: { ...event.payload, gatilhos: 'Original', observacoes: 'Old' } };
+  const edit = { ...event, id: 'edit', type: 'record.update', status: 'failed' as const, lastError: 'REVISAO_CONFLITO', payload: { recordId: event.id, expected_version: 1, observacoes: 'Local' } };
+  const data = withPendingMutations(snapshot, [creation, edit]);
+  expect(data.registros).toHaveLength(1);
+  expect(data.registros[0]).toMatchObject({ gatilhos: 'Original', observacoes: 'Local', pending: true, sync_error: 'REVISAO_CONFLITO' });
+  expect(data.recaidas).toEqual(snapshot.recaidas);
+  expect(data.vicios).toEqual(snapshot.vicios);
+  expect(withPendingMutations(snapshot, [creation, { ...edit, userId: 'other' }]).registros[0]?.observacoes).toBe('Old');
+});

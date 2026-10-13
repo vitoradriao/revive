@@ -22,6 +22,15 @@ export const reviveApi = {
   getAddiction: (id: string) => apiFetch<{ vicio: Addiction }>(`/vicios/${id}`),
   updateAddiction: (id: string, input: UpdateAddictionInput) => apiFetch<{ vicio: Addiction }>(`/v2/vicios/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteAddiction: (id: string) => apiFetch<{ mensagem: string }>(`/vicios/${id}`, { method: 'DELETE' }),
+  getRecord: (id: string) => apiFetch<{ registro: import('@/domain/types').DailyRecord }>(`/v2/registros/${id}`),
+  listRecords: (input: import('@/domain/types').RecordFilter) => {
+    const params = new URLSearchParams({ inicio: input.inicio, fim: input.fim, limit: String(input.limit ?? 50) });
+    if (input.vicio_id) params.set('vicio_id', input.vicio_id);
+    if (input.cursor) params.set('cursor', input.cursor);
+    return apiFetch<import('@/domain/types').RecordPage>(`/v2/registros?${params}`);
+  },
+  updateRecord: (id: string, input: import('@/domain/types').UpdateRecordInput, idempotencyKey: string) =>
+    apiFetch<{ registro: import('@/domain/types').DailyRecord }>(`/v2/registros/${id}`, { method: 'PATCH', body: JSON.stringify(input), idempotencyKey }),
   createRecord: (input: CreateRecordInput, idempotencyKey?: string) =>
     apiFetch('/v2/registros', { method: 'POST', body: JSON.stringify(input), idempotencyKey }),
   createRelapse: (addictionId: string, input: CreateRelapseInput, idempotencyKey?: string) =>

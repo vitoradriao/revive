@@ -9,7 +9,7 @@ import { bootstrapKey } from '@/features/bootstrap/use-bootstrap';
 import type { QueuedMutation } from '@/domain/types';
 import { AppButton, Card, PageTitle, Screen, textStyles } from '@/ui/components';
 
-const labels = { 'record.create': 'Check-in', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
+const labels = { 'record.create': 'Check-in', 'record.update': 'Correção do diário', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
 
 export default function SyncScreen() {
   const { user } = useSession();
@@ -33,7 +33,8 @@ export default function SyncScreen() {
       <Text style={textStyles.heading}>{labels[item.type as keyof typeof labels] || 'Alteração incompatível'}</Text>
       <Text style={textStyles.muted}>{new Date(item.occurredAt).toLocaleString('pt-BR')}</Text>
       <Text style={textStyles.body}>{item.lastError || 'Aguardando envio'}</Text>
-      {item.status === 'failed' && !item.needsRecovery ? <AppButton title="Tentar novamente" disabled={busy} onPress={() => user && void run(async () => { await retryUserMutation(user.id, item.id); await syncPendingMutations(user.id); })} /> : null}
+      {item.type === 'record.update' ? <AppButton title="Consultar e resolver correção" variant="secondary" disabled={busy} onPress={() => router.push({ pathname: '/(app)/records/[id]', params: { id: String(item.payload.recordId) } })} /> : null}
+      {item.status === 'failed' && !item.needsRecovery && !item.lastError?.startsWith('REVISAO_CONFLITO') ? <AppButton title="Tentar novamente" disabled={busy} onPress={() => user && void run(async () => { await retryUserMutation(user.id, item.id); await syncPendingMutations(user.id); })} /> : null}
       <AppButton title="Descartar alteração" variant="danger" disabled={busy} onPress={() => Alert.alert('Descartar alteração?', 'A alteração pendente será removida deste aparelho. Se houve uma resposta perdida, ela pode já existir no servidor.', [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Descartar', style: 'destructive', onPress: () => user && void run(() => discardUserMutation(user.id, item.id)) },

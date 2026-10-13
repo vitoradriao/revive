@@ -64,3 +64,5 @@ O comando verifica tipos TypeScript, lint e testes Jest. Também é possível ex
 - Testes automatizados não substituem a validação em aparelho ou banco real.
 
 Veja o [estado da implementação](docs/implementation-status.md) e siga o [fluxo de contribuição](../CONTRIBUTING.md).
+
+Consulta e correcao do diario: [contrato, evidencias e rollout](docs/diary-validation.md).

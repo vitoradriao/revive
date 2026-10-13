@@ -44,7 +44,7 @@ try {
   const clean = open('clean.db');
   await migrateDatabase(clean.adapter);
   await migrateDatabase(clean.adapter);
-  assert.equal(clean.sqlite.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(clean.sqlite.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(clean.sqlite.prepare('SELECT COUNT(*) AS n FROM mutation_queue_v1').get().n, 0);
   assert.equal(clean.sqlite.prepare("SELECT type FROM sqlite_master WHERE name = 'urge_event_pages_v1'").get().type, 'table');
   clean.sqlite.close();
@@ -98,7 +98,7 @@ try {
   assert.equal(rows[6].payload_version, 0);
   assert.deepEqual(recovered.sqlite.prepare('SELECT user_id FROM bootstrap_cache_v1 ORDER BY user_id').all().map((row) => row.user_id), ['a', 'b']);
   await migrateDatabase(recovered.adapter);
-  assert.equal(recovered.sqlite.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(recovered.sqlite.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(recovered.sqlite.prepare('SELECT COUNT(*) AS n FROM mutation_queue_v1').get().n, 7);
   assert.throws(() => recovered.sqlite.prepare("UPDATE mutation_queue SET status = 'pending'").run(), /view/);
   assert.throws(() => recovered.sqlite.prepare("INSERT INTO mutation_queue(id, user_id, type, payload, occurred_at, next_retry_at) VALUES ('old', 'a', 'goal.complete', '{}', 'now', 'now')").run(), /view/);
@@ -127,7 +127,7 @@ try {
 
   const upgradeRetry = open('upgrade-failure.db');
   await migrateDatabase(upgradeRetry.adapter);
-  assert.equal(upgradeRetry.sqlite.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(upgradeRetry.sqlite.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(upgradeRetry.sqlite.prepare('SELECT id FROM mutation_queue_v1').get().id, 'kept-key');
   upgradeRetry.sqlite.close();
 

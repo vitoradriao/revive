@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { validateRecordFields, parseRecordCursor } = require('./diary-records');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { buildProgressSnapshot, observedAccountAwards, observedAwards } = require('./progress-metrics');
@@ -440,8 +441,53 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
         }
     });
 
+    router.get('/registros', authenticate, async (req, res) => {
+        const { inicio, fim, vicio_id, cursor } = req.query;
+        const limit = req.query.limit === undefined ? 50 : Number(req.query.limit);
+        const after = cursor === undefined ? null : parseRecordCursor(cursor);
+        if (!isValidLocalDate(inicio) || !isValidLocalDate(fim) || fim < inicio
+            || (new Date(fim) - new Date(inicio)) / MS_PER_DAY > 3660
+            || (vicio_id !== undefined && (typeof vicio_id !== 'string' || !UUID_PATTERN.test(vicio_id)))
+            || !Number.isInteger(limit) || limit < 1 || limit > 100 || (cursor !== undefined && !after)) {
+            return apiError(res, 422, 'DADOS_INVALIDOS', 'Informe hábito, intervalo e cursor válidos.');
+        }
+        try {
+            const { data, error } = await supabase.rpc('list_diary_records', {
+                p_usuario_id: req.usuarioId, p_vicio_id: vicio_id || null, p_inicio: inicio, p_fim: fim,
+                p_limit: limit + 1, p_cursor_date: after?.date || null, p_cursor_id: after?.id || null,
+            });
+            if (error) throw error;
+            const rows = data || [];
+            const records = rows.slice(0, limit);
+            const last = records.at(-1);
+            return res.json({ registros: records, next_cursor: rows.length > limit
+                ? Buffer.from(JSON.stringify({ date: last.data_registro, id: last.id })).toString('base64url') : null });
+        } catch { return apiError(res, 503, 'CONSULTA_INDISPONIVEL', 'Não foi possível consultar o diário.'); }
+    });
+
+    router.get('/registros/:id', authenticate, async (req, res) => {
+        if (!UUID_PATTERN.test(req.params.id)) return apiError(res, 404, 'REGISTRO_NAO_ENCONTRADO', 'Registro não encontrado.');
+        try {
+            const { data, error } = await supabase.from('registros_diarios').select('*, vicios!inner(usuario_id)')
+                .eq('id', req.params.id).eq('vicios.usuario_id', req.usuarioId).maybeSingle();
+            if (error) throw error;
+            if (!data) return apiError(res, 404, 'REGISTRO_NAO_ENCONTRADO', 'Registro não encontrado.');
+            const { vicios: _habit, ...registro } = data;
+            return res.json({ registro });
+        } catch { return apiError(res, 503, 'CONSULTA_INDISPONIVEL', 'Não foi possível consultar o registro.'); }
+    });
+
+    router.patch('/registros/:id', authenticate, async (req, res) => {
+        if (!UUID_PATTERN.test(req.params.id)) return apiError(res, 404, 'REGISTRO_NAO_ENCONTRADO', 'Registro não encontrado.');
+        if (!validateRecordFields(req.body, true)) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise os campos e a versão do registro.');
+        try {
+            return await executeIdempotent(req, res, 'record.update', { ...req.body, recordId: req.params.id }, 'execute_diary_record_update');
+        } catch { return apiError(res, 503, 'EDICAO_INDISPONIVEL', 'Não foi possível corrigir o registro.'); }
+    });
+
     router.post('/registros', authenticate, async (req, res) => {
         try {
+            if (!validateRecordFields(req.body)) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise os campos do registro.');
             const payload = { ...req.body, data_registro: clean(req.body.data_registro) || new Date().toISOString().slice(0, 10) };
             return await executeIdempotent(req, res, 'record.create', payload);
         } catch (error) {

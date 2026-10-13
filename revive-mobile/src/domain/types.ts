@@ -51,7 +51,14 @@ export type ProgressSnapshot = {
   pendente?: boolean;
 };
 
+export type RecordPage = { registros: DailyRecord[]; next_cursor: string | null };
+export type RecordFilter = { vicio_id?: string; inicio: string; fim: string; limit?: number; cursor?: string | null };
+export type UpdateRecordInput = { expected_version: number; humor?: string | null; gatilhos?: string | null; conquistas?: string | null; observacoes?: string | null };
+
 export type DailyRecord = {
+  sync_error?: string | null;
+  revision?: number;
+  updated_at?: string;
   id: string;
   vicio_id: string;
   data_registro: string;
@@ -193,12 +200,14 @@ export type CreateGoalInput = {
 
 export type QueueOperationType =
   | 'record.create'
+  | 'record.update'
   | 'relapse.create'
   | 'urge.create'
   | 'goal.create'
   | 'goal.complete';
 
 export type QueuedMutation = {
+  resolvedRecordId?: string;
   id: string;
   userId: string;
   type: QueueOperationType | (string & {});

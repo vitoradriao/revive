@@ -136,6 +136,8 @@
  *           type: string
  *         observacoes:
  *           type: string
+ *         revision: { type: integer, minimum: 1, description: Versao usada como expected_version na correcao }
+ *         updated_at: { type: string, format: date-time }
  *     Recaida:
  *       type: object
  *       properties:
@@ -290,6 +292,29 @@
 /**
  * @openapi
  * /api/v2/registros:
+ *   get:
+ *     tags: [Mobile Offline v2]
+ *     summary: Consulta diario por data civil e habito com paginacao data+ID
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: inicio, required: true, schema: { type: string, format: date } }
+ *       - { in: query, name: fim, required: true, schema: { type: string, format: date } }
+ *       - { in: query, name: vicio_id, schema: { type: string, format: uuid } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+ *       - { in: query, name: cursor, schema: { type: string }, description: next_cursor da pagina anterior com os mesmos filtros }
+ *     responses:
+ *       200:
+ *         description: Pagina ordenada por data_registro desc e ID desc; sem conversao UTC de data civil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [registros, next_cursor]
+ *               properties:
+ *                 registros: { type: array, items: { $ref: '#/components/schemas/RegistroDiario' } }
+ *                 next_cursor: { type: string, nullable: true }
+ *       422: { description: Intervalo acima de 3660 dias ou filtro/cursor invalido }
+ *       503: { description: Consulta indisponivel }
  *   post:
  *     tags: [Mobile Offline v2]
  *     summary: Cria um registro diario idempotente
@@ -307,6 +332,57 @@
  *         description: Registro criado ou resposta original repetida
  *       409:
  *         description: Chave usada com outro payload ou ainda em processamento
+ * /api/v2/registros/{id}:
+ *   parameters:
+ *     - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *   get:
+ *     tags: [Mobile Offline v2]
+ *     summary: Consulta todos os campos de um registro proprio, inclusive de habito arquivado
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Registro completo, sem truncar campos legados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 registro: { $ref: '#/components/schemas/RegistroDiario' }
+ *       404: { description: Registro ausente ou de outra conta }
+ *   patch:
+ *     tags: [Mobile Offline v2]
+ *     summary: Corrige campos com versao esperada e recibo idempotente atomico
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: header, name: Idempotency-Key, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [expected_version]
+ *             minProperties: 2
+ *             properties:
+ *               expected_version: { type: integer, minimum: 1 }
+ *               humor: { type: string, nullable: true, maxLength: 100 }
+ *               gatilhos: { type: string, nullable: true, maxLength: 500 }
+ *               conquistas: { type: string, nullable: true, maxLength: 500 }
+ *               observacoes: { type: string, nullable: true, maxLength: 1000 }
+ *     responses:
+ *       200:
+ *         description: Registro corrigido ou resposta original repetida
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 registro: { $ref: '#/components/schemas/RegistroDiario' }
+ *       409: { description: REVISAO_CONFLITO ou conflito de chave; recarregar e reaplicar manualmente com nova chave }
+ *       404: { description: Registro ausente ou de outra conta }
+ *       422: { description: Campos invalidos; habito e data sao imutaveis }
+ *       503: { description: Edicao indisponivel }
  * /api/v2/vontades:
  *   post:
  *     tags: [Mobile Offline v2]

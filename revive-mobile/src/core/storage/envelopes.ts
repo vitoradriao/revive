@@ -41,6 +41,7 @@ export const validUrgeEventPage = (value: unknown, userId: string): value is Urg
 export const validMutation = (type: string, value: unknown): type is QueueOperationType => {
   if (!object(value)) return false;
   switch (type) {
+    case 'record.update': return typeof value.recordId === 'string' && Number.isInteger(value.expected_version) && Number(value.expected_version) > 0;
     case 'record.create': return typeof value.vicio_id === 'string' && typeof value.humor === 'string';
     case 'relapse.create': return typeof value.addictionId === 'string' && typeof value.resetarContador === 'boolean';
     case 'urge.create': return typeof value.vicio_id === 'string' && typeof value.occurred_at === 'string'

@@ -6,6 +6,7 @@ import pg from 'pg';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
+import { verifyDiaryRecords } from './diary-records.mjs';
 import { verifyHabitEdits } from './habit-edit.mjs';
 
 const require = createRequire(import.meta.url);
@@ -69,6 +70,7 @@ async function verifyConnections(a, b) {
 
 async function verifyApi(app, sql) {
   await verifyHabitEdits(app, sql, process.env.JWT_SECRET);
+  await verifyDiaryRecords(app, sql, process.env.JWT_SECRET);
   const suffix = randomUUID();
   const password = 'Senha!12345';
   const users = [];
