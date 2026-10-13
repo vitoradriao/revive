@@ -59,10 +59,16 @@ export function withPendingMutations(snapshot: BootstrapData, mutations: QueuedM
   for (const mutation of mutations) {
     if (mutation.userId !== snapshot.usuario.id || mutation.needsRecovery) continue;
     const payload = mutation.payload;
-    if (mutation.type === 'record.create' && !result.registros.some((item) => item.id === mutation.id)) {
-      result.registros.unshift({ ...payload, id: mutation.id, pending: true } as DailyRecord);
+    const recordId = mutation.resolvedRecordId || mutation.id;
+    if (mutation.type === 'record.create' && !result.registros.some((item) => item.id === recordId)) {
+      result.registros.unshift({ ...payload, id: recordId, pending: true, sync_error: mutation.lastError } as DailyRecord);
     }
-    if (mutation.type === 'relapse.create' && !result.recaidas.some((item) => item.id === mutation.id)) {
+    if (mutation.type === 'record.update') {
+      result.registros = result.registros.map(record => record.id === payload.recordId ? {
+        ...record, ...Object.fromEntries(['humor', 'gatilhos', 'conquistas', 'observacoes'].filter(key => key in payload).map(key => [key, payload[key]])), pending: true, sync_error: mutation.lastError,
+      } : record);
+    }
+    if (mutation.type === 'relapse.create'  && !result.recaidas.some((item) => item.id === mutation.id)) {
       result.recaidas.unshift({ id: mutation.id, vicio_id: String(payload.addictionId), data_recaida: String(payload.occurred_at), motivo: payload.motivo ? String(payload.motivo) : null, pending: true });
       result.vicios = result.vicios.map((item) => item.id === payload.addictionId
         ? projectRelapse(item, String(payload.occurred_at), payload.resetarContador === true)

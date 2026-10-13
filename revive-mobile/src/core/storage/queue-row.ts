@@ -12,6 +12,7 @@ export const mapQueueRow = (row: Record<string, unknown>): QueuedMutation => {
     }
   } catch { /* Preserve the row, and block automatic replay. */ }
   return {
+    ...(typeof row.resolved_record_id === 'string' ? { resolvedRecordId: row.resolved_record_id } : {}),
     id: String(row.id), userId: String(row.user_id), type: String(row.type), payload,
     occurredAt: String(row.occurred_at), attempts: Number(row.attempts),
     nextRetryAt: String(row.next_retry_at), status: String(row.status) as QueuedMutation['status'],

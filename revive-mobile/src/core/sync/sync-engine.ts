@@ -2,6 +2,7 @@ import { ApiError, toUserMessage } from '@/core/api/errors';
 import { reviveApi } from '@/core/api/repositories';
 import {
   getPendingMutations,
+  bindRecordEdits,
   markMutationFailed,
   markMutationSyncing,
   reconcileMutations,
@@ -15,6 +16,10 @@ const replay = async (mutation: QueuedMutation) => {
   switch (mutation.type) {
     case 'record.create':
       return reviveApi.createRecord(mutation.payload as CreateRecordInput, mutation.id);
+    case 'record.update': {
+      const { recordId, dependsOn: _dependency, ...input } = mutation.payload;
+      return reviveApi.updateRecord(String(recordId), input as import('@/domain/types').UpdateRecordInput, mutation.id);
+    }
     case 'relapse.create': {
       const { addictionId, ...payload } = mutation.payload as CreateRelapseInput & { addictionId: string };
       return reviveApi.createRelapse(addictionId, payload, mutation.id);
@@ -41,7 +46,9 @@ export const syncPendingMutations = (userId: string) => {
     const mutations = await getPendingMutations(userId);
     let synced = 0;
     const committed: QueuedMutation[] = [];
-    for (const mutation of mutations) {
+    for (const original of mutations) {
+      const mutation = original.payload.dependsOn ? (await getPendingMutations(userId)).find(m => m.id === original.id) || original : original;
+      if (mutation.type === 'record.update' && mutation.payload.dependsOn) break;
       if (!tokenStore.isCurrent(generation)) break;
       if (mutation.needsRecovery) break;
       // Do not let later events overtake an earlier event waiting for retry.
@@ -52,7 +59,11 @@ export const syncPendingMutations = (userId: string) => {
           await markMutationFailed(mutation.id, mutation.attempts + 1, 'A sessão mudou antes do envio.', true);
           break;
         }
-        await replay(mutation);
+        const response = await replay(mutation);
+        if (mutation.type === 'record.create' && tokenStore.isCurrent(generation)) {
+          const record = (response as { registro?: import('@/domain/types').DailyRecord })?.registro;
+          if (record?.id) await bindRecordEdits(userId, mutation.id, record);
+        }
         if (!tokenStore.isCurrent(generation)) {
           await markMutationFailed(mutation.id, mutation.attempts + 1, 'A sessão mudou antes da confirmação da sincronização.', true);
           break;
@@ -60,7 +71,7 @@ export const syncPendingMutations = (userId: string) => {
         committed.push(mutation);
       } catch (error) {
         const retryable = error instanceof ApiError ? error.isRetryable : false;
-        await markMutationFailed(mutation.id, mutation.attempts + 1, toUserMessage(error), retryable);
+        await markMutationFailed(mutation.id, mutation.attempts + 1, error instanceof ApiError && error.code === 'REVISAO_CONFLITO' ? 'REVISAO_CONFLITO: ' + error.message : toUserMessage(error), retryable);
         break;
       }
     }

@@ -49,3 +49,7 @@
 - [Esquema base do banco](https://github.com/VitorYunguiar/revive/issues/6).
 
 Os registros de publicação citados acima são evidências datadas. Para a validação automatizada atual, consulte o [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml).
+
+## Diario completo e correcao (#22)
+
+Consulta por habito/periodo com paginacao, detalhe completo, correcao offline dependente, revision/updated_at e conflito com reaplicacao manual. [Contratos, evidencias e rollout](diary-validation.md). SQL remoto e homologacao Android complementar nao executados nesta entrega.

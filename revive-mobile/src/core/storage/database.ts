@@ -3,6 +3,7 @@ import * as Crypto from 'expo-crypto';
 import type { BootstrapData, QueueOperationType, UrgeEventPage } from '@/domain/types';
 import { decodePayload, encodePayload, validBootstrap, validUrgeEventPage } from './envelopes';
 import { migrateDatabase } from './migrations';
+import { withPendingMutations } from '@/domain/pending-snapshot';
 import { mapQueueRow } from './queue-row';
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -111,9 +112,10 @@ export const enqueueMutation = async (
 export const getPendingMutations = async (userId: string) => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<Record<string, unknown>>(
-    `SELECT * FROM mutation_queue_v1
-     WHERE user_id = ? AND status IN ('pending', 'failed', 'syncing')
-     ORDER BY rowid ASC`,
+    `SELECT q.*, m.server_id AS resolved_record_id FROM mutation_queue_v1 q
+     LEFT JOIN diary_record_ids_v1 m ON m.user_id=q.user_id AND m.local_id=q.id
+     WHERE q.user_id = ? AND q.status IN ('pending', 'failed', 'syncing')
+     ORDER BY q.rowid ASC`,
     userId,
   );
   return rows.map(mapQueueRow);
@@ -166,6 +168,16 @@ export const reconcileMutations = async (userId: string, ids: string[], data: Bo
       encodePayload(data),
       new Date().toISOString(),
     );
+    // Keep previously paged history canonical after a confirmed correction.
+    const records = new Map(data.registros.map(record => [record.id, record]));
+    for (const row of await db.getAllAsync<{ query_key: string; payload: string }>('SELECT query_key,payload FROM diary_pages_v1 WHERE user_id=?', userId)) {
+      try {
+        const page = decodePayload(row.payload, 1) as import('@/domain/types').RecordPage;
+        if (!Array.isArray(page.registros)) continue;
+        page.registros = page.registros.map(record => records.get(record.id) || record);
+        await db.runAsync('UPDATE diary_pages_v1 SET payload=? WHERE user_id=? AND query_key=?', encodePayload(page), userId, row.query_key);
+      } catch { /* Preserve malformed cache bytes for recovery. */ }
+    }
     for (const id of ids) await db.runAsync('DELETE FROM mutation_queue_v1 WHERE user_id = ? AND id = ?', userId, id);
   });
 };
@@ -177,14 +189,77 @@ export const retryUserMutation = async (userId: string, id: string) => {
 
 export const discardUserMutation = async (userId: string, id: string) => {
   const db = await getDatabase();
-  await db.runAsync("DELETE FROM mutation_queue_v1 WHERE user_id = ? AND id = ? AND status != 'syncing'", userId, id);
+  await db.withTransactionAsync(async () => {
+    const pending = await getPendingMutations(userId);
+    if (pending.some(m => m.type === 'record.update' && m.payload.dependsOn === id)) throw new Error('Este registro tem uma correção dependente. Resolva ou descarte a correção antes da criação.');
+    await db.runAsync("DELETE FROM mutation_queue_v1 WHERE user_id = ? AND id = ? AND status != 'syncing'", userId, id);
+  });
 };
 
 export const clearUserData = async (userId: string) => {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM diary_record_ids_v1 WHERE user_id = ?', userId);
+    await db.runAsync('DELETE FROM diary_pages_v1 WHERE user_id = ?', userId);
     await db.runAsync('DELETE FROM urge_event_pages_v1 WHERE user_id = ?', userId);
     await db.runAsync('DELETE FROM bootstrap_cache_v1 WHERE user_id = ?', userId);
     await db.runAsync('DELETE FROM mutation_queue_v1 WHERE user_id = ?', userId);
   });
+};
+
+export const cacheRecordPage = async (userId: string, key: string, page: import('@/domain/types').RecordPage) => {
+  const db = await getDatabase();
+  await db.runAsync('INSERT INTO diary_pages_v1 VALUES(?,?,?) ON CONFLICT(user_id,query_key) DO UPDATE SET payload=excluded.payload', userId, key, encodePayload(page));
+};
+export const getCachedRecordPage = async (userId: string, key: string): Promise<import('@/domain/types').RecordPage | null> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ payload: string }>('SELECT payload FROM diary_pages_v1 WHERE user_id=? AND query_key=?', userId, key);
+  if (!row) return null;
+  try {
+    const page = decodePayload(row.payload, 1) as import('@/domain/types').RecordPage;
+    return Array.isArray(page.registros) && page.registros.every(r => typeof r.id === 'string' && typeof r.vicio_id === 'string' && typeof r.data_registro === 'string') && (page.next_cursor === null || typeof page.next_cursor === 'string') ? page : null;
+  } catch { return null; }
+};
+/** Rebind dependent edits durably before they can replay, including after a crash. */
+export const bindRecordEdits = async (userId: string, creationId: string, record: import('@/domain/types').DailyRecord) => {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('INSERT INTO diary_record_ids_v1 VALUES(?,?,?) ON CONFLICT(user_id,local_id) DO UPDATE SET server_id=excluded.server_id', userId, creationId, record.id);
+    const pending = await getPendingMutations(userId);
+    for (const item of pending.filter(m => m.type === 'record.update' && m.payload.dependsOn === creationId)) {
+      const { dependsOn: _dependency, ...payload } = item.payload;
+      await db.runAsync('UPDATE mutation_queue_v1 SET payload=? WHERE user_id=? AND id=?', encodePayload({ ...payload, recordId: record.id, expected_version: record.revision ?? 1 }), userId, item.id);
+    }
+  });
+};
+export const replaceFailedRecordEdit = async (userId: string, oldId: string, id: string, payload: Record<string, unknown>) => {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const old = (await getPendingMutations(userId)).find(m => m.id === oldId && m.type === 'record.update' && m.status === 'failed');
+    if (!old) throw new Error('A alteração já mudou. Atualize o diário.');
+    await enqueueMutation(userId, 'record.update', payload, new Date().toISOString(), id);
+    await db.runAsync('DELETE FROM mutation_queue_v1 WHERE user_id=? AND id=?', userId, oldId);
+  });
+};
+
+export const getCachedDiaryRecord = async (userId: string, id: string) => {
+  const bootstrap = await getCachedBootstrap(userId);
+  let record = bootstrap?.registros.find(r => r.id === id) || null;
+  const db = await getDatabase();
+  for (const row of await db.getAllAsync<{ payload: string }>('SELECT payload FROM diary_pages_v1 WHERE user_id=?', userId)) {
+    try {
+      const page = decodePayload(row.payload, 1) as import('@/domain/types').RecordPage;
+      const candidate = page.registros?.find(r => r.id === id);
+      if (candidate && (!record || (candidate.revision ?? 0) > (record.revision ?? 0))) record = candidate;
+    } catch { /* Preserve corrupt bytes; never expose another account's cache. */ }
+  }
+  const pending = await getPendingMutations(userId);
+  const localSnapshot = { usuario: { id: userId, nome: '', email: '' }, registros: record ? [record] : [], vicios: [], recaidas: [], metas: [], server_time: '', mensagem: null } as BootstrapData;
+  return withPendingMutations(localSnapshot, pending).registros.find(item => item.id === id) || record;
+};
+
+export const resolveDiaryRecordId = async (userId: string, id: string) => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ server_id: string }>('SELECT server_id FROM diary_record_ids_v1 WHERE user_id=? AND local_id=?',userId,id);
+  return row?.server_id || id;
 };

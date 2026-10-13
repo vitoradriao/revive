@@ -1,7 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 import { decodePayload, encodePayload } from './envelopes';
 
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 type Database = SQLite.SQLiteDatabase;
 
@@ -57,7 +57,7 @@ export async function migrateDatabase(db: Database) {
   }
 
   const migratedVersion = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
-  if (migratedVersion === DATABASE_VERSION) return;
+  if (migratedVersion >= 2) { await migrateDiaryPages(db); return; }
   if (migratedVersion !== 1) throw new Error('Versão local não suportada para a migração de eventos.');
   await db.withExclusiveTransactionAsync(async (tx) => {
     const version = (await tx.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
@@ -75,5 +75,16 @@ export async function migrateDatabase(db: Database) {
         ON urge_event_pages_v1(user_id, updated_at);
       PRAGMA user_version = 2;
     `);
+  });
+  await migrateDiaryPages(db);
+}
+
+async function migrateDiaryPages(db: Database) {
+  const version = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version;
+  if (version === 3) return;
+  await db.withExclusiveTransactionAsync(async tx => {
+    const lockedVersion = (await tx.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version;
+    if (lockedVersion !== 2) throw new Error('Versao local alterada durante a migracao do diario.');
+    await tx.execAsync(`CREATE TABLE diary_pages_v1 (user_id TEXT NOT NULL, query_key TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(user_id, query_key)); CREATE TABLE diary_record_ids_v1 (user_id TEXT NOT NULL, local_id TEXT NOT NULL, server_id TEXT NOT NULL, PRIMARY KEY(user_id, local_id)); PRAGMA user_version = 3;`);
   });
 }

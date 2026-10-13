@@ -148,9 +148,10 @@ export default function HabitDetailScreen() {
 
       <View style={styles.divider} />
       <Text style={textStyles.heading}>Registros recentes</Text>
+      <AppButton title="Consultar diário completo" variant="secondary" onPress={() => router.push({ pathname: '/(app)/records', params: { habitId: habit.id } })} />
       {!recentRecords.length ? <Text style={textStyles.muted}>Nenhum registro ainda.</Text> : recentRecords.map((record) => (
         <View key={record.id} style={styles.record}>
-          <RecordDetails record={record} />
+          <RecordDetails record={record} /><AppButton title="Abrir e corrigir registro" variant="secondary" onPress={() => router.push({ pathname: '/(app)/records/[id]', params: { id: record.id } })} />
         </View>
       ))}
       <View style={styles.divider} />
