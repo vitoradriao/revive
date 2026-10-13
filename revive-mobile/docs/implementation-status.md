@@ -56,4 +56,4 @@ Consulta por habito/periodo com paginacao, detalhe completo, correcao offline de
 
 ## Vontades no mobile (#25)
 
-Formulário descritivo com intensidade 0–10, gatilhos e campos opcionais; criação durável, recibos locais e consulta paginada por hábito/período/fuso. O calendário distingue check-ins, vontades e recaídas por texto. [Contrato, validação e roteiro Android](urge-events-validation.md). A homologação física permanece no gate #7; não houve SQL remoto nesta entrega.
+Formulário descritivo com intensidade 0–10, gatilhos e campos opcionais; criação durável, recibos locais e consulta paginada por hábito/período/fuso. O calendário distingue check-ins, vontades e recaídas por texto. [Contrato e validação](urge-events-validation.md); [homologação Android de 13/10/2026](urge-events-android-validation.md) com SQLite/PostgreSQL reais, offline, processo morto, fusos, arquivamento e contas sintéticas. Gate #7 permanece aberto: alteração de configuração em execução falhou (#50), e os demais aceites pendentes estão explícitos. Não houve SQL de produção nesta execução.

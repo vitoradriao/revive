@@ -16,6 +16,7 @@
 - Teste de isolamento com duas contas.
 - Executar o [roteiro de lembretes locais](local-reminders-validation.md): entrega, mudança de fuso, cold start, bloqueio local, autorização revogada e cancelamento/troca de conta em Android real.
 - Modo avião: criar check-in, recaída e meta; reiniciar; reconectar; confirmar uma única gravação.
+- Vontades: consultar a [matriz física Android](urge-events-android-validation.md), completar TalkBack auditivo/upgrade/corridas e resolver a [falha de configuração #50](https://github.com/vitoradriao/revive/issues/50). O aceite funcional da #25 não encerra o gate #7.
 - Busca por segredos no bundle/config de build.
 - Cleartext desabilitado em production.
 

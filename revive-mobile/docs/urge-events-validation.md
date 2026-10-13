@@ -27,13 +27,13 @@ Não há migration adicional: SQLite v3 e a tabela de páginas da #24 são reuti
 - Consulta paginada, deduplicação entre servidor/recibo/fila, conta A/B durante uma resposta, erro de autorização sem fallback para dados antigos, filtros de hábito/dia/fuso e estados offline.
 - SQLite real em arquivo: criar offline, fechar/reabrir, recibo gravado antes de falha de snapshot, replay com a chave original, um único evento canônico, instante histórico e isolamento/limpeza por conta. O transporte e o adaptador nativo são substituídos neste teste; a persistência, a fila e a sincronização são os módulos reais.
 - PostgreSQL 17.6/PostgREST reais: schema novo/legado, replay concorrente de vontades, autorização, filtros de dia/fuso, paginação com timestamps iguais, intensidade/futuro inválidos e contador preservado. O servidor é o contrato existente da #24, sem alteração de SQL.
-- 72 testes da API e 15 do painel/build, 160 links locais da documentação e bundle Android (3902 módulos). Nenhum aparelho estava conectado na verificação desta sessão.
+- 72 testes da API e 15 do painel/build, 160 links locais da documentação e bundle Android (3902 módulos). A verificação automatizada foi complementada em 13/10/2026 pela [matriz física Android](urge-events-android-validation.md), com resultados aprovados, falha nativa e aceites não executados explícitos.
 
 Comandos: `npm run validate --prefix revive-mobile`, `npm run validate` na raiz e `npm run test:db` com Docker.
 
 ## Roteiro em Android
 
-Verificar em aparelho antes de liberação, no gate integrado [#7](https://github.com/vitoradriao/revive/issues/7). Não confundir testes automatizados ou bundle com aceite físico.
+Executado parcialmente em aparelho em 13/10/2026; consultar a [evidência física e suas limitações](urge-events-android-validation.md). Completar os aceites restantes antes de liberação no gate integrado [#7](https://github.com/vitoradriao/revive/issues/7). Não confundir testes automatizados ou bundle com aceite físico.
 
 1. Registrar vontade com intensidade 0, sem campos opcionais; confirmar estado e contador intacto. Repetir com 10, gatilhos e campos máximos.
 2. Em modo avião, salvar, encerrar e reabrir; consultar o evento. Reconectar e confirmar um único evento com os dados finais, sem recriar.
