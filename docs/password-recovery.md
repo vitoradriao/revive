@@ -82,4 +82,3 @@ Manutenção pode remover solicitações consumidas/expiradas com mais de sete d
 - SQL remoto, habilitação em produção, áudio TalkBack destas telas e iOS não foram realizados. O gate #7 e o rollout operacional acima continuam aplicáveis.
 
 Os requisitos de proteção seguem o [guia de recuperação de senha da OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html). A caixa de CI usa a [API do Mailpit](https://mailpit.axllent.org/docs/api-v1/) para ler a mensagem somente em memória, sem imprimir seu conteúdo.
-
