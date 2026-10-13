@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
 const net = require('node:net');
 const tls = require('node:tls');
+const smtpPhases = { EHLO: 'ehlo', HELO: 'ehlo', STARTTLS: 'starttls', AUTH: 'auth', MAIL: 'mail', RCPT: 'rcpt', DATA: 'data' };
+const smtpErrorCodes = new Set(['ETIMEDOUT', 'EAUTH', 'ECONNECTION', 'ETLS', 'ESOCKET', 'EENVELOPE', 'EMESSAGE', 'EDNS', 'EPROTOCOL', 'ERR_TLS_CERT_ALTNAME_INVALID']);
 
 // Production requires an authenticated TLS SMTP provider. No console/file mailer.
 function createRecoveryEmail(env = process.env) {
@@ -14,6 +16,18 @@ function createRecoveryEmail(env = process.env) {
         configured,
         async send({ email, code, requestId }) {
             if (!configured) throw new Error('EMAIL_NOT_CONFIGURED');
+            const started = Date.now();
+            let phase = 'connect';
+            // Nodemailer passes complete SMTP lines to its logger. Consume only
+            // the command name; never forward lines, AUTH tokens or MIME data.
+            const ignore = () => {};
+            const logger = { trace: ignore, info: ignore, warn: ignore, error: ignore, fatal: ignore,
+                debug(context, line) {
+                    if (context?.tnx !== 'client') return;
+                    const command = /^(?:C: )?(EHLO|HELO|STARTTLS|AUTH|MAIL|RCPT|DATA)\b/.exec(String(line));
+                    if (command) phase = smtpPhases[command[1]];
+                },
+            };
             // Use the OS resolver (including split DNS) and own the socket so a
             // deadline also cancels DNS/connect work and cannot send mail later.
             const abort = new AbortController();
@@ -32,6 +46,7 @@ function createRecoveryEmail(env = process.env) {
                     const ready = () => {
                         clearTimeout(connecting);
                         socket.removeListener('error', failed);
+                        phase = 'greeting';
                         callback(null, { connection: socket, secured: secure });
                     };
                     socket = (secure ? tls.connect : net.connect)({
@@ -44,7 +59,7 @@ function createRecoveryEmail(env = process.env) {
                 },
                 ...(env.SMTP_USER && { auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD } }),
                 connectionTimeout: 2000, greetingTimeout: 2000, socketTimeout: 2000,
-                logger: false, debug: false,
+                logger, debug: true,
                 disableFileAccess: true, disableUrlAccess: true,
             });
             let timer;
@@ -60,6 +75,17 @@ function createRecoveryEmail(env = process.env) {
                     }),
                     new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('EMAIL_UNAVAILABLE')), 2500); }),
                 ]);
+            } catch (error) {
+                const responseCode = Number(error?.responseCode);
+                console.warn('password_recovery_smtp', {
+                    event: 'delivery_failed', phase,
+                    category: error?.message === 'EMAIL_UNAVAILABLE' ? 'deadline' : error?.message === 'EMAIL_REJECTED' ? 'rejected' : 'transport',
+                    elapsed_ms: Math.max(0, Date.now() - started),
+                    code: smtpErrorCodes.has(error?.code) ? error.code : 'UNKNOWN',
+                    ...(Number.isInteger(responseCode) && responseCode >= 100 && responseCode <= 599 && { response_code: responseCode }),
+                    region: /^[a-z]{3}\d$/.test(env.VERCEL_REGION || '') ? env.VERCEL_REGION : 'unknown',
+                });
+                throw error;
             } finally {
                 clearTimeout(timer); clearTimeout(connecting);
                 abort.abort(); socket?.destroy(); transport.close();
