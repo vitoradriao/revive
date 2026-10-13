@@ -1,7 +1,7 @@
 import { test, expect, jest } from '@jest/globals';
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { DateField } from './date-field';
+import { DateCalendar, DateField } from './date-field';
 import { Field } from './components';
 
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
@@ -42,4 +42,11 @@ test('permite conferir e ocultar senha sem alterar seu conteúdo', async () => {
   expect(screen.getByLabelText('Senha').props.secureTextEntry).toBe(false);
   await fireEvent.press(screen.getByLabelText('Ocultar senha'));
   expect(screen.getByLabelText('Senha').props.secureTextEntry).toBe(true);
+});
+
+test('Hoje selects the chosen-zone day instead of the device day', async () => {
+  const onSelect=jest.fn();
+  await render(<DateCalendar selected="2026-01-01" maxDate="2026-01-02" todayKey="2026-01-02" onSelect={onSelect} />);
+  await fireEvent.press(screen.getByLabelText('Selecionar hoje'));
+  expect(onSelect).toHaveBeenCalledWith('2026-01-02');
 });

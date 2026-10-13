@@ -9,7 +9,7 @@ import { bootstrapKey } from '@/features/bootstrap/use-bootstrap';
 import type { QueuedMutation } from '@/domain/types';
 import { AppButton, Card, PageTitle, Screen, textStyles } from '@/ui/components';
 
-const labels = { 'record.create': 'Check-in', 'record.update': 'Correção do diário', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
+const labels = { 'record.create': 'Check-in', 'record.update': 'Correção do diário', 'urge.create': 'Registro de vontade', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
 
 export default function SyncScreen() {
   const { user } = useSession();
@@ -20,7 +20,7 @@ export default function SyncScreen() {
   useFocusEffect(useCallback(() => { void refresh().catch(() => Alert.alert('Sincronização', 'Não foi possível carregar as alterações.')); }, [refresh]));
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
-    try { await action(); await refresh(); if (user) await queryClient.invalidateQueries({ queryKey: bootstrapKey(user.id) }); }
+    try { await action(); await refresh(); if (user) { await queryClient.invalidateQueries({ queryKey: bootstrapKey(user.id) }); await queryClient.invalidateQueries({ queryKey: ['urges', user.id] }); } }
     catch (error) { Alert.alert('Sincronização', error instanceof Error ? error.message : 'Tente novamente.'); }
     finally { setBusy(false); }
   };

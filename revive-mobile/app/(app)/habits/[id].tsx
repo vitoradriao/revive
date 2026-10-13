@@ -127,6 +127,10 @@ export default function HabitDetailScreen() {
       </View>
 
       {user ? <HabitManagement key={`${user.id}:${habit.id}`} habit={habit} userId={user.id} /> : null}
+      <Text accessibilityRole="header" style={textStyles.heading}>Vontades</Text>
+      <Text style={textStyles.muted}>Um relato de vontade é diferente de uma recaída e não reinicia o contador.</Text>
+      {habit.ativo !== false ? <AppButton title="Registrar vontade" onPress={() => router.push({ pathname: '/(app)/urges/new', params: { habitId: habit.id } })} /> : null}
+      <AppButton title="Consultar histórico de vontades" variant="secondary" onPress={() => router.push({ pathname: '/(app)/urges', params: { habitId: habit.id } })} />
       {habit.ativo !== false ? <>
       <Text style={textStyles.heading}>Check-in de hoje</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>

@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
-import type { BootstrapData, QueueOperationType, UrgeEventPage } from '@/domain/types';
+import type { BootstrapData, QueueOperationType, UrgeEventPage, UrgeEvent } from '@/domain/types';
 import { decodePayload, encodePayload, validBootstrap, validUrgeEventPage } from './envelopes';
 import { migrateDatabase } from './migrations';
 import { withPendingMutations } from '@/domain/pending-snapshot';
@@ -118,7 +118,11 @@ export const getPendingMutations = async (userId: string) => {
      ORDER BY q.rowid ASC`,
     userId,
   );
-  return rows.map(mapQueueRow);
+  const mutations = rows.map(mapQueueRow);
+  if (!mutations.some(m => m.type === 'urge.create')) return mutations;
+  const receipts = await getUrgeReceipts(userId);
+  return mutations.map(mutation => mutation.type === 'urge.create' && receipts.has(mutation.id)
+    ? { ...mutation, resolvedUrgeEvent: receipts.get(mutation.id) } : mutation);
 };
 
 export const countPendingMutations = async (userId: string) => {
@@ -263,3 +267,42 @@ export const resolveDiaryRecordId = async (userId: string, id: string) => {
   const row = await db.getFirstAsync<{ server_id: string }>('SELECT server_id FROM diary_record_ids_v1 WHERE user_id=? AND local_id=?',userId,id);
   return row?.server_id || id;
 };
+
+/** Server receipts survive removal of the queue: bootstrap deliberately omits urge history. */
+export const cacheUrgeReceipt = async (userId: string, mutationId: string, event: UrgeEvent) => {
+  await cacheUrgeEventPage(userId, `receipt:urge:${mutationId}`, {
+    vontades: [event], next_cursor: null,
+    cobertura: { total: 1, retornados: 1, tem_mais: false }, atualizado_em: event.updated_at,
+  });
+};
+const getUrgeReceipts = async (userId: string) => {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ query_key: string; payload: string; payload_version: number }>(
+    "SELECT query_key,payload,payload_version FROM urge_event_pages_v1 WHERE user_id=? AND query_key LIKE 'receipt:urge:%'", userId);
+  const receipts = new Map<string, UrgeEvent>();
+  for (const row of rows) {
+    try {
+      const page = decodePayload(row.payload, row.payload_version);
+      if (validUrgeEventPage(page, userId) && page.vontades[0]) receipts.set(row.query_key.slice('receipt:urge:'.length), page.vontades[0]);
+    } catch { /* Keep malformed bytes for recovery. */ }
+  }
+  return receipts;
+};
+export const getLocalUrgeEvents = async (userId: string, receiptsOnly = false) => {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ payload: string; payload_version: number }>(
+    `SELECT payload,payload_version FROM urge_event_pages_v1 WHERE user_id=?${receiptsOnly ? " AND query_key LIKE 'receipt:urge:%'" : ''}`, userId);
+  const events = new Map<string, UrgeEvent>();
+  for (const row of rows) {
+    try {
+      const page = decodePayload(row.payload, row.payload_version);
+      if (validUrgeEventPage(page, userId)) for (const event of page.vontades) {
+        const existing = events.get(event.id);
+        if (!existing || !Number.isFinite(Date.parse(existing.updated_at)) || Date.parse(event.updated_at) >= Date.parse(existing.updated_at)) events.set(event.id, event);
+      }
+    } catch { /* Retain source bytes; do not manufacture history. */ }
+  }
+  return [...events.values()];
+};
+
+export const getUrgeReceipt = async (userId: string, mutationId: string) => (await getUrgeReceipts(userId)).get(mutationId) || null;

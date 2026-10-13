@@ -86,3 +86,21 @@ it('rejects a stale account before enqueue and suppresses old cache publication 
   expect(queryClient.setQueryData).not.toHaveBeenCalled();
   expect(syncPendingMutations).not.toHaveBeenCalled();
 });
+
+it('persists an urge with its historical timestamp before transport and validates active ownership', async () => {
+  const habit = { id:'h', usuario_id:'a', nome_vicio:'Synthetic',ativo:true,data_inicio:'2026-01-01' };
+  jest.mocked(getCachedBootstrap).mockResolvedValue({...snapshot,vicios:[habit]});
+  jest.mocked(NetInfo.fetch).mockResolvedValue({isConnected:false} as never);
+  const hook=await renderHook(()=>useReviveMutations());
+  const payload={vicio_id:'h',occurred_at:'2026-10-12T20:00:00.000Z',timezone:'America/Sao_Paulo',intensidade:0};
+  expect(await hook.result.current.createUrgeEventWithReceipt(payload)).toEqual({id:'durable-key',status:'queued'});
+  expect(enqueueMutation).toHaveBeenCalledWith('a','urge.create',expect.objectContaining({...payload,gatilhos:[],nota:null,acao_realizada:null,resultado:null}),payload.occurred_at,'durable-key');
+  expect(jest.mocked(enqueueMutation).mock.invocationCallOrder[0]!).toBeLessThan(jest.mocked(NetInfo.fetch).mock.invocationCallOrder[0]!);
+  jest.mocked(enqueueMutation).mockClear();
+  jest.mocked(getCachedBootstrap).mockResolvedValue({...snapshot,vicios:[{...habit,ativo:false}]});
+  await expect(hook.result.current.createUrgeEventWithReceipt(payload)).rejects.toThrow('Reative');
+  expect(enqueueMutation).not.toHaveBeenCalled();
+  jest.mocked(getCachedBootstrap).mockResolvedValue({...snapshot,vicios:[{...habit,usuario_id:'b'}]});
+  await expect(hook.result.current.createUrgeEventWithReceipt(payload)).rejects.toThrow('indisponível');
+  expect(enqueueMutation).not.toHaveBeenCalled();
+});

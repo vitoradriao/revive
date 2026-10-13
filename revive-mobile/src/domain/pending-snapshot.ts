@@ -74,20 +74,16 @@ export function withPendingMutations(snapshot: BootstrapData, mutations: QueuedM
         ? projectRelapse(item, String(payload.occurred_at), payload.resetarContador === true)
         : item);
     }
-    if (mutation.type === 'urge.create' && !result.vontades?.some((item) => item.id === mutation.id)) {
+    if (mutation.type === 'urge.create') {
       const urge = payload as CreateUrgeEventInput;
-      result.vontades?.unshift({
-        ...urge,
-        gatilhos: urge.gatilhos ?? [],
-        nota: urge.nota ?? null,
-        acao_realizada: urge.acao_realizada ?? null,
-        resultado: urge.resultado ?? null,
-        id: mutation.id,
-        usuario_id: mutation.userId,
-        created_at: mutation.occurredAt,
-        updated_at: mutation.occurredAt,
-        pending: true,
-      });
+      const event = mutation.resolvedUrgeEvent || {
+        ...urge, gatilhos: urge.gatilhos ?? [], nota: urge.nota ?? null,
+        acao_realizada: urge.acao_realizada ?? null, resultado: urge.resultado ?? null,
+        id: mutation.id, usuario_id: mutation.userId, created_at: mutation.occurredAt, updated_at: mutation.occurredAt,
+      };
+      if (event.usuario_id !== snapshot.usuario.id) continue;
+      result.vontades = result.vontades?.filter(item => item.id !== mutation.id && item.id !== event.id);
+      result.vontades?.unshift({ ...event, pending: true, sync_error: mutation.lastError });
     }
     if (mutation.type === 'goal.create' && !result.metas.some((item) => item.id === mutation.id)) {
       result.metas.unshift({ ...(payload as CreateGoalInput), id: mutation.id, usuario_id: mutation.userId, pending: true, concluida: false });

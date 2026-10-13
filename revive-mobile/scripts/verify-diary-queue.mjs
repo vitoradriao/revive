@@ -13,6 +13,7 @@ const directory = mkdtempSync(join(tmpdir(), 'revive-diary-'));
 const filename = join(directory, 'diary.db');
 const originalLoad = Module._load, originalResolve = Module._resolveFilename, originalTs = Module._extensions['.ts'];
 let sqlite, db, online = false, generation = 1, currentUser = 'a', failSnapshot = false;
+const urges = new Map();
 const server = new Map(), receipts = new Map(), calls = [];
 const snapshot = () => ({ usuario: { id: 'a', nome: 'Synthetic', email: 'synthetic@example.invalid' }, server_time: '', vicios: [], registros: [...server.values()], recaidas: [], metas: [], mensagem: null });
 let ApiError;
@@ -31,6 +32,14 @@ const api = {
     const { expected_version: _version, ...patch } = input;
     const updated = { ...record, ...patch, revision: record.revision + 1 };
     server.set(id, updated); receipts.set(key, { registro: updated }); return receipts.get(key);
+  },
+  async createUrgeEvent(input, key) {
+    assert.equal(online,true); calls.push(['urge',key]);
+    if (!receipts.has(key)) {
+      const event = { ...input, id:randomUUID(), usuario_id:'a', created_at:new Date().toISOString(), updated_at:new Date().toISOString() };
+      urges.set(event.id,event); receipts.set(key,{vontade:event});
+    }
+    return receipts.get(key);
   },
   async bootstrap() { if (failSnapshot) throw new ApiError('Snapshot unavailable', 503); return snapshot(); },
 };
@@ -103,10 +112,40 @@ try {
   await db.replaceFailedRecordEdit('a',conflict,replacement,{recordId:record.id,expected_version:2,observacoes:failed.payload.observacoes});
   assert.equal(await sync('a'),1); assert.equal(server.get(record.id).observacoes,'Local conflict text');
   assert.equal((await db.getCachedRecordPage('a','history')).registros[0].observacoes,'Local conflict text');
+  // The real local database must retain accepted urge history outside bootstrap.
+  const urgeKey=randomUUID();
+  const urgePayload={vicio_id:'habit',occurred_at:'2026-10-12T22:00:00.000Z',timezone:'America/Sao_Paulo',intensidade:0,gatilhos:['estresse'],nota:'Synthetic retrospective',acao_realizada:null,resultado:null};
+  online=false;
+  await db.enqueueMutation('a','urge.create',urgePayload,urgePayload.occurred_at,urgeKey);
+  assert.equal(urges.size,0);
+  sqlite.close(); sync=await open();
+  const unsent=(await db.getPendingMutations('a')).find(m=>m.id===urgeKey);
+  assert.deepEqual(unsent.payload,urgePayload); assert.equal(unsent.occurredAt,urgePayload.occurred_at);
+  const before=JSON.stringify(snapshot());
+  online=true; failSnapshot=true;
+  assert.equal(await sync('a'),0); assert.equal(urges.size,1);
+  assert.equal(JSON.stringify(snapshot()),before,'urge does not change records/counters in bootstrap');
+  const urgeId=[...urges.keys()][0];
+  assert.equal((await db.getLocalUrgeEvents('a'))[0].id,urgeId);
+  const accepted=(await db.getPendingMutations('a')).find(m=>m.id===urgeKey);
+  assert.equal(accepted.resolvedUrgeEvent.id,urgeId);
+  const project=require('../src/domain/pending-snapshot.ts').withPendingMutations;
+  assert.equal(project({...snapshot(),vontades:[...urges.values()]},[accepted]).vontades.length,1);
+  sqlite.close(); sync=await open(); failSnapshot=false;
+  await db.retryUserMutation('a',urgeKey);
+  assert.equal(await sync('a'),1); assert.equal(urges.size,1);
+  assert.equal((await db.getPendingMutations('a')).length,0);
+  assert.equal((await db.getLocalUrgeEvents('a'))[0].intensidade,0);
+  assert.equal((await db.getUrgeReceipt('a',urgeKey)).id,urgeId);
+  assert.equal(await db.getUrgeReceipt('b',urgeKey),null);
+  assert.deepEqual(await db.getLocalUrgeEvents('b'),[]);
+  assert.deepEqual(calls.filter(call=>call[0]==='urge').map(call=>call[1]),[urgeKey,urgeKey]);
+  await assert.rejects(db.cacheUrgeEventPage('b','bad-owner',{vontades:[...urges.values()],next_cursor:null,cobertura:{total:1,retornados:1,tem_mais:false},atualizado_em:urgePayload.occurred_at}),/inválida/);
+  console.log('Urge SQLite: offline/reopen, durable receipt before snapshot, original-key replay, unique canonical ID, historical moment and account isolation passed.');
   currentUser='b'; generation++;
   await db.enqueueMutation('a','record.update',{recordId:record.id,expected_version:3,humor:'a only'});
   const callCount=calls.length; assert.equal(await sync('a'),0); assert.equal(calls.length,callCount);
-  await db.clearUserData('a'); assert.equal(await db.getCachedRecordPage('a','filter-a'),null);
+  await db.clearUserData('a'); assert.deepEqual(await db.getLocalUrgeEvents('a'),[]); assert.equal(await db.getCachedRecordPage('a','filter-a'),null);
   console.log('Diary SQLite: offline create/edit, reopen, ID rebind, repeated receipts, conflict preservation/manual reapply and account/cache isolation passed.');
 } finally {
   try { sqlite?.close(); } catch {}

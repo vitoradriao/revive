@@ -28,7 +28,7 @@ export const validBootstrap = (value: unknown, userId: string): value is Bootstr
 export const validUrgeEventPage = (value: unknown, userId: string): value is UrgeEventPage =>
   object(value) && Array.isArray(value.vontades) && value.vontades.every(event => object(event)
     && event.usuario_id === userId && typeof event.id === 'string' && typeof event.vicio_id === 'string'
-    && typeof event.occurred_at === 'string' && typeof event.timezone === 'string'
+    && typeof event.occurred_at === 'string' && Number.isFinite(Date.parse(event.occurred_at)) && typeof event.timezone === 'string'
     && Number.isInteger(event.intensidade) && Number(event.intensidade) >= 0 && Number(event.intensidade) <= 10
     && Array.isArray(event.gatilhos) && event.gatilhos.every(code => typeof code === 'string'))
   && (value.next_cursor === null || typeof value.next_cursor === 'string')

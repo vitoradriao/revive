@@ -1,0 +1,27 @@
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import { expect, it, jest } from '@jest/globals';
+import CalendarScreen from '../../../app/(app)/calendar';
+import { UrgeList } from './urge-list';
+import { dateInZone } from '@/domain/urge-time';
+jest.mock('expo-router', () => ({useRouter:()=>({push:jest.fn(),back:jest.fn()})}));
+jest.mock('@/features/bootstrap/use-bootstrap', () => {const {dateInZone}=jest.requireActual<typeof import('@/domain/urge-time')>('@/domain/urge-time');return {useBootstrap:()=>({data:{vicios:[{id:'h',nome_vicio:'Sintetico',ativo:true},{id:'archived',nome_vicio:'Antigo',ativo:false}],registros:[{id:'record',vicio_id:'h',data_registro:dateInZone(new Date(),'UTC'),humor:'Bem'}],recaidas:[{id:'relapse',vicio_id:'h',data_recaida:new Date().toISOString(),motivo:'Relato'}]}})};});
+jest.mock('./use-urge-activity',()=>({useUrgeActivity:()=>({data:[]})}));
+jest.mock('@/features/diary/use-records',()=>({useRecords:()=>({records:[],local:false,isLoading:false,isError:false,hasNextPage:false})}));
+jest.mock('./urge-list',()=>{const {Text}=jest.requireActual<typeof import('react-native')>('react-native');return {UrgeList:jest.fn(function SyntheticUrgeList({habit}:{habit:{nome_vicio:string}}){return <Text>Vontade registrada de {habit.nome_vicio}</Text>;})};});
+jest.mock('react-native-safe-area-context',()=>{const {View}=jest.requireActual<typeof import('react-native')>('react-native');return {SafeAreaView:View,useSafeAreaInsets:()=>({top:0,bottom:0,left:0,right:0})};});
+jest.mock('lucide-react-native',()=>({CalendarDays:()=>null,ChevronDown:()=>null,ChevronLeft:()=>null,ChevronRight:()=>null,X:()=>null,Eye:()=>null,EyeOff:()=>null}));
+it('distinguishes three textual types and applies habit, archived history and zone filters',async()=>{
+  await render(<CalendarScreen/>);
+  expect(screen.getByText('Recaída registrada · Sintetico')).toBeTruthy();
+  expect(screen.getByText('Vontade registrada de Sintetico')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Vontades'));
+  expect(screen.queryByText('Recaída registrada · Sintetico')).toBeNull();
+  expect(screen.queryByText('Check-in: Bem')).toBeNull();
+  await fireEvent.press(screen.getByRole('button',{name:'Antigo · arquivado'}));
+  expect(screen.queryByText('Vontade registrada de Sintetico')).toBeNull();
+  expect(screen.getByText('Vontade registrada de Antigo')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Usar UTC'));
+  await fireEvent.press(screen.getByText('Aplicar fuso'));
+  expect(UrgeList).toHaveBeenLastCalledWith(expect.objectContaining({habit:expect.objectContaining({id:'archived'}),inicio:dateInZone(new Date(),Intl.DateTimeFormat().resolvedOptions().timeZone),timezone:'UTC'}),undefined);
+});

@@ -66,3 +66,5 @@ O comando verifica tipos TypeScript, lint e testes Jest. Também é possível ex
 Veja o [estado da implementação](docs/implementation-status.md) e siga o [fluxo de contribuição](../CONTRIBUTING.md).
 
 Consulta e correcao do diario: [contrato, evidencias e rollout](docs/diary-validation.md).
+
+Registro e histórico de vontades: [contrato, evidências e homologação](docs/urge-events-validation.md).

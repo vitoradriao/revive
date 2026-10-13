@@ -80,6 +80,7 @@ export type Relapse = {
 };
 
 export type UrgeEvent = {
+  sync_error?: string | null;
   id: string;
   usuario_id: string;
   vicio_id: string;
@@ -207,6 +208,7 @@ export type QueueOperationType =
   | 'goal.complete';
 
 export type QueuedMutation = {
+  resolvedUrgeEvent?: UrgeEvent;
   resolvedRecordId?: string;
   id: string;
   userId: string;

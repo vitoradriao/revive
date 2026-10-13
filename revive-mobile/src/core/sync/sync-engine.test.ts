@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, jest } from '@jest/globals';
 import { ApiError } from '@/core/api/errors';
 import { reviveApi } from '@/core/api/repositories';
-import { getPendingMutations, markMutationFailed, reconcileMutations } from '@/core/storage/database';
+import { cacheUrgeReceipt, getPendingMutations, markMutationFailed, reconcileMutations } from '@/core/storage/database';
 import { tokenStore } from '@/core/auth/token-store';
 import type { QueuedMutation } from '@/domain/types';
 import { syncPendingMutations } from './sync-engine';
@@ -10,7 +10,7 @@ jest.mock('@/core/api/repositories', () => ({ reviveApi: {
   updateRecord: jest.fn(), createRecord: jest.fn(), createRelapse: jest.fn(), createUrgeEvent: jest.fn(), bootstrap: jest.fn(),
 } }));
 jest.mock('@/core/storage/database', () => ({
-  bindRecordEdits: jest.fn(), getPendingMutations: jest.fn(), markMutationSyncing: jest.fn(),
+  cacheUrgeReceipt: jest.fn(), bindRecordEdits: jest.fn(), getPendingMutations: jest.fn(), markMutationSyncing: jest.fn(),
   markMutationFailed: jest.fn(), reconcileMutations: jest.fn(),
 }));
 jest.mock('@/core/auth/token-store', () => ({ tokenStore: { getUser: jest.fn(), getGeneration: jest.fn(), isCurrent: jest.fn() } }));
@@ -66,9 +66,11 @@ it('replays a queued urge with its stable idempotency key and independent event 
     vicio_id: 'habit', occurred_at: '2026-01-01T00:00:00.000Z', timezone: 'America/Sao_Paulo',
     intensidade: 4, gatilhos: ['estresse'], nota: null,
   };
+  jest.mocked(reviveApi.createUrgeEvent).mockResolvedValue({ vontade: { id: 'server-urge', usuario_id: 'user-a' } } as never);
   jest.mocked(getPendingMutations).mockResolvedValue([{ ...event('urge-key'), type: 'urge.create', payload }]);
   expect(await syncPendingMutations('user-a')).toBe(1);
   expect(reviveApi.createUrgeEvent).toHaveBeenCalledWith(payload, 'urge-key');
+  expect(cacheUrgeReceipt).toHaveBeenCalledWith('user-a','urge-key',expect.objectContaining({id:'server-urge'}));
   expect(reconcileMutations).toHaveBeenCalledWith('user-a', ['urge-key'], { usuario: { id: 'user-a' } });
 });
 
