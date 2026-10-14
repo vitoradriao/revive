@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getPendingMutations, retryUserMutation, discardUserMutation } from '@/core/storage/database';
 import { syncPendingMutations } from '@/core/sync/sync-engine';
@@ -7,7 +7,10 @@ import { queryClient } from '@/core/query/client';
 import { useSession } from '@/features/auth/session-context';
 import { bootstrapKey } from '@/features/bootstrap/use-bootstrap';
 import type { QueuedMutation } from '@/domain/types';
-import { AppButton, Card, PageTitle, Screen, textStyles } from '@/ui/components';
+import { AppButton, Card, LoadingState, Screen, textStyles } from '@/ui/components';
+import { BackHeader, EditorialTitle, editorialStyles, Flourish } from '@/ui/editorial';
+import { Illustration } from '@/ui/illustration';
+import { colors } from '@/ui/theme';
 
 const labels = { 'record.create': 'Check-in', 'record.update': 'Correção do diário', 'urge.create': 'Registro de vontade', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
 
@@ -16,7 +19,16 @@ export default function SyncScreen() {
   const router = useRouter();
   const [items, setItems] = useState<QueuedMutation[]>([]);
   const [busy, setBusy] = useState(false);
-  const refresh = useCallback(async () => { if (user) setItems(await getPendingMutations(user.id)); }, [user]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    try {
+      setItems(await getPendingMutations(user.id));
+      setLoaded(true);
+      setLoadError(false);
+    } catch (error) { setLoadError(true); throw error; }
+  }, [user]);
   useFocusEffect(useCallback(() => { void refresh().catch(() => Alert.alert('Sincronização', 'Não foi possível carregar as alterações.')); }, [refresh]));
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -25,10 +37,16 @@ export default function SyncScreen() {
     finally { setBusy(false); }
   };
   return <Screen>
-    <AppButton title="Voltar" variant="secondary" onPress={() => router.back()} />
-    <PageTitle title="Sincronização" subtitle="Suas alterações são enviadas na ordem em que foram registradas." />
+    <BackHeader section="Sincronização" onBack={() => router.back()} />
+    <EditorialTitle title="Cada passo," emphasis="no seu lugar." />
+    {!loaded ? loadError ? <Text accessibilityRole="alert" style={textStyles.body}>Não foi possível consultar a fila. Tente sincronizar novamente.</Text> : <LoadingState label="Consultando alterações salvas..." /> : <Card style={{ backgroundColor: colors.sage, borderWidth: 0, alignItems: 'center', paddingVertical: 24, gap: 18 }}>
+      <Text style={[editorialStyles.eyebrow, { color: colors.text }]}>{items.length} ALTERAÇÕES PENDENTES</Text>
+      <Illustration name="sincronizacao" size={190} height={160} />
+      <Text style={textStyles.heading}>{items.length ? 'Seu caminho está guardado.' : 'Nada aguardando envio.'}</Text>
+      <Text style={[textStyles.body, { textAlign: 'center' }]}>{items.length ? 'Suas alterações aguardam sincronização.' : 'Sua fila de alterações está vazia.'}</Text>
+    </Card>}
+    <Text style={textStyles.muted}>Suas alterações são enviadas na ordem em que foram registradas.</Text>
     <AppButton title="Sincronizar agora" loading={busy} onPress={() => user && void run(() => syncPendingMutations(user.id))} />
-    {!items.length ? <Text style={textStyles.muted}>Nenhuma alteração aguardando envio.</Text> : null}
     {items.map((item) => <Card key={item.id}>
       <Text style={textStyles.heading}>{labels[item.type as keyof typeof labels] || 'Alteração incompatível'}</Text>
       <Text style={textStyles.muted}>{new Date(item.occurredAt).toLocaleString('pt-BR')}</Text>
@@ -40,5 +58,6 @@ export default function SyncScreen() {
         { text: 'Descartar', style: 'destructive', onPress: () => user && void run(() => discardUserMutation(user.id, item.id)) },
       ])} />
     </Card>)}
+    <View style={{ alignItems: 'center', gap: 8 }}><Text style={editorialStyles.note}>Seu caminho segue com você.</Text><Flourish width={140} /></View>
   </Screen>;
 }

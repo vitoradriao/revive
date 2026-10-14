@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { colors, radius, spacing } from './theme';
+import { colors, fonts, radius, spacing } from './theme';
 
 export function Screen({ children, scroll = true }: React.PropsWithChildren<{ scroll?: boolean }>) {
   const content = scroll ? (
@@ -80,7 +80,7 @@ export const Field = forwardRef<TextInput, TextInputProps & { label: string; err
 export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <View style={styles.titleWrap}>
-      <Text style={styles.title}>{title}</Text>
+      <Text accessibilityRole="header" style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
@@ -105,27 +105,27 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
 }
 
 export const textStyles = StyleSheet.create({
-  heading: { color: colors.text, fontSize: 22, fontWeight: '800' },
-  body: { color: colors.text, fontSize: 16 },
-  muted: { color: colors.muted, fontSize: 14 },
-  value: { color: colors.primary, fontSize: 28, fontWeight: '900' },
+  heading: { color: colors.text, fontFamily: fonts.sans, fontSize: 22, fontWeight: '700' },
+  body: { color: colors.text, fontFamily: fonts.sans, fontSize: 16, lineHeight: 23 },
+  muted: { color: colors.muted, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
+  value: { color: colors.text, fontFamily: fonts.sans, fontSize: 28, fontWeight: '700' },
 });
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: 48, gap: spacing.md, flexGrow: 1 },
+  content: { padding: spacing.lg, paddingBottom: 40, gap: spacing.md, flexGrow: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
-  button: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  buttonSecondary: { backgroundColor: 'transparent', borderColor: colors.primary, borderWidth: 1 },
+  button: { minHeight: 50, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.text },
+  buttonSecondary: { backgroundColor: 'transparent', borderColor: colors.border, borderWidth: 1 },
   buttonDanger: { backgroundColor: colors.danger },
-  buttonText: { color: colors.background, fontWeight: '800', fontSize: 16 },
+  buttonText: { color: colors.background, fontFamily: fonts.sans, fontWeight: '700', fontSize: 16, textAlign: 'center' },
   buttonSecondaryText: { color: colors.primary },
   pressed: { opacity: 0.78 },
   disabled: { opacity: 0.45 },
   fieldWrap: { gap: spacing.xs },
   label: { color: colors.text, fontSize: 14, fontWeight: '700' },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md },
-  input: { flex: 1, minWidth: 0, minHeight: 50, color: colors.text, paddingHorizontal: spacing.md, fontSize: 16 },
+  input: { flex: 1, minWidth: 0, minHeight: 50, color: colors.text, paddingHorizontal: spacing.md, fontFamily: fonts.sans, fontSize: 16 },
   inputFocused: { borderColor: colors.primary },
   inputAction: { width: 48, minHeight: 50, alignItems: 'center', justifyContent: 'center' },
   hint: { color: colors.muted, fontSize: 13, lineHeight: 19 },
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   inputError: { borderColor: colors.danger },
   error: { color: colors.danger, fontSize: 13 },
   titleWrap: { gap: spacing.xs, marginBottom: spacing.sm },
-  title: { color: colors.text, fontSize: 34, lineHeight: 38, fontWeight: '900' },
+  title: { color: colors.text, fontFamily: fonts.sans, fontSize: 34, lineHeight: 38, fontWeight: '700', letterSpacing: -1.2 },
   subtitle: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.md, flex: 1 },
   cardTitle: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },

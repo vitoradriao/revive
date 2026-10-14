@@ -28,7 +28,7 @@ export function ReminderSettings() {
         <Text accessibilityRole="header" style={textStyles.body}>Lembrete diário</Text>
         <Text accessibilityLiveRegion="polite" style={textStyles.muted}>{state.status === 'scheduled' ? `Agendado às ${formatReminderTime(savedHour, savedMinute)} no horário local do aparelho.` : state.status === 'off' ? 'Lembrete desligado.' : 'Lembrete não confirmado pelo sistema.'}</Text>
       </View>
-      <Switch accessibilityLabel="Lembrete diário" accessibilityState={{ checked: state.status === 'scheduled', disabled: busy, busy }} value={state.status === 'scheduled'} disabled={busy} trackColor={{ true: colors.primary }} onValueChange={enabled => {
+      <Switch accessibilityLabel="Lembrete diário" accessibilityState={{ checked: state.status === 'scheduled', disabled: busy, busy }} value={state.status === 'scheduled'} disabled={busy} thumbColor={colors.surface} trackColor={{ true: colors.primary }} onValueChange={enabled => {
         if (enabled) void apply(true, true);
         else { setError(''); void update(savedHour, savedMinute, false); }
       }} />

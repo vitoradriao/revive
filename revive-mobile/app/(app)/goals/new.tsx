@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { useReviveMutations } from '@/features/mutations/use-revive-mutations';
 import { toUserMessage } from '@/core/api/errors';
-import { AppButton, Card, Field, PageTitle, Screen, textStyles } from '@/ui/components';
+import { AppButton, Field, Screen, textStyles } from '@/ui/components';
+import { BackHeader, EditorialTitle } from '@/ui/editorial';
 import { localDateKey, parseMoney, formatMoneyInput } from '@/domain/formats';
 import { colors, radius, spacing } from '@/ui/theme';
 
@@ -40,25 +41,27 @@ export default function NewGoalScreen() {
   });
   return (
     <Screen>
-      <PageTitle title="Nova meta" subtitle="Escolha a jornada e um objetivo em dias ou valor." />
-      <Card>
+      <BackHeader section="Nova meta" onBack={() => router.back()} />
+      <EditorialTitle title="Dê forma" emphasis="ao próximo passo." />
+      <View style={{ gap: 20 }}>
         <Text style={textStyles.body}>Hábito</Text>
         {habits.map((habit) => <Pressable accessibilityRole="radio" accessibilityState={{ checked: habitId === habit.id }} key={habit.id} onPress={() => setHabitId(habit.id)} style={[styles.choice, habitId === habit.id && styles.choiceActive]}><Text style={textStyles.body}>{habit.nome_vicio}</Text></Pressable>)}
         {data && !habits.length ? <><Text style={textStyles.muted}>Crie ou reative um hábito antes de definir uma meta.</Text><AppButton title="Criar hábito" variant="secondary" onPress={() => router.push('/habits/new')} /></> : null}
         <Controller control={control} name="description" render={({ field }) => <Field ref={field.ref} onBlur={field.onBlur} maxLength={240} placeholder="Ex.: completar meu primeiro mês" label="Descrição" value={field.value} onChangeText={field.onChange} error={errors.description?.message} />} />
+        <Text style={textStyles.heading}>Seu objetivo</Text><Text style={textStyles.muted}>Preencha dias, valor ou os dois.</Text>
         <Controller control={control} name="days" render={({ field }) => <Field ref={field.ref} onBlur={field.onBlur} error={errors.days?.message} maxLength={5} placeholder="Ex.: 30" label="Objetivo em dias (opcional)" keyboardType="number-pad" value={field.value} onChangeText={field.onChange} />} />
         <Controller control={control} name="value" render={({ field }) => <Field ref={field.ref} onBlur={() => { field.onChange(formatMoneyInput(field.value)); field.onBlur(); }} error={errors.value?.message} maxLength={16} placeholder="0,00" label="Objetivo em dinheiro (R$, opcional)" keyboardType="decimal-pad" value={field.value} onChangeText={field.onChange} />} />
-        <View style={styles.switchRow}><Text style={[textStyles.body, { flex: 1 }]}>Contar progresso a partir de hoje</Text><Switch accessibilityLabel="Contar progresso a partir de hoje" trackColor={{ false: colors.border, true: colors.primary }} value={startToday} onValueChange={(value) => setValue('startToday', value)} /></View>
+        <View style={styles.switchRow}><Text style={[textStyles.body, { flex: 1 }]}>Contar progresso a partir de hoje</Text><Switch accessibilityLabel="Contar progresso a partir de hoje" thumbColor={colors.surface} trackColor={{ false: colors.border, true: colors.primary }} value={startToday} onValueChange={(value) => setValue('startToday', value)} /></View>
         {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
         <AppButton title="Criar meta" loading={isSubmitting} disabled={!habitId} onPress={submit} />
         <AppButton title="Cancelar" disabled={isSubmitting} variant="secondary" onPress={() => router.back()} />
-      </Card>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  choiceActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  choiceActive: { borderColor: colors.primary, backgroundColor: colors.lavender },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: colors.butter, padding: 16, borderRadius: radius.md },
 });

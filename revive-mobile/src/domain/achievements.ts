@@ -22,6 +22,7 @@ export function achievementProgress(data: BootstrapData) {
     const current = values[group.category];
     return {
       id: `${group.category}-${target}`,
+      categoryKey: group.category,
       label: group.category === 'streak' ? `${target} dias consecutivos`
         : group.category === 'savings' ? `${formatCurrency(target)} de economia estimada acumulada`
           : group.category === 'goals' ? `${target} metas concluídas`

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import AchievementsScreen from '../../../app/(app)/achievements';
@@ -14,6 +14,30 @@ const snapshot = (data: BootstrapData) => {
 };
 
 describe('achievement screen', () => {
+  it('switches categories without duplicating milestones and keeps distinct-date progress', async () => {
+    snapshot({
+      server_time: '2026-10-14T12:00:00Z',
+      usuario: { id: 'u', nome: 'Pessoa', email: 'test@example.invalid' },
+      vicios: [], metas: [], recaidas: [], mensagem: null, conquistas: [],
+      registros: [
+        { id: 'one', vicio_id: 'h', data_registro: '2026-10-14' },
+        { id: 'two', vicio_id: 'h', data_registro: '2026-10-14' },
+      ],
+    });
+    const view = await render(<AchievementsScreen />);
+    expect(view.getByText('0 de 15 marcos alcançados')).toBeTruthy();
+    expect(view.getAllByText(/dias consecutivos/)).toHaveLength(6);
+    await fireEvent.press(view.getByRole('tab', { name: 'Economia' }));
+    expect(view.queryByText('30 dias consecutivos')).toBeNull();
+    expect(view.getAllByText(/de economia estimada acumulada/)).toHaveLength(4);
+    await fireEvent.press(view.getByRole('tab', { name: 'Metas' }));
+    expect(view.getAllByText(/metas concluídas/)).toHaveLength(3);
+    await fireEvent.press(view.getByRole('tab', { name: 'Registros' }));
+    expect(view.getByText('Próximo marco: 1 de 7')).toBeTruthy();
+    expect(view.getByText('Próximo marco: 1 de 30')).toBeTruthy();
+    expect(view.getByRole('tab', { name: 'Registros' }).props.accessibilityState.selected).toBe(true);
+  });
+
   it('shows an awarded 30-day milestone as permanent after the active streak resets to two days', async () => {
     snapshot({
       server_time: '2026-02-01T12:00:00Z',

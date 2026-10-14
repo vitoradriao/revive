@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
 import { z } from 'zod';
@@ -7,6 +7,8 @@ import { bootstrapKey, useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { useReviveMutations } from '@/features/mutations/use-revive-mutations';
 import { AppButton, EmptyState, Field, LoadingState, Screen, textStyles } from '@/ui/components';
 import { colors, radius, spacing } from '@/ui/theme';
+import { BackHeader, EditorialTitle } from '@/ui/editorial';
+import { MoodPicker } from '@/ui/mood-picker';
 import { coverageLabel, currentStreak, distinctCheckinDays, formatCurrency, milestoneCategoryLabel, sequenceSavings } from '@/domain/metrics';
 import { reviveApi } from '@/core/api/repositories';
 import { queryClient } from '@/core/query/client';
@@ -95,6 +97,7 @@ export default function HabitDetailScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: habit.nome_vicio }} />
+      <BackHeader section={habit.nome_vicio} onBack={() => router.back()} />
       <View style={styles.summary}>
         <Text accessibilityRole="header" style={textStyles.heading}>Progresso de {habit.nome_vicio}</Text>
         <Text style={textStyles.muted}>Sequência atual</Text>
@@ -132,14 +135,12 @@ export default function HabitDetailScreen() {
       {habit.ativo !== false ? <AppButton title="Registrar vontade" onPress={() => router.push({ pathname: '/(app)/urges/new', params: { habitId: habit.id } })} /> : null}
       <AppButton title="Consultar histórico de vontades" variant="secondary" onPress={() => router.push({ pathname: '/(app)/urges', params: { habitId: habit.id } })} />
       {habit.ativo !== false ? <>
-      <Text style={textStyles.heading}>Check-in de hoje</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {['Bem', 'Confiante', 'Ansioso', 'Desanimado'].map((mood) => <Pressable key={mood} accessibilityRole="button" accessibilityState={{ selected: humor === mood }} onPress={() => setHumor(mood)} style={[styles.mood, humor === mood && { borderColor: colors.primary, backgroundColor: colors.surfaceRaised }]}><Text style={textStyles.body}>{mood}</Text></Pressable>)}
-      </View>
+      <EditorialTitle title="Como foi seu dia?" emphasis="Pode ser sincero." />
+      <MoodPicker value={humor} onChange={setHumor} disabled={saving} />
       <Field maxLength={100} label="Humor" value={humor} onChangeText={setHumor} placeholder="Ou descreva como está se sentindo" />
-      <Field maxLength={500} label="Gatilhos" value={gatilhos} onChangeText={setGatilhos} multiline />
-      <Field maxLength={500} label="Conquistas" value={conquistas} onChangeText={setConquistas} multiline />
-      <Field maxLength={1000} label="Observações" value={observacoes} onChangeText={setObservacoes} multiline />
+      <Field maxLength={500} label="Gatilhos" value={gatilhos} onChangeText={setGatilhos} placeholder="Algo tornou seu dia mais difícil?" multiline />
+      <Field maxLength={500} label="Conquistas" value={conquistas} onChangeText={setConquistas} placeholder="Que pequena vitória você quer guardar?" multiline />
+      <Field maxLength={1000} label="Observações" value={observacoes} onChangeText={setObservacoes} placeholder="Este espaço é seu." multiline />
       <AppButton title="Salvar check-in" onPress={submitRecord} loading={saving} />
 
       <View style={styles.divider} />
@@ -165,8 +166,7 @@ export default function HabitDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  mood: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-  summary: { borderRadius: radius.lg, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
+  summary: { borderRadius: radius.lg, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.sm },
   milestones: { gap: spacing.xs },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   record: { borderRadius: radius.md, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.xs },
