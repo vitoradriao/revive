@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Illustration, type IllustrationName } from './illustration';
 import { colors, fonts, radius } from './theme';
 
@@ -11,8 +11,10 @@ const moods: readonly { label: string; art: IllustrationName }[] = [
 ];
 
 export function MoodPicker({ value, onChange, disabled = false }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width < 350 || fontScale > 1.2;
   return <View accessibilityRole="radiogroup" accessibilityLabel="Humor do check-in" style={styles.options}>
-    {moods.map(mood => <Pressable key={mood.label} accessibilityRole="radio" accessibilityLabel={`Humor: ${mood.label}`} accessibilityState={{ checked: value === mood.label, disabled }} disabled={disabled} onPress={() => onChange(mood.label)} style={[styles.option, value === mood.label && styles.selected, disabled && { opacity: 0.5 }]}>
+    {moods.map(mood => <Pressable key={mood.label} accessibilityRole="radio" accessibilityLabel={`Humor: ${mood.label}`} accessibilityState={{ checked: value === mood.label, disabled }} disabled={disabled} onPress={() => onChange(mood.label)} style={[styles.option, compact && { flexBasis: '45%' }, value === mood.label && styles.selected, disabled && { opacity: 0.5 }]}>
       <Illustration name={mood.art} size={46} />
       <Text style={styles.label}>{mood.label}</Text>
       {value === mood.label ? <Text accessible={false} style={styles.check}>✓</Text> : null}

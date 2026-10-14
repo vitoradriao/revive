@@ -5,7 +5,7 @@ import { Check, Plus, Trash2 } from 'lucide-react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { bootstrapKey, useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { useReviveMutations } from '@/features/mutations/use-revive-mutations';
-import { EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
+import { DataUnavailable, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
 import { AppHeader, EditorialTitle, editorialStyles, Flourish } from '@/ui/editorial';
 import { colors, radius, spacing } from '@/ui/theme';
 import { reviveApi } from '@/core/api/repositories';
@@ -13,7 +13,7 @@ import { queryClient } from '@/core/query/client';
 import { useSession } from '@/features/auth/session-context';
 
 export default function GoalsScreen() {
-  const { data, isLoading } = useBootstrap();
+  const { data, isLoading, error, refetch } = useBootstrap();
   const { completeGoal } = useReviveMutations();
   const { user } = useSession();
   const removeGoal = (id: string) => Alert.alert('Excluir meta?', 'Esta ação exige conexão.', [
@@ -27,6 +27,7 @@ export default function GoalsScreen() {
     } },
   ]);
   if (isLoading && !data) return <Screen scroll={false}><LoadingState /></Screen>;
+  if (error && !data) return <Screen><AppHeader section="Metas" /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   return (
     <Screen>
       <AppHeader section="Metas" />

@@ -1,12 +1,16 @@
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs } from 'expo-router';
 import { Heart, ListChecks, Target, ChartNoAxesCombined, UserRound } from 'lucide-react-native';
 import { colors } from '@/ui/theme';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const contentHeight = 72 + Math.max(0, fontScale - 1) * 28;
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border, paddingTop: 8, minHeight: 70 }, tabBarLabelStyle: { fontSize: 10, marginTop: 5, marginBottom: 6 } }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border, paddingTop: 8, height: contentHeight + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }, tabBarLabelStyle: { fontSize: 10, marginTop: 5, marginBottom: 0 } }}>
       <Tabs.Screen name="index" options={{ title: 'Jornada', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><Heart color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
       <Tabs.Screen name="habits" options={{ title: 'Hábitos', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><ListChecks color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
       <Tabs.Screen name="goals" options={{ title: 'Metas', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><Target color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />

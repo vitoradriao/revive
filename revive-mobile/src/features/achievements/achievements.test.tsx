@@ -26,12 +26,15 @@ describe('achievement screen', () => {
     });
     const view = await render(<AchievementsScreen />);
     expect(view.getByText('0 de 15 marcos alcançados')).toBeTruthy();
-    expect(view.getAllByText(/dias consecutivos/)).toHaveLength(6);
+    expect(view.getByText('30 dias consecutivos')).toBeTruthy();
+    expect(view.getByText('365 dias consecutivos')).toBeTruthy();
     await fireEvent.press(view.getByRole('tab', { name: 'Economia' }));
     expect(view.queryByText('30 dias consecutivos')).toBeNull();
     expect(view.getAllByText(/de economia estimada acumulada/)).toHaveLength(4);
     await fireEvent.press(view.getByRole('tab', { name: 'Metas' }));
-    expect(view.getAllByText(/metas concluídas/)).toHaveLength(3);
+    expect(view.getByText('1 meta concluída')).toBeTruthy();
+    expect(view.getByText('5 metas concluídas')).toBeTruthy();
+    expect(view.getByText('10 metas concluídas')).toBeTruthy();
     await fireEvent.press(view.getByRole('tab', { name: 'Registros' }));
     expect(view.getByText('Próximo marco: 1 de 7')).toBeTruthy();
     expect(view.getByText('Próximo marco: 1 de 30')).toBeTruthy();
@@ -60,6 +63,7 @@ describe('achievement screen', () => {
 
     expect(view.getByText('30 dias consecutivos')).toBeTruthy();
     expect(view.getByText('Conquista permanente')).toBeTruthy();
+    await fireEvent.press(view.getByRole('button', { name: 'Reconhecimentos permanentes' }));
     expect(view.getByText(/Reconhecido em/)).toBeTruthy();
     expect(view.getByText('Próximo marco: 2 de 90')).toBeTruthy();
   });

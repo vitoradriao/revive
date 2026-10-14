@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/features/auth/session-context';
 import { usePrivacyLock } from '@/features/privacy/privacy-lock-provider';
 import { ReminderSettings } from '@/features/reminders/reminder-settings';
 import { AppButton, Card, Screen, textStyles } from '@/ui/components';
-import { AppHeader, EditorialTitle, editorialStyles } from '@/ui/editorial';
+import { AppHeader, ArrowMark, EditorialTitle, editorialStyles } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors, spacing } from '@/ui/theme';
 import { syncPendingMutations } from '@/core/sync/sync-engine';
@@ -15,10 +16,14 @@ export default function ProfileScreen() {
   const { user, signOut, deleteAccount } = useSession();
   const privacyLock = usePrivacyLock();
   const router = useRouter();
-  const [pending, setPending] = useState(0);
+  const [pendingState, setPendingState] = useState<{ userId: string; count: number | null; error: boolean } | null>(null);
+  const pending = pendingState?.userId === user?.id ? pendingState?.count : null;
+  const pendingError = pendingState?.userId === user?.id && pendingState?.error;
 
   useEffect(() => {
-    if (user) void countPendingMutations(user.id).then(setPending);
+    let active = true;
+    if (user) void countPendingMutations(user.id).then(count => { if (active) setPendingState({ userId: user.id, count, error: false }); }).catch(() => { if (active) setPendingState({ userId: user.id, count: null, error: true }); });
+    return () => { active = false; };
   }, [user]);
 
   const reportLogoutError = (error: unknown) => Alert.alert('Não foi possível sair', error instanceof Error ? error.message : 'Tente novamente.');
@@ -80,8 +85,9 @@ export default function ProfileScreen() {
       <AppHeader section="Perfil" />
       <EditorialTitle title="Seu espaço." emphasis="Do seu jeito." />
       <Card style={{ backgroundColor: colors.peach, borderWidth: 0 }}><View style={editorialStyles.row}><Text style={[textStyles.heading, { flex: 1 }]}>{user?.nome}</Text><Illustration name="sol" size={66} /></View><Text style={textStyles.body}>{user?.email}</Text></Card>
-      <Card style={{ backgroundColor: colors.lavender, borderWidth: 0 }}><AppButton title="Sincronização" variant="secondary" onPress={() => router.push('/(app)/sync')} /><Text style={[textStyles.muted, { color: colors.text }]}>Gerenciar alterações pendentes</Text></Card>
-      {pending > 0 ? <Card><Text style={textStyles.body}>{pending} alteração(ões) aguardando sincronização.</Text></Card> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel="Sincronização" onPress={() => router.push('/(app)/sync')} style={styles.syncCard}><RefreshCw color={colors.text} size={22} /><View style={{ flex: 1, gap: 5 }}><Text style={[textStyles.body, { fontSize: 14, fontWeight: '700' }]}>Sincronização</Text><Text style={[textStyles.body, { fontSize: 12 }]}>Gerenciar alterações pendentes</Text></View><ArrowMark /></Pressable>
+      {pending != null && pending > 0 ? <Card><Text style={textStyles.body}>{pending} alteração(ões) aguardando sincronização.</Text></Card> : null}
+      {pendingError ? <Text style={textStyles.muted}>Não foi possível consultar as pendências. Abra Sincronização para tentar novamente.</Text> : null}
       <ReminderSettings key={user?.id} />
       <Card>
         <View style={styles.row}>
@@ -109,4 +115,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md } });
+const styles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  syncCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.lavender, borderRadius: 22, minHeight: 76, padding: 16 },
+});

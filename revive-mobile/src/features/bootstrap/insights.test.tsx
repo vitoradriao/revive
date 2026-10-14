@@ -43,3 +43,14 @@ test('separates reports from overview and exports the actual snapshot', async ()
   await fireEvent.press(screen.getByRole('button', { name: 'Conquistas' }));
   expect(mockPush.mock.calls).toEqual([['/(app)/calendar'], ['/(app)/achievements']]);
 });
+
+test('offers retry for missing data without displaying zero progress or exports', async () => {
+  const refetch = jest.fn();
+  jest.mocked(useBootstrap).mockReturnValue({ data: undefined, isLoading: false, refetch } as unknown as ReturnType<typeof useBootstrap>);
+  await render(<InsightsScreen />);
+  expect(screen.getByText('Seus dados ainda não estão disponíveis.')).toBeTruthy();
+  expect(screen.queryByText('0')).toBeNull();
+  expect(screen.queryByLabelText('Compartilhar CSV')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Atualizar dados' }));
+  expect(refetch).toHaveBeenCalledTimes(1);
+});

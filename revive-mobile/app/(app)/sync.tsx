@@ -40,7 +40,7 @@ export default function SyncScreen() {
     <BackHeader section="Sincronização" onBack={() => router.back()} />
     <EditorialTitle title="Cada passo," emphasis="no seu lugar." />
     {!loaded ? loadError ? <Text accessibilityRole="alert" style={textStyles.body}>Não foi possível consultar a fila. Tente sincronizar novamente.</Text> : <LoadingState label="Consultando alterações salvas..." /> : <Card style={{ backgroundColor: colors.sage, borderWidth: 0, alignItems: 'center', paddingVertical: 24, gap: 18 }}>
-      <Text style={[editorialStyles.eyebrow, { color: colors.text }]}>{items.length} ALTERAÇÕES PENDENTES</Text>
+      <Text style={[editorialStyles.eyebrow, { color: colors.text }]}>{items.length} {items.length === 1 ? 'ALTERAÇÃO PENDENTE' : 'ALTERAÇÕES PENDENTES'}</Text>
       <Illustration name="sincronizacao" size={190} height={160} />
       <Text style={textStyles.heading}>{items.length ? 'Seu caminho está guardado.' : 'Nada aguardando envio.'}</Text>
       <Text style={[textStyles.body, { textAlign: 'center' }]}>{items.length ? 'Suas alterações aguardam sincronização.' : 'Sua fila de alterações está vazia.'}</Text>

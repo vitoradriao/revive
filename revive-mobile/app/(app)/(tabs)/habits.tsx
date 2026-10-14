@@ -4,21 +4,22 @@ import { Link } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { coverageLabel, currentStreak, formatCurrency, sequenceSavings } from '@/domain/metrics';
-import { AppButton, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
+import { AppButton, DataUnavailable, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
 import { AppHeader, ArrowMark, EditorialTitle, editorialStyles } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors, radius, spacing } from '@/ui/theme';
 
 export default function HabitsScreen() {
-  const { data, isLoading } = useBootstrap();
+  const { data, isLoading, error, refetch } = useBootstrap();
   const [archived, setArchived] = useState(false);
   const habits = (data?.vicios || []).filter(habit => (habit.ativo === false) === archived);
   if (isLoading && !data) return <Screen scroll={false}><LoadingState /></Screen>;
+  if (error && !data) return <Screen><AppHeader section="Hábitos" /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   return (
     <Screen>
       <AppHeader section="Hábitos" />
       <View style={editorialStyles.row}><EditorialTitle title="Há espaço" emphasis="para mudar." /><Link href="/(app)/habits/new" asChild><Pressable accessibilityRole="button" accessibilityLabel="Adicionar hábito" style={styles.add}><Plus color={colors.background} /></Pressable></Link></View>
-      <Text style={editorialStyles.eyebrow}>{habits.length} {archived ? 'HÁBITOS ARQUIVADOS' : 'HÁBITOS EM ACOMPANHAMENTO'}</Text>
+      <Text style={editorialStyles.eyebrow}>{habits.length} {archived ? habits.length === 1 ? 'HÁBITO ARQUIVADO' : 'HÁBITOS ARQUIVADOS' : habits.length === 1 ? 'HÁBITO EM ACOMPANHAMENTO' : 'HÁBITOS EM ACOMPANHAMENTO'}</Text>
       {!habits.length ? <EmptyState title={archived ? 'Nenhum hábito arquivado' : 'Nenhum hábito ativo'} body={archived ? 'Os hábitos arquivados aparecerão aqui.' : 'Cadastre ou reative um hábito para começar.'} /> : habits.map((habit, index) => (
         <Link key={habit.id} href={{ pathname: '/(app)/habits/[id]', params: { id: habit.id } }} asChild>
           <Pressable accessibilityRole="button" accessibilityLabel={`Ver jornada de ${habit.nome_vicio}`} style={[styles.item, { backgroundColor: index % 2 ? colors.sage : colors.lavender }]}>
@@ -29,7 +30,7 @@ export default function HabitsScreen() {
             <Text style={[textStyles.muted, { color: colors.text }]}>{habit.progresso?.pendente ? 'Progresso pendente de sincronização' : currentStreak(habit).legacy ? 'Contador legado · histórico parcial' : coverageLabel(currentStreak(habit).coverage)}</Text>
             <View style={editorialStyles.rule} />
             <Text style={textStyles.body}>{sequenceSavings(habit).value == null ? 'Economia indisponível' : `${formatCurrency(sequenceSavings(habit).value)} de economia estimada na sequência`}</Text>
-            <View style={editorialStyles.row}><Text style={styles.journeyLink}>Ver minha jornada</Text><ArrowMark /></View>
+            <View style={styles.journeyButton}><Text style={styles.journeyLink}>Ver minha jornada</Text><ArrowMark color={colors.background} /></View>
           </Pressable>
         </Link>
       ))}
@@ -46,6 +47,7 @@ const styles = StyleSheet.create({
   item: { borderRadius: 28, padding: 20, gap: spacing.sm },
   badge: { ...editorialStyles.eyebrow, fontSize: 10, letterSpacing: 0.3, color: colors.text },
   habitName: { ...textStyles.heading, fontSize: 30, letterSpacing: -1 },
-  journeyLink: { ...textStyles.body, fontWeight: '700', paddingVertical: 12 },
+  journeyLink: { ...textStyles.body, color: colors.background, flex: 1, fontSize: 14, fontWeight: '700' },
+  journeyButton: { ...editorialStyles.row, minHeight: 48, backgroundColor: colors.text, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 12 },
   encouragement: { flexDirection: 'row', alignItems: 'center', gap: 20, paddingVertical: 12 },
 });

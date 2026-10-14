@@ -29,3 +29,13 @@ it('refreshes immediately after returning to the foreground on a different day',
   await act(async () => { onChange('active'); });
   expect(hook.result.current).toBe('2026-10-06');
 });
+
+it('uses the selected calendar zone immediately and across its midnight', async () => {
+  jest.setSystemTime(new Date('2026-10-05T10:59:59Z'));
+  const hook = await renderHook<string, { timezone: string }>(({ timezone }) => useLocalDay(timezone), { initialProps: { timezone: 'UTC' } });
+  expect(hook.result.current).toBe('2026-10-05');
+  await hook.rerender({ timezone: 'Pacific/Auckland' });
+  expect(hook.result.current).toBe('2026-10-05');
+  await act(async () => { jest.advanceTimersByTime(30_000); });
+  expect(hook.result.current).toBe('2026-10-06');
+});

@@ -1,12 +1,12 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, fonts, radius, spacing } from './theme';
 
-export function Wordmark() {
-  return <View accessible accessibilityLabel="Revive" style={styles.wordmark}>
-    <View style={styles.wordmarkText}><Text style={styles.brand}>revive</Text><View style={styles.dot} /></View>
-    <Svg width={90} height={22} viewBox="0 0 90 22" accessible={false}>
+export function Wordmark({ small = false }: { small?: boolean }) {
+  return <View accessible accessibilityLabel="Revive" style={[styles.wordmark, small && { width: 66 }]}>
+    <View style={styles.wordmarkText}><Text allowFontScaling={false} style={[styles.brand, small && { fontSize: 20, letterSpacing: -1.2 }]}>revive</Text><View style={[styles.dot, small && { width: 5, height: 5, marginLeft: 4 }]} /></View>
+    <Svg width={small ? 61 : 90} height={small ? 15 : 22} viewBox="0 0 90 22" accessible={false}>
       <Path d="M4 7 C18 17 41 15 43 4 C45 -6 33 -4 36 6 C41 17 67 18 82 8" fill="none" stroke={colors.primary} strokeWidth={1.8} strokeLinecap="round" />
     </Svg>
   </View>;
@@ -21,15 +21,15 @@ export function BackHeader({ section, onBack }: { section: string; onBack: () =>
     <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onBack} style={styles.back}>
       <Svg width={22} height={22} viewBox="0 0 24 24" accessible={false}><Path d="m12 5-7 7 7 7 M5 12h15" stroke={colors.text} strokeWidth={1.7} fill="none" strokeLinecap="round" /></Svg>
     </Pressable>
-    <Text style={[styles.section, { flex: 1, textAlign: 'left' }]}>{section.toLocaleUpperCase('pt-BR')}</Text>
-    <Wordmark />
+    <Text numberOfLines={2} accessibilityLabel={section} style={[styles.section, { flex: 1, textAlign: 'left' }]}>{section.toLocaleUpperCase('pt-BR')}</Text>
+    <Wordmark small />
   </View>;
 }
 
-export function EditorialTitle({ title, emphasis, eyebrow }: { title: string; emphasis: string; eyebrow?: string }) {
+export function EditorialTitle({ title, emphasis, eyebrow, compact = false }: { title: string; emphasis: string; eyebrow?: string; compact?: boolean }) {
   return <View style={styles.titleWrap}>
     {eyebrow ? <Text style={styles.eyebrow}>{eyebrow.toLocaleUpperCase('pt-BR')}</Text> : null}
-    <Text accessibilityRole="header" style={styles.title}>{title}{'\n'}<Text style={styles.emphasis}>{emphasis}</Text></Text>
+    <Text accessibilityRole="header" style={[styles.title, compact && { fontSize: 27, lineHeight: 33, letterSpacing: -0.8 }]}>{title}{'\n'}<Text style={styles.emphasis}>{emphasis}</Text></Text>
   </View>;
 }
 
@@ -39,9 +39,9 @@ export function Flourish({ width = 110 }: { width?: number }) {
   </Svg>;
 }
 
-export function ArrowMark() {
+export function ArrowMark({ color = colors.text }: { color?: string }) {
   return <Svg width={20} height={20} viewBox="0 0 24 24" accessible={false}>
-    <Path d="M7 7h10v10 M7 17 17 7" fill="none" stroke={colors.text} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M7 7h10v10 M7 17 17 7" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>;
 }
 
@@ -52,13 +52,24 @@ export function StatusCheck() {
   </Svg>;
 }
 
-export function SectionTabs<T extends string>({ tabs, selected, onSelect }: { tabs: readonly { value: T; label: string }[]; selected: T; onSelect: (value: T) => void }) {
+export function SectionTabs<T extends string>({ tabs, selected, onSelect, variant = 'line', disabled = false }: { tabs: readonly { value: T; label: string }[]; selected: T; onSelect: (value: T) => void; variant?: 'line' | 'pill'; disabled?: boolean }) {
   const { width, fontScale } = useWindowDimensions();
-  const compact = width < 360 || fontScale > 1.2;
-  return <View accessibilityRole="tablist" style={styles.tabs}>
-    {tabs.map(tab => <Pressable key={tab.value} accessibilityRole="tab" accessibilityState={{ selected: selected === tab.value }} onPress={() => onSelect(tab.value)} style={[styles.tab, compact && { flexBasis: '45%' }, selected === tab.value && styles.activeTab]}>
-      <Text style={[styles.tabText, selected === tab.value && styles.activeTabText]}>{tab.label}</Text>
+  const compact = (width < 360 && tabs.length > 3) || fontScale > 1.2;
+  return <View accessibilityRole="tablist" style={[styles.tabs, variant === 'pill' && { borderBottomWidth: 0, gap: 4 }]}>
+    {tabs.map(tab => <Pressable key={tab.value} accessibilityRole="tab" accessibilityState={{ selected: selected === tab.value, disabled }} disabled={disabled} onPress={() => { Keyboard.dismiss(); onSelect(tab.value); }} style={[styles.tab, variant === 'pill' && styles.pillTab, compact && { flexBasis: '45%' }, selected === tab.value && (variant === 'pill' ? styles.activePillTab : styles.activeTab), disabled && { opacity: 0.5 }]}>
+      <Text style={[styles.tabText, variant === 'pill' && { fontSize: 11 }, selected === tab.value && (variant === 'pill' ? { color: colors.background } : styles.activeTabText)]}>{tab.label}</Text>
     </Pressable>)}
+  </View>;
+}
+
+export function Disclosure({ title, children, defaultOpen = false }: React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>) {
+  const [open, setOpen] = useState(defaultOpen);
+  return <View style={{ gap: 12 }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ expanded: open }} onPress={() => { Keyboard.dismiss(); setOpen(!open); }} style={styles.disclosure}>
+      <Text style={[styles.actionTitle, { flex: 1 }]}>{title}</Text>
+      <Svg width={20} height={20} viewBox="0 0 24 24" accessible={false}><Path d={open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} fill="none" stroke={colors.text} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" /></Svg>
+    </Pressable>
+    <View style={[{ gap: 16 }, !open && { display: 'none' }]} accessibilityElementsHidden={!open} importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}>{children}</View>
   </View>;
 }
 
@@ -94,6 +105,8 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', flexWrap: 'wrap', borderBottomColor: colors.border, borderBottomWidth: 1 },
   tab: { flexGrow: 1, flexBasis: 65, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', paddingHorizontal: 5, paddingVertical: 10 },
   activeTab: { borderBottomColor: colors.primary },
+  pillTab: { borderBottomWidth: 0, borderRadius: radius.pill, paddingHorizontal: 4 },
+  activePillTab: { backgroundColor: colors.primary },
   tabText: { fontFamily: fonts.sans, color: colors.muted, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   activeTabText: { color: colors.primary },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 80, paddingVertical: 16, borderBottomWidth: 1, borderColor: colors.border },
@@ -101,4 +114,5 @@ const styles = StyleSheet.create({
   actionCopy: { flex: 1, gap: 5 },
   actionTitle: { fontFamily: fonts.sans, color: colors.text, fontSize: 16, fontWeight: '700' },
   actionSubtitle: { fontFamily: fonts.sans, color: colors.muted, fontSize: 13, lineHeight: 19 },
+  disclosure: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderColor: colors.border },
 });

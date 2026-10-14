@@ -10,7 +10,7 @@ export const colors = {
   text: '#292B55',
   muted: '#666579',
   border: '#DAD4CA',
-  danger: '#A3374A',
+  danger: '#8F2E43',
   warning: '#795C16',
   success: '#365C42',
   white: '#FFFFFF',

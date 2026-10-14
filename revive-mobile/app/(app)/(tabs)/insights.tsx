@@ -4,7 +4,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { FileJson, FileSpreadsheet, Printer } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { accountAccumulatedSavings, accountCurrentStreak, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency, moodDistribution } from '@/domain/metrics';
-import { AppButton, Card, LoadingState, Screen, textStyles } from '@/ui/components';
+import { AppButton, Card, DataUnavailable, LoadingState, Screen, textStyles } from '@/ui/components';
 import { ActionRow, AppHeader, EditorialTitle, editorialStyles, Flourish, SectionTabs } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors } from '@/ui/theme';
@@ -14,10 +14,10 @@ const tabs = [{ value: 'overview', label: 'Visão geral' }, { value: 'reports', 
 
 export default function InsightsScreen() {
   const router = useRouter();
-  const { data, isLoading } = useBootstrap();
+  const { data, isLoading, refetch } = useBootstrap();
   const [tab, setTab] = useState<'overview' | 'reports'>('overview');
   if (isLoading && !data) return <Screen scroll={false}><LoadingState /></Screen>;
-  if (!data) return <Screen><AppHeader section="Insights" /><EditorialTitle title="Seu caminho," emphasis="no seu tempo." /><Text style={textStyles.muted}>Sem dados disponíveis.</Text></Screen>;
+  if (!data) return <Screen><AppHeader section="Insights" /><EditorialTitle title="Seu caminho," emphasis="no seu tempo." /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   const currentLeader = accountCurrentStreak(data.vicios);
   const recordHolder = accountRecordHolder(data.vicios);
   const accumulatedSavings = accountAccumulatedSavings(data.vicios);

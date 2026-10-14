@@ -5,7 +5,7 @@ import { Plus, RefreshCw } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { useSession } from '@/features/auth/session-context';
 import { accountAccumulatedSavings, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency } from '@/domain/metrics';
-import { Card, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
+import { Card, DataUnavailable, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
 import { AppHeader, ArrowMark, EditorialTitle, editorialStyles, Flourish } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors, radius, spacing } from '@/ui/theme';
@@ -18,9 +18,11 @@ export default function DashboardScreen() {
   const { data, isLoading, error, refetch, isFetching } = useBootstrap();
   const activeHabits = (data?.vicios || []).filter(habit => habit.ativo !== false);
   const recordHolder = accountRecordHolder(data?.vicios || []);
+  const goalCount = completedGoals(data?.metas || []);
   const savings = accountAccumulatedSavings(data?.vicios || []);
   const hasPendingProgress = Boolean(data?.vicios.some(habit => habit.progresso?.pendente));
   if (isLoading && !data) return <Screen scroll={false}><LoadingState label="Preparando sua jornada..." /></Screen>;
+  if (error && !data) return <Screen><AppHeader section="Sua jornada" /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   return (
     <Screen>
       <AppHeader section="Sua jornada" />
@@ -28,7 +30,6 @@ export default function DashboardScreen() {
         <EditorialTitle eyebrow={`Olá, ${user?.nome?.split(' ')[0] || 'você'}`} title="Um dia de" emphasis="cada vez." />
         <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" accessibilityState={{ busy: isFetching }} onPress={() => void refetch()} style={styles.iconButton}><RefreshCw color={colors.text} size={22} /></Pressable>
       </View>
-      {error && !data ? <Card><Text style={{ color: colors.danger }}>{error.message}</Text></Card> : null}
       <Card style={styles.poster}>
         <Text style={[editorialStyles.eyebrow, { color: colors.text }]}>SUA MAIOR SEQUÊNCIA</Text>
         <View style={editorialStyles.row}>
@@ -52,7 +53,7 @@ export default function DashboardScreen() {
           </Pressable>
         </Link>
       ))}
-      <Text style={textStyles.body}>{completedGoals(data?.metas || [])} metas concluídas. <Text style={styles.note}>Tudo tem seu tempo.</Text></Text>
+      <Text style={textStyles.body}>{goalCount} {goalCount === 1 ? 'meta concluída.' : 'metas concluídas.'} <Text style={styles.note}>Tudo tem seu tempo.</Text></Text>
       <QuickCheckin />
       {data?.mensagem ? <Card style={{ backgroundColor: colors.sage }}><Text style={textStyles.body}>“{data.mensagem.mensagem}”</Text></Card> : null}
       <Text style={textStyles.muted}>Recorde e economia acumulada incluem o histórico dos hábitos arquivados.</Text>
