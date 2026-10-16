@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Sessões web v2](web-sessions.md): contrato, concorrência entre abas, rollout e verificações da issue #57.
+
 - [Cadastro de hábitos no web](web-habit-creation-validation.md): confirmação de envio, validação e recuperação de falhas da issue #56.
 
 ## Evidências e entregas anteriores

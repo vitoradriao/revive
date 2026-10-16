@@ -30,7 +30,7 @@ A API mantém boa parte das regras em dois módulos. A divisão em serviços men
 
 ## Painel web
 
-O roteamento fica em `revive-painel/src/App.jsx`. Os contextos de autenticação, dados e interface coordenam o estado; os arquivos em `services/` centralizam as chamadas à API. O endereço é resolvido em `src/config/env.js` a partir de `VITE_API_URL` ou dos padrões de desenvolvimento/produção.
+O roteamento fica em `revive-painel/src/App.jsx`. Os contextos de autenticação, dados e interface coordenam o estado; os arquivos em `services/` centralizam as chamadas à API. O navegador usa `/api` na mesma origem. Em desenvolvimento, `vite.config.js` encaminha para `REVIVE_API_PROXY_TARGET`; as [sessões web v2](web-sessions.md) usam cookie HttpOnly para refresh e access token em memória.
 
 ```mermaid
 sequenceDiagram

@@ -55,7 +55,7 @@ import TipsPage from './pages/TipsPage';
  * @returns {JSX.Element} Arvore de rotas React Router ou tela de carregamento
  */
 export default function App() {
-  const { token, user, authLoading } = useAuth();
+  const { token, user, authLoading, authError, restoreSession } = useAuth();
 
   if (authLoading) {
     return (
@@ -63,6 +63,13 @@ export default function App() {
         <div className="text-white/60 text-lg animate-pulse">Carregando Revive...</div>
       </div>
     );
+  }
+
+  if (authError && !token) {
+    return <main className="min-h-screen flex flex-col gap-4 items-center justify-center p-6">
+      <p role="alert">Não foi possível restaurar sua sessão. {authError.message}</p>
+      <button type="button" className="btn-primary px-5 py-3" onClick={restoreSession}>Tentar novamente</button>
+    </main>;
   }
 
   return (

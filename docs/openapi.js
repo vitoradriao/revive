@@ -1049,3 +1049,100 @@
  *       200:
  *         description: Meta removida
  */
+
+/**
+ * @openapi
+ * components:
+ *   securitySchemes:
+ *     webRefresh:
+ *       type: apiKey
+ *       in: cookie
+ *       name: revive_refresh
+ *   schemas:
+ *     WebSession:
+ *       type: object
+ *       required: [access_token, expires_in, usuario]
+ *       additionalProperties: false
+ *       properties:
+ *         access_token: { type: string, description: Bearer mantido somente em memória }
+ *         expires_in: { type: integer, example: 900 }
+ *         usuario:
+ *           type: object
+ *           properties:
+ *             id: { type: string, format: uuid }
+ *             nome: { type: string }
+ *             email: { type: string, format: email }
+ * /api/v2/web-auth/login:
+ *   post:
+ *     summary: Login web com refresh HttpOnly na mesma origem
+ *     description: Requer WEB_AUTH_ENABLED, Origin igual ao Host/esquema e JSON. Cookie host-only, Path=/api/v2/web-auth, HttpOnly, SameSite=Lax, Secure em produção. Nunca retorna refresh_token no JSON.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/LoginRequest' }
+ *     responses:
+ *       '200':
+ *         description: Sessão criada; Set-Cookie armazena refresh por 30 dias
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '401': { description: Credenciais inválidas }
+ *       '403': { description: Origin ausente ou não permitido }
+ *       '422': { description: Dados inválidos }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/cadastro:
+ *   post:
+ *     summary: Cadastro web usando a autenticação própria e cookie de refresh
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/CadastroRequest' }
+ *     responses:
+ *       '201':
+ *         description: Conta e sessão criadas; mesmos requisitos de origem/cookie do login
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '403': { description: Origin não permitido }
+ *       '409': { description: Email já cadastrado }
+ *       '422': { description: Dados inválidos }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/refresh:
+ *   post:
+ *     summary: Rotacionar sessão web usando somente o cookie HttpOnly
+ *     security: [{ webRefresh: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       '200':
+ *         description: Access e cookie renovados; serializar requisições entre abas
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '401': { description: Cookie ausente, inválido, expirado, revogado ou reutilizado; servidor limpa cookie }
+ *       '403': { description: Origin não permitido }
+ *       '422': { description: Corpo não é objeto JSON }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/logout:
+ *   post:
+ *     summary: Revogar família de sessão web e limpar cookie após confirmação
+ *     security: [{ webRefresh: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       '204': { description: Revogação confirmada e cookie limpo; sem corpo }
+ *       '403': { description: Origin não permitido }
+ *       '422': { description: Corpo não é objeto JSON }
+ *       '503': { description: Não confirmou saída; cookie preservado para recuperação }
+ */

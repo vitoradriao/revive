@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { createWebAuthTransport } = require('./web-auth-transport');
 const { validateRecordFields, parseRecordCursor } = require('./diary-records');
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -89,15 +90,22 @@ function calculateStats(addiction) {
     };
 }
 
-function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true' }) {
+function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true', webSecureCookies = process.env.NODE_ENV === 'production', webAuthEnabled = process.env.WEB_AUTH_ENABLED === 'true' }) {
     if (!jwtSecret) throw new Error('JWT_SECRET e obrigatorio para a API mobile');
     const router = express.Router();
+    const webAuth = createWebAuthTransport({ secure: webSecureCookies });
 
     router.use((req, res, next) => {
         const requestId = clean(req.get('X-Request-Id')) || crypto.randomUUID();
         res.locals.requestId = requestId;
         res.set('X-Request-Id', requestId);
         next();
+    });
+
+    router.use('/web-auth', (req, res, next) => {
+        res.set('Cache-Control', 'no-store');
+        if (!webAuthEnabled) return apiError(res, 503, 'WEB_AUTH_DESABILITADO', 'O acesso web está temporariamente indisponível.');
+        return webAuth.guard(req, res, next);
     });
 
     const authenticate = async (req, res, next) => {
@@ -170,6 +178,8 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
     };
 
     const respondSession = (res, session, status = 200) => {
+        res.set('Cache-Control', 'no-store');
+        if (res.locals.webAuth) return webAuth.respond(res, session, status);
         const { sessionId, familyId, ...publicSession } = session;
         return res.status(status).json(publicSession);
     };
@@ -184,7 +194,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
         return campos;
     };
 
-    router.post('/auth/cadastro', async (req, res) => {
+    router.post(['/auth/cadastro', '/web-auth/cadastro'], async (req, res) => {
         try {
             const nome = clean(req.body.nome);
             const email = clean(req.body.email)?.toLowerCase();
@@ -205,17 +215,18 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             if (!session) return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Entre novamente com a senha atual.');
             return respondSession(res, session, 201);
         } catch (error) {
-            console.error('mobile cadastro failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel criar a conta.');
+            console.error('session cadastro failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel criar a conta.');
         }
     });
 
-    router.post('/auth/login', async (req, res) => {
+    router.post(['/auth/login', '/web-auth/login'], async (req, res) => {
         try {
             const email = clean(req.body.email)?.toLowerCase();
             const senha = req.body.senha;
             if (!email || !senha) return apiError(res, 422, 'DADOS_INVALIDOS', 'Email e senha sao obrigatorios.');
             const { data: usuario, error } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
+            if (error && res.locals.webAuth) throw error;
             if (error || !usuario || !(await bcrypt.compare(senha, usuario.senha_hash))) {
                 return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Email ou senha invalidos.');
             }
@@ -223,14 +234,17 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             if (!session) return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Email ou senha invalidos.');
             return respondSession(res, session);
         } catch (error) {
-            console.error('mobile login failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel entrar.');
+            console.error('session login failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel entrar.');
         }
     });
 
-    router.post('/auth/refresh', async (req, res) => {
-        const refreshToken = clean(req.body.refresh_token);
-        if (!refreshToken) return apiError(res, 422, 'REFRESH_AUSENTE', 'Refresh token obrigatorio.');
+    router.post(['/auth/refresh', '/web-auth/refresh'], async (req, res) => {
+        const refreshToken = res.locals.webAuth ? res.locals.webRefreshToken : clean(req.body.refresh_token);
+        if (!refreshToken) {
+            if (res.locals.webAuth) webAuth.clear(res);
+            return apiError(res, res.locals.webAuth ? 401 : 422, 'REFRESH_AUSENTE', res.locals.webAuth ? 'Sessão não fornecida.' : 'Refresh token obrigatorio.');
+        }
         try {
             const hash = tokenHash(refreshToken);
             const replacementId = crypto.randomUUID();
@@ -243,6 +257,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             });
             if (error) throw error;
             if (rotated?.status !== 'rotated') {
+                if (res.locals.webAuth) webAuth.clear(res);
                 const codes = { reused: 'REFRESH_REUTILIZADO', expired: 'REFRESH_EXPIRADO', invalid: 'REFRESH_INVALIDO' };
                 return apiError(res, 401, codes[rotated?.status] || 'REFRESH_INVALIDO', 'Sessao invalida ou encerrada.');
             }
@@ -254,8 +269,22 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
                 usuario
             });
         } catch (error) {
-            console.error('mobile refresh failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel renovar a sessao.');
+            console.error('session refresh failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel renovar a sessao.');
+        }
+    });
+
+    router.post('/web-auth/logout', async (req, res) => {
+        try {
+            const token = res.locals.webRefreshToken;
+            if (token) {
+                const { data, error } = await supabase.rpc('revoke_mobile_session_family', { p_refresh_token_hash: tokenHash(token) });
+                if (error || data?.status !== 'revoked') throw error || new Error('Invalid revocation response');
+            }
+            webAuth.clear(res);
+            return res.status(204).send();
+        } catch {
+            return apiError(res, 503, 'SESSAO_INDISPONIVEL', 'Não foi possível encerrar a sessão.');
         }
     });
 

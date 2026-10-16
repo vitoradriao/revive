@@ -50,7 +50,9 @@ npm run dev:stack
 
 Também é possível executar `npm run dev` na raiz e `npm run dev --prefix revive-painel` em terminais separados. `npm start` inicia a API sem recarga automática.
 
-Para uma API em outro endereço, copie `revive-painel/.env.example` para `revive-painel/.env.local`, preencha `VITE_API_URL` com o sufixo `/api` e reinicie o Vite. Sem essa variável, o painel usa a porta `3000` no mesmo host em desenvolvimento e `/api` em produção.
+O navegador usa `/api` na mesma origem. Em desenvolvimento, o proxy Vite encaminha para `http://127.0.0.1:3000`. Para outra API, copie `revive-painel/.env.example` para `revive-painel/.env.local`, preencha `REVIVE_API_PROXY_TARGET` sem o sufixo `/api` e reinicie o Vite. Preserve Host/Origin no proxy.
+
+Antes de habilitar `WEB_AUTH_ENABLED=true` na API, aplique todas as migrations, incluindo a revogação da família de sessão, e siga o [procedimento de implantação de sessões web](web-sessions.md). Use HTTPS ou localhost com Web Locks/BroadcastChannel. A flag desabilitada retorna 503 no novo transporte e não afeta o mobile.
 
 ## 4. Verificar
 
@@ -70,7 +72,7 @@ Instale as dependências com `npm ci --prefix revive-mobile` e siga o [README mo
 | Sintoma | O que conferir |
 | --- | --- |
 | API não inicia por falta de URL/chave | `.env` na raiz e variáveis do Supabase preenchidas |
-| Painel não encontra a API | API iniciada, porta correta e `VITE_API_URL` quando houver endereço personalizado |
+| Painel não encontra a API | API iniciada, porta correta e `REVIVE_API_PROXY_TARGET` no Vite quando houver destino personalizado |
 | Celular não acessa `localhost` | Use o IP da máquina na rede ou uma API HTTPS; `localhost` no aparelho aponta para ele mesmo |
 | Migração falha por tabela inexistente | Confira se o baseline inicial foi aplicado antes das migrações incrementais versionadas; em banco existente, execute primeiro a checagem de drift |
 | Browser bloqueia a origem | Confira `ALLOWED_ORIGINS` na API e reinicie o servidor após alterar o ambiente |

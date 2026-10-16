@@ -1,65 +1,76 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
+import { createSessionManager } from '../services/session-manager';
 
-const { mockShowToast, mockAuthService } = vi.hoisted(() => ({
-  mockShowToast: vi.fn(),
-  mockAuthService: {
-    login: vi.fn(),
-    cadastro: vi.fn(),
-    verificarToken: vi.fn()
-  }
+const { managerRef, mockShowToast } = vi.hoisted(() => ({ managerRef: { current: null }, mockShowToast: vi.fn() }));
+vi.mock('./UIContext', () => ({ useUI: () => ({ showToast: mockShowToast }) }));
+vi.mock('../services/session-manager', async importOriginal => ({
+  ...await importOriginal(), getSessionManager: () => managerRef.current
 }));
 
-vi.mock('./UIContext', () => ({
-  useUI: () => ({
-    showAlert: vi.fn(),
-    showToast: mockShowToast
-  })
-}));
-
-vi.mock('../services/auth.service', () => mockAuthService);
-
-function AuthConsumer() {
-  const { login, token, user } = useAuth();
-
-  return (
-    <div>
-      <button onClick={() => login('teste@revive.app', 'Senha@123')}>Login</button>
-      <span data-testid="token">{token}</span>
-      <span data-testid="user">{user?.email || ''}</span>
-    </div>
-  );
+function Consumer() {
+  const { login, logout, restoreSession, token, user, authLoading, authError } = useAuth();
+  return <div>
+    <button disabled={authLoading} onClick={() => login('synthetic@example.invalid', 'Synthetic!1')}>Login</button>
+    <button onClick={() => logout()}>Logout</button>
+    <button onClick={restoreSession}>Restaurar</button>
+    <span data-testid="token">{token}</span><span data-testid="user">{user?.id || ''}</span>
+    <span data-testid="loading">{String(authLoading)}</span>
+    {authError && <p role="alert">{authError.message}</p>}
+  </div>;
 }
-
-describe('AuthContext', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    vi.clearAllMocks();
-    mockAuthService.verificarToken.mockResolvedValue({});
+let cookie, offline, counter;
+beforeEach(() => {
+  localStorage.clear(); vi.clearAllMocks(); cookie = false; offline = false; counter = 0;
+  managerRef.current = createSessionManager({
+    storage: localStorage, locks: { request: (_name, task) => Promise.resolve().then(task) },
+    listenStorage: () => () => {}, makeChannel: () => ({ postMessage() {}, close() {} }),
+    request: async (path, options) => {
+      if (offline) throw Object.assign(new Error('Conexão indisponível'), { code: 'REDE_INDISPONIVEL' });
+      if (path.endsWith('/logout')) { cookie = false; return {}; }
+      if (path.endsWith('/login')) { expect(JSON.parse(options.body).senha).toBe('Synthetic!1'); cookie = true; }
+      if (!cookie) throw Object.assign(new Error('Sem sessão'), { status: 401 });
+      return { access_token: 'memory-token-' + ++counter, expires_in: 900, usuario: { id: 'synthetic-user' } };
+    }
   });
+});
+afterEach(() => managerRef.current.dispose());
 
-  it('stores token and user after login', async () => {
-    mockAuthService.login.mockResolvedValue({
-      token: 'fake-token',
-      usuario: { email: 'teste@revive.app' }
-    });
-
-    render(
-      <AuthProvider>
-        <AuthConsumer />
-      </AuthProvider>
-    );
-
+describe('AuthContext cookie session', () => {
+  it('keeps login credentials only in memory and removes the old localStorage JWT', async () => {
+    localStorage.setItem('revive_token', 'old-secret');
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
     fireEvent.click(screen.getByText('Login'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('token')).toHaveTextContent('fake-token');
-      expect(screen.getByTestId('user')).toHaveTextContent('teste@revive.app');
-    });
-
-    expect(localStorage.getItem('revive_token')).toBe('fake-token');
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    expect(screen.getByTestId('token')).toHaveTextContent('memory-token-1');
+    expect(localStorage.getItem('revive_token')).toBeNull();
+    expect(JSON.stringify({ ...localStorage })).not.toContain('memory-token');
     expect(mockShowToast).toHaveBeenCalledWith('success', 'Login realizado com sucesso!');
+  });
+  it('restores a valid cookie session during initialization', async () => {
+    cookie = true;
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    expect(screen.getByTestId('loading')).toHaveTextContent('false');
+  });
+  it('lets a network failure be retried without calling it invalid credentials', async () => {
+    cookie = true; offline = true;
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Conexão indisponível');
+    expect(mockShowToast).not.toHaveBeenCalled();
+    offline = false; fireEvent.click(screen.getByText('Restaurar'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('does not announce a successful logout on network failure', async () => {
+    cookie = true;
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    offline = true; fireEvent.click(screen.getByText('Logout'));
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('error', expect.stringContaining('Não foi possível confirmar a saída')));
+    expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user');
   });
 });
