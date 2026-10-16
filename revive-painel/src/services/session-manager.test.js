@@ -6,6 +6,7 @@ afterEach(() => { for (const manager of managers.splice(0)) manager.dispose(); }
 
 function harness() {
   const data = new Map([['revive_token', 'old-legacy-token']]), channels = new Set(), storageListeners = new Set();
+  let dropSession = false;
   let tail = Promise.resolve(), refreshes = 0, cookie = true, offline = false, currentToken, user = 'account-a', generation = 0;
   const locks = { request: (_name, task) => { const next = tail.then(task); tail = next.catch(() => {}); return next; } };
   const storage = { getItem: key => data.get(key) ?? null, removeItem: key => data.delete(key), setItem: (key, value) => {
@@ -32,6 +33,7 @@ function harness() {
       listenStorage: callback => { storageListeners.add(callback); return () => storageListeners.delete(callback); },
       makeChannel: () => {
         const channel = { onmessage: null, postMessage: message => {
+          if (dropSession && message.kind === 'session') { dropSession = false; return; }
           for (const peer of channels) if (peer !== channel) queueMicrotask(() => peer.onmessage?.({ data: structuredClone(message) }));
         }, close: () => channels.delete(channel) };
         channels.add(channel); return channel;
@@ -39,7 +41,7 @@ function harness() {
     });
     managers.push(manager); return manager;
   };
-  return { tab, data, request, refreshes: () => refreshes, offline: value => { offline = value; }, revoke: () => { cookie = false; currentToken = null; } };
+  return { tab, data, request, dropNextSession: () => { dropSession = true; }, refreshes: () => refreshes, offline: value => { offline = value; }, revoke: () => { cookie = false; currentToken = null; } };
 }
 
 describe('web session generations and tab coordination', () => {
@@ -53,6 +55,16 @@ describe('web session generations and tab coordination', () => {
     expect([...h.data.keys()]).toEqual(['revive_auth_metadata']);
     expect([...h.data.values()].join('')).not.toContain('access-');
     expect([...h.data.values()].join('')).not.toContain('account-a');
+  });
+  it('recovers a missed login announcement after storage metadata becomes visible', async () => {
+    const h = harness(), a = h.tab(), b = h.tab();
+    await Promise.all([a.start(), b.start()]);
+    const before = h.refreshes();
+    h.dropNextSession();
+    await a.login('account-b', 'Synthetic!1');
+    await expect.poll(() => b.getSnapshot().user?.id).toBe('account-b');
+    expect(h.refreshes()).toBe(before);
+    expect(b.getSnapshot().token).toBe(a.getSnapshot().token);
   });
   it('coalesces concurrent request refreshes rather than replaying a rotated cookie', async () => {
     const h = harness(), a = h.tab(), b = h.tab();

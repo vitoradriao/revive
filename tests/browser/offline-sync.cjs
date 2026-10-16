@@ -9,6 +9,7 @@ const habit = '10000000-0000-4000-8000-000000000001';
 const stats = async () => (await fetch(fixture + '/__test/status')).json();
 const setup = (page, login) => page.evaluate(async ({ A, login }) => {
   const session = (await import('/src/services/session-manager.js')).getSessionManager();
+  window.testSession = session;
   await session.start();
   if (login) await session.login('a@example.invalid', 'Synthetic!1');
   if (session.getSnapshot().user?.id !== A) throw Error('Fixture session A not restored');
@@ -98,7 +99,7 @@ const run = page => page.evaluate(() => window.testSync.run().then(result => ({
         const manager = (await import('/src/services/session-manager.js')).getSessionManager();
         await manager.start(); await manager.login('b@example.invalid', 'Synthetic!1');
       });
-      await b.waitForFunction(async user => (await import('/src/services/session-manager.js')).getSessionManager().getSnapshot().user?.id === user, B);
+      await b.waitForFunction(user => window.testSession.getSnapshot().user?.id === user, B);
       const notifications = await b.evaluate(() => window.syncChanges);
       release(); await late; await b.unroute('**/api/v2/registros');
       assert.equal(await b.evaluate(() => window.syncChanges), notifications);

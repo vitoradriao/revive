@@ -9,8 +9,10 @@ const accountA = '00000000-0000-4000-8000-000000000001';
 const accountB = '00000000-0000-4000-8000-000000000002';
 const managerModule = '/src/services/session-manager.js';
 const snapshot = page => page.evaluate(async name => (await import(name)).getSessionManager().getSnapshot(), managerModule);
-const waitUser = (page, expected) => page.waitForFunction(async ({ name, expected }) =>
-  (await import(name)).getSessionManager().getSnapshot().user?.id === expected, { name: managerModule, expected });
+const waitUser = async (page, expected) => {
+  await page.evaluate(async name => { window.browserTestSession = (await import(name)).getSessionManager(); }, managerModule);
+  await page.waitForFunction(user => window.browserTestSession.getSnapshot().user?.id === user, expected);
+};
 const stats = async () => (await fetch(fixture + '/__test/status')).json();
 
 (async () => {

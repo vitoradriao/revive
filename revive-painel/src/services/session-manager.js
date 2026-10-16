@@ -148,7 +148,12 @@ export function createSessionManager(environment = {}) {
         } catch (error) { publish({ authError: error, authLoading: false }); }
       };
       unlisten = listenStorage(() => {
-        try { syncMeta(); } catch (error) { publish({ authError: error, authLoading: false }); }
+        try {
+          const meta = syncMeta();
+          // Broadcast and storage notifications can arrive in either order. Ask the
+          // current owner again once coordination metadata is visible in this tab.
+          if (!fresh(meta)) void peerSession();
+        } catch (error) { publish({ authError: error, authLoading: false }); }
       });
     } catch (error) {
       publish({ authLoading: false, authError: error });
