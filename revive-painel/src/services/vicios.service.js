@@ -62,10 +62,21 @@ export async function buscarVicio(id, token) {
  * // POST /api/vicios
  */
 export async function criarVicio(payload, token) {
-  return apiCall('/vicios', {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  }, token);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const result = await apiCall('/vicios', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    }, token);
+    if (!result?.vicio?.id) {
+      throw Object.assign(new Error('O servidor não confirmou qual hábito foi salvo.'), { outcomeUnknown: true });
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**

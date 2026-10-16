@@ -30,6 +30,10 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 - [Estado da implementação](../revive-mobile/docs/implementation-status.md).
 - [Melhorias de uso](../revive-mobile/docs/quality-of-life.md).
 
+## Evidências do painel
+
+- [Cadastro de hábitos no web](web-habit-creation-validation.md): confirmação de envio, validação e recuperação de falhas da issue #56.
+
 ## Evidências e entregas anteriores
 
 - [Entregas acadêmicas da Fase 02](academico/fase-02/README.md): documentos, versões de revisão e diagramas preservados.
