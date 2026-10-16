@@ -15,6 +15,7 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 | Executar as verificações | [Testes e qualidade](testes.md) |
 | Contribuir | [Fluxo de contribuição](../CONTRIBUTING.md) e [convenções](coding-conventions.md) |
 | Consultar pendências | [Roadmap](roadmap.md) |
+| Conferir disponibilidade por plataforma | [Matriz de implementação, ambiente e homologação](matriz-paridade.md) |
 
 ## Publicação
 

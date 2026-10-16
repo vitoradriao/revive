@@ -1,5 +1,42 @@
 # Acompanhamento do roadmap
 
+Estado consultado em **16/10/2026**, main `e454726`. A sequência, as dependências e os critérios de fechamento ficam na [issue #10](https://github.com/vitoradriao/revive/issues/10). A [matriz de paridade](matriz-paridade.md) distingue implementação, integração, ambiente habilitado e homologação de API, web, Android e iOS.
+
+## Fundação já integrada
+
+As issues [#6](https://github.com/vitoradriao/revive/issues/6), [#8](https://github.com/vitoradriao/revive/issues/8) e [#11–#25](https://github.com/vitoradriao/revive/issues?q=is%3Aissue+is%3Aclosed) estão encerradas; não recriar baseline, atomicidade/fila mobile, sessões, histórico, check-in, lembretes, recovery, edição/archive, diário ou vontades mobile.
+
+Em particular, o diário completo foi integrado no [PR #48](https://github.com/vitoradriao/revive/pull/48), em 13/10, e as vontades no [PR #49](https://github.com/vitoradriao/revive/pull/49). A [homologação Android de vontades](../revive-mobile/docs/urge-events-android-validation.md) entrou pelo [PR #51](https://github.com/vitoradriao/revive/pull/51); o [PR #52](https://github.com/vitoradriao/revive/pull/52) registrou a limpeza final. Isso não encerra o gate geral nem comprova iOS.
+
+## Trabalho atual
+
+| Grupo | Issues e estado |
+| --- | --- |
+| Preparação | [#55](https://github.com/vitoradriao/revive/issues/55) documentação/matriz; [#56](https://github.com/vitoradriao/revive/issues/56) cadastro concluído no [PR #70](https://github.com/vitoradriao/revive/pull/70); [#50](https://github.com/vitoradriao/revive/issues/50) investigação Android |
+| Fundação web | [#57](https://github.com/vitoradriao/revive/issues/57) sessões v2 → [#58](https://github.com/vitoradriao/revive/issues/58) persistência/fila offline |
+| Paridade web | [#59](https://github.com/vitoradriao/revive/issues/59) progresso, [#60](https://github.com/vitoradriao/revive/issues/60) hábitos, [#61](https://github.com/vitoradriao/revive/issues/61) diário, [#62](https://github.com/vitoradriao/revive/issues/62) vontades, [#63](https://github.com/vitoradriao/revive/issues/63) metas/recaídas e [#64](https://github.com/vitoradriao/revive/issues/64) conta |
+| Web e mobile | [#26](https://github.com/vitoradriao/revive/issues/26) resumo canônico, [#27](https://github.com/vitoradriao/revive/issues/27) exportação seletiva, [#65](https://github.com/vitoradriao/revive/issues/65) motivo, [#66](https://github.com/vitoradriao/revive/issues/66) preferências, [#67](https://github.com/vitoradriao/revive/issues/67) introdução e [#68](https://github.com/vitoradriao/revive/issues/68) busca |
+| Visual mobile | [#53](https://github.com/vitoradriao/revive/issues/53), [PR #54 aberto](https://github.com/vitoradriao/revive/pull/54); não integrado na referência desta consulta |
+| Gate | [#7](https://github.com/vitoradriao/revive/issues/7) homologação integrada; testes Android, iOS e navegadores têm cobertura própria |
+| Descoberta independente | [#69](https://github.com/vitoradriao/revive/issues/69) tempo recuperado; sem contador de produção e sem bloquear a liberação das demais melhorias |
+
+A tabela agrupa trabalho, não substitui o grafo de dependências da #10. As dependências API/mobile originais de #26/#27 já foram integradas; faltam as novas entregas e o aceite de ambas as plataformas. O [PR #36](https://github.com/vitoradriao/revive/pull/36) continua sendo preparação de exportação, não entrega completa.
+
+## Ambiente e saída
+
+Recuperação de senha foi implementada/aceita no cenário Westmail/Android de 09/10; [rollout e evidências](password-recovery.md) separam isso da habilitação remota. A consulta documental atual não aplicou SQL nem comprovou configuração de Production.
+
+Cada PR deve atualizar a matriz com commit, schema, ambiente e cenário. Não limpar fila/histórico para atualizar nem afirmar homologação sem execução. A integração na main dispara o deploy Production configurado na Vercel; publicar exige decisão própria, além do encerramento técnico de uma issue.
+
+Permanecem excluídos apoio imediato, planos de enfrentamento, ações recorrentes, comunidade, IA terapêutica, widgets, mascote, gamificação e monetização. Registro de vontade é descritivo. Biometria, proteção nativa e agendamento local não ganham controles web sem efeito.
+
+<details>
+<summary>Registro histórico anterior — acompanhamento de 09/10/2026</summary>
+
+As informações abaixo foram preservadas como histórico. Menções a #22/#25 abertas ou como próximas tarefas representam a data anterior e foram superadas pelo estado acima.
+
+# Acompanhamento do roadmap
+
 Estado verificado em **09/10/2026**. #18 e #19 foram integradas e encerradas após o aceite Android; #21 entrou pelo PR #46. A recuperação de senha (#20) foi implementada pelo [PR #45](https://github.com/vitoradriao/revive/pull/45), com aceite externo Westmail/Gmail e Android, conflitos resolvidos e configuração SMTP local. A issue #7 continua como gate mais amplo; SQL remoto e habilitação em produção exigem rollout próprio. As issues são a fonte dos critérios detalhados; o acompanhamento principal permanece na [issue #10](https://github.com/vitoradriao/revive/issues/10).
 
 ## Entregas concluídas
@@ -45,3 +82,6 @@ O aceite físico de #18 e #19 foi concluído no Moto G52 com contas descartávei
 As etapas de distribuição, como testes iOS, política de privacidade, página de exclusão e configuração de push remoto, permanecem no [estado da implementação mobile](../revive-mobile/docs/implementation-status.md) e no [checklist de release](../revive-mobile/docs/release-checklist.md).
 
 Para registrar uma nova proposta, use os [modelos de Issue](https://github.com/vitoradriao/revive/issues/new/choose) e siga o [guia de contribuição](../CONTRIBUTING.md).
+
+
+</details>

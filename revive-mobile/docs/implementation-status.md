@@ -1,5 +1,49 @@
 # Estado da implementação
 
+Atualizado em **16/10/2026**, main `e454726`. Consultar a [matriz por plataforma](../../docs/matriz-paridade.md) para código, integração, ambiente e homologação; a [issue #10](https://github.com/vitoradriao/revive/issues/10) mantém a fila e as dependências.
+
+## Integrado no código mobile/API
+
+- Expo SDK 57/React Native, autenticação própria v2, access em memória e refresh no SecureStore; rotação, revogação e isolamento de sessão.
+- SQLite versionado por conta e intenções persistidas antes da rede; mutação/recibo idempotente atômicos no servidor. [Sincronização](../../docs/mobile-sync.md), [migrations SQLite](sqlite-migrations.md), issues #8/#13/#14 encerradas.
+- Cadastro/detalhe/exclusão, [edição e arquivamento](../../docs/habit-edit-archive.md) com revisão e economia prospectiva.
+- [Progresso histórico](progresso-historico.md), conquistas permanentes e dias distintos com check-in.
+- [Check-in rápido](quick-checkin-validation.md), diário, recaídas e metas com fila/recuperação.
+- [Consulta/correção completa do diário](diary-validation.md), conflitos e dependência de criação pendente; #22 encerrada pelo PR #48.
+- [Vontades descritivas](urge-events-validation.md), consulta paginada e calendário textual; #25 encerrada pelo PR #49.
+- [Lembrete local](local-reminders-validation.md) com horário por conta e entrada protegida no check-in.
+- Bloqueio biométrico local opcional e proteção de prévia/captura; #23 encerrada pelo PR #40. Proteção de janela não significa criptografia SQLite.
+- [Recuperação de senha](../../docs/password-recovery.md), exclusão transacional de conta e base de registro de dispositivos.
+- Exportação fixa CSV/JSON e relatório imprimível. Seleção de período/campos ainda é #27; resumo canônico ainda é #26.
+
+## Ambiente habilitado e homologação
+
+Código integrado não comprova habilitação das migrations/SMTP no ambiente atual. Registros de publicação e de Supabase são datados; não executar SQL de produção por consequência desta documentação.
+
+- Android: [#18](quick-checkin-validation.md) e [#19](local-reminders-validation.md) têm aceites físicos no Moto G52/Android 13; [recovery](../../docs/password-recovery.md) tem aceite externo/Android específico.
+- Vontades: [matriz física de 13/10](urge-events-android-validation.md) comprova seus cenários com backend/contas descartáveis. A alteração de fonte/densidade durante execução falhou e está na [#50](https://github.com/vitoradriao/revive/issues/50).
+- Edição/archive e diário corrigível têm PostgreSQL/SQLite reais e testes de interface; os roteiros físicos complementares continuam no [gate #7](https://github.com/vitoradriao/revive/issues/7).
+- iOS: build e homologação física não demonstrados para esta versão. Compartilhar código não amplia evidência Android.
+- Push remoto exige worker, FCM/APNs e receipts; lembretes locais não demonstram esse serviço.
+- Privacidade, suporte/exclusão públicos e distribuição continuam no [checklist de release](release-checklist.md).
+
+## Pendências atuais
+
+- [#26](https://github.com/vitoradriao/revive/issues/26) resumo semanal e [#27](https://github.com/vitoradriao/revive/issues/27) exportação seletiva para ambas plataformas.
+- [#65](https://github.com/vitoradriao/revive/issues/65) motivo privado, [#66](https://github.com/vitoradriao/revive/issues/66) preferências, [#67](https://github.com/vitoradriao/revive/issues/67) introdução e [#68](https://github.com/vitoradriao/revive/issues/68) busca/perguntas.
+- [#53](https://github.com/vitoradriao/revive/issues/53) identidade visual: PR #54 aberto, sem integração na main desta consulta.
+- Paridade web #57–#64 e homologação integrada #7, conforme a matriz.
+- Tempo recuperado #69 é descoberta; não implementar contador automaticamente nem bloquear as outras entregas.
+
+Atomicidade, persistência antes do envio, baseline e biometria já entregues não são novas histórias. Incremental global e biblioteca editorial citados em anotações antigas não foram promovidos automaticamente ao escopo atual.
+
+<details>
+<summary>Snapshot anterior de documentação preservado para rastreabilidade</summary>
+
+O texto abaixo mistura fundações antigas e adendos datados. Suas antigas “próximas histórias” não representam a fila atual; consultar o estado acima e a matriz.
+
+# Estado da implementação
+
 ## Entregue no repositório
 
 - Fundação Expo SDK 57, React Native, TypeScript estrito e Expo Router.
@@ -57,3 +101,6 @@ Consulta por habito/periodo com paginacao, detalhe completo, correcao offline de
 ## Vontades no mobile (#25)
 
 Formulário descritivo com intensidade 0–10, gatilhos e campos opcionais; criação durável, recibos locais e consulta paginada por hábito/período/fuso. O calendário distingue check-ins, vontades e recaídas por texto. [Contrato e validação](urge-events-validation.md); [homologação Android de 13/10/2026](urge-events-android-validation.md) com SQLite/PostgreSQL reais, offline, processo morto, fusos, arquivamento e contas sintéticas. Gate #7 permanece aberto: alteração de configuração em execução falhou (#50), e os demais aceites pendentes estão explícitos. Não houve SQL de produção nesta execução.
+
+
+</details>

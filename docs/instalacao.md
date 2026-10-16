@@ -72,7 +72,7 @@ Instale as dependências com `npm ci --prefix revive-mobile` e siga o [README mo
 | API não inicia por falta de URL/chave | `.env` na raiz e variáveis do Supabase preenchidas |
 | Painel não encontra a API | API iniciada, porta correta e `VITE_API_URL` quando houver endereço personalizado |
 | Celular não acessa `localhost` | Use o IP da máquina na rede ou uma API HTTPS; `localhost` no aparelho aponta para ele mesmo |
-| Migração falha por tabela inexistente | Confira se o baseline inicial foi aplicado antes das cinco migrações incrementais; em banco existente, execute primeiro a checagem de drift |
+| Migração falha por tabela inexistente | Confira se o baseline inicial foi aplicado antes das migrações incrementais versionadas; em banco existente, execute primeiro a checagem de drift |
 | Browser bloqueia a origem | Confira `ALLOWED_ORIGINS` na API e reinicie o servidor após alterar o ambiente |
 
 ## Publicação
