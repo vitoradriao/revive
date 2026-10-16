@@ -44,6 +44,7 @@ import CalendarPage from './pages/CalendarPage';
 import AchievementsPage from './pages/AchievementsPage';
 import ReportsPage from './pages/ReportsPage';
 import ProfilePage from './pages/ProfilePage';
+import SyncPage from './pages/SyncPage';
 import TipsPage from './pages/TipsPage';
 
 /**
@@ -55,7 +56,7 @@ import TipsPage from './pages/TipsPage';
  * @returns {JSX.Element} Arvore de rotas React Router ou tela de carregamento
  */
 export default function App() {
-  const { token, user, authLoading, authError, restoreSession } = useAuth();
+  const { token, user, authLoading, authError, restoreSession, localAccess } = useAuth();
 
   if (authLoading) {
     return (
@@ -65,7 +66,7 @@ export default function App() {
     );
   }
 
-  if (authError && !token) {
+  if (authError && !token && !localAccess) {
     return <main className="min-h-screen flex flex-col gap-4 items-center justify-center p-6">
       <p role="alert">Não foi possível restaurar sua sessão. {authError.message}</p>
       <button type="button" className="btn-primary px-5 py-3" onClick={restoreSession}>Tentar novamente</button>
@@ -96,6 +97,7 @@ export default function App() {
         <Route path="conquistas" element={<AchievementsPage />} />
         <Route path="relatorios" element={<ReportsPage />} />
         <Route path="perfil" element={<ProfilePage />} />
+        <Route path="sincronizacao" element={<SyncPage />} />
         <Route path="dicas" element={<TipsPage />} />
       </Route>
 

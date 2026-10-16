@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { createSessionManager } from '../services/session-manager';
 
 const { managerRef, mockShowToast } = vi.hoisted(() => ({ managerRef: { current: null }, mockShowToast: vi.fn() }));
+vi.mock('./OfflineContext', () => ({ useOffline: () => ({ loading: false, client: { logout: async () => { await managerRef.current.logout(); return true; } } }) }));
 vi.mock('./UIContext', () => ({ useUI: () => ({ showToast: mockShowToast }) }));
 vi.mock('../services/session-manager', async importOriginal => ({
   ...await importOriginal(), getSessionManager: () => managerRef.current

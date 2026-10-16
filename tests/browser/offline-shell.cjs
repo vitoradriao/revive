@@ -95,7 +95,7 @@ async function stopFixture(child) {
       }));
       assert.equal(pendingPreserved, true);
       results.push({ engine, browserVersion: version, networkTest: engine === 'webkit' ? 'own HTTP server stopped; WebKit offline protocol avoided' : 'own HTTP server stopped and context offline', coldReopenOffline: true, pendingPreservedAcrossWorkerUpdate: pendingPreserved, publicFiles: cached.length, privateResponsesCached: false,
-        scope: 'Public production build reopens offline; private account UI/fallback is a separate pending integration.' });
+        scope: 'Public production build reopens offline; private account UI/fallback is verified separately in offline-ui.cjs.' });
     } catch (error) {
       console.error('Offline shell failure in ' + engine, await page?.locator('body').innerText().catch(() => 'unavailable'));
       throw error;

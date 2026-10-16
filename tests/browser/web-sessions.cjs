@@ -148,5 +148,9 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       fs.writeFileSync(path.join(process.env.REVIVE_BROWSER_EVIDENCE, 'web-sessions-results.json'), JSON.stringify(result, null, 2));
     }
     console.log(JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error('Synthetic session UI:', await context.pages().at(-1)?.locator('body').innerText());
+    console.error('Synthetic offline state:', await context.pages().at(-1)?.evaluate(async () => { const state = (await import('/src/offline/client.js')).getOfflineClient().getSnapshot(); return { loading: state.loading, user: state.user?.id, error: state.error?.code }; }));
+    throw error;
   } finally { await browser.close(); await fetch(fixture + '/__test/reset', { method: 'POST' }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

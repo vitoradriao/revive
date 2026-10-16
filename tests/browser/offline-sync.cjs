@@ -31,7 +31,7 @@ const run = page => page.evaluate(() => window.testSync.run().then(result => ({
     let context;
     const ids = Object.fromEntries(['create', 'edit', 'goal', 'complete', 'relapse', 'urge', 'conflict', 'closedOwner', 'late'].map(key => [key, randomUUID()]));
     try {
-      context = await playwright[engine].launchPersistentContext(profile, options);
+      context = await playwright[engine].launchPersistentContext(profile, options); await context.route("**/*", route => route.request().resourceType() === "document" ? route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body></body></html>" }) : route.continue());
       let a = await context.newPage(); await a.goto(base); await setup(a, true);
       const record = { vicio_id: habit, humor: 'bom', data_registro: '2026-10-16', timezone: 'America/Sao_Paulo', observacoes: 'synthetic draft' };
       await enqueue(a, 'record.create', record, { id: ids.create });
@@ -52,7 +52,7 @@ const run = page => page.evaluate(() => window.testSync.run().then(result => ({
       assert.equal(await a.evaluate(id => window.testStore.getReceipt(id), ids.goal), null);
       assert.equal((await a.evaluate(() => window.testStore.getQueue()))[0].id, ids.goal);
       await context.close();
-      context = await playwright[engine].launchPersistentContext(profile, options);
+      context = await playwright[engine].launchPersistentContext(profile, options); await context.route("**/*", route => route.request().resourceType() === "document" ? route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body></body></html>" }) : route.continue());
       a = await context.newPage(); await a.goto(base); await setup(a, false);
       assert.equal((await a.evaluate(() => window.testStore.getQueue()))[0].id, ids.goal);
       await a.evaluate(id => window.testStore.retry(id), ids.goal);
@@ -71,7 +71,7 @@ const run = page => page.evaluate(() => window.testSync.run().then(result => ({
       assert.equal((await run(a)).error, 'REVISAO_CONFLITO');
       let queue = await a.evaluate(() => window.testStore.getQueue());
       assert.equal(queue[0].status, 'recovery'); assert.equal(queue[0].payload.observacoes, 'preserved synthetic conflict');
-      await context.close(); context = await playwright[engine].launchPersistentContext(profile, options);
+      await context.close(); context = await playwright[engine].launchPersistentContext(profile, options); await context.route("**/*", route => route.request().resourceType() === "document" ? route.fulfill({ contentType: "text/html", body: "<!doctype html><html><body></body></html>" }) : route.continue());
       a = await context.newPage(); await a.goto(base); await setup(a, false);
       queue = await a.evaluate(() => window.testStore.getQueue());
       assert.equal(queue[0].status, 'recovery'); assert.equal(queue[0].payload.observacoes, 'preserved synthetic conflict');

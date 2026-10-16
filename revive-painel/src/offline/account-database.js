@@ -138,7 +138,10 @@ function accountStore(db, userId, onVersionChange) {
             const order = Number(sequence.target.result?.value || 0) + 1;
             let entry = { id, userId, type, payload: clone(payload), dependsOn, sequence: order, localId: 'local:' + id,
               status: 'pending', attempts: 0, nextRetryAt: 0, createdAt: new Date().toISOString(), lastError: null };
-            const persist = () => { meta.put({ key: 'nextSequence', value: order }); outbox.add(entry); set(entry); };
+            const persist = () => {
+              try { meta.put({ key: 'nextSequence', value: order }); outbox.add(entry); set(entry); }
+              catch (error) { abort(storageError(error)); }
+            };
             if (!dependsOn) { persist(); return; }
             tx.objectStore('mappings').get(dependsOn).onsuccess = mapping => {
               if (mapping.target.result) {

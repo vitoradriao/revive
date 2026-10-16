@@ -29,7 +29,9 @@
     "test:browser:storage": "node tests/browser/offline-storage.cjs",
     "test:browser:sync": "node tests/browser/offline-sync.cjs",
     "test:browser:shell": "node tests/browser/offline-shell.cjs",
-    "test:browser": "npm run test:browser:sessions && npm run test:browser:storage && npm run test:browser:sync && npm run test:browser:shell"
+    "test:browser:offline-ui": "node tests/browser/offline-ui.cjs",
+    "test:browser:client": "node tests/browser/offline-client.cjs",
+    "test:browser": "npm run test:browser:sessions && npm run test:browser:storage && npm run test:browser:sync && npm run test:browser:shell && npm run test:browser:client && npm run test:browser:offline-ui"
   },
   "keywords": [
     "revive",

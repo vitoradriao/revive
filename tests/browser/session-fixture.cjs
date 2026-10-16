@@ -16,7 +16,7 @@ const secret = 'synthetic-browser-session-key-not-production';
 const counts = { refresh: 0, login: 0, writes: 0, replays: 0 };
 const events = { registros: new Map(), vontades: new Map(), recaidas: new Map(), metas: new Map() };
 const receipts = new Map();
-let dropNextResponse = false;
+let dropNextResponse = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
     nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1
@@ -68,7 +68,9 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
         vicios: habits.filter(item => item.usuario_id === user.id),
         ...Object.fromEntries(Object.entries(events).map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
 });
+app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
+    if (blockMutations && req.method !== 'GET' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
         if (dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') && res.statusCode < 300) {
@@ -111,6 +113,6 @@ app.get('/sw.js', (_req, res) => {
     res.type('application/javascript').set('Cache-Control', 'no-cache').send(source);
 });
 app.use(express.static(publicBuild));
-app.get('/{*any}', (req, res) => req.path.startsWith('/api/') ? res.sendStatus(404) : res.sendFile(path.join(publicBuild, 'index.html')));
+app.get('/{*any}', (req, res) => req.path.startsWith('/api/') ? res.sendStatus(404) : res.sendFile(path.join(publicBuild, 'index.html'), { dotfiles: 'allow' }));
 const port = Number(process.env.REVIVE_BROWSER_API_PORT || 3177);
 app.listen(port, '127.0.0.1', () => console.log('Synthetic session HTTP API on 127.0.0.1:' + port));

@@ -43,7 +43,8 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
       valor_economizado_inicio: formMeta.iniciar_hoje ? Number(selectedVicio?.valor_economizado) || 0 : 0
     };
 
-    await onAddMeta(payload);
+    const saved = await onAddMeta(payload);
+    if (saved === false) return;
     setFormMeta(initialForm);
     setShowForm(false);
   };

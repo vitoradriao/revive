@@ -1,6 +1,6 @@
-# Persistência offline web — preparação da #58
+# Persistência offline web — #58
 
-**Estado em 16/10/2026: fundação implementada e testada; issue [#58](https://github.com/vitoradriao/revive/issues/58) ainda aberta.** Falta integrar acesso aos dados locais, tela de Sincronização e decisões de logout. Os formulários de diário/vontades/metas/recaídas serão ligados nas issues próprias [#61](https://github.com/vitoradriao/revive/issues/61), [#62](https://github.com/vitoradriao/revive/issues/62) e [#63](https://github.com/vitoradriao/revive/issues/63). Este documento não declara a experiência offline de produto concluída.
+**Estado em 16/10/2026: implementação no [PR #73](https://github.com/vitoradriao/revive/pull/73), aguardando integração e publicação autorizada.** A [#58](https://github.com/vitoradriao/revive/issues/58) inclui armazenamento, fila, shell público, acesso à cópia local, Sincronização e escolhas de saída. Os formulários já existentes de registro, meta/conclusão e recaída usam a fila. A paridade completa do diário [#61](https://github.com/vitoradriao/revive/issues/61), o formulário de vontades [#62](https://github.com/vitoradriao/revive/issues/62) e as demais regras de metas/recaídas [#63](https://github.com/vitoradriao/revive/issues/63) continuam nas issues próprias; seus contratos de persistência já estão disponíveis.
 
 Base: main 5ca7db4, com sessões [#57](https://github.com/vitoradriao/revive/issues/57) integradas e [rollout autorizado](web-sessions-rollout.md). Preservar Express, autenticação própria, PostgreSQL, React/Vite e APIs mobile.
 
@@ -19,7 +19,7 @@ Base: main 5ca7db4, com sessões [#57](https://github.com/vitoradriao/revive/iss
 
 A gravação só retorna sucesso no oncomplete da transação nativa. Um request individual bem sucedido não comprova commit. Escritas pedem durability=strict quando a implementação aceita a opção. Quota, abertura negada, aborto e versão incompatível são falhas; nenhum fluxo limpa o banco para reparar automaticamente.
 
-A atualização adiciona stores sem apagar os anteriores. O evento versionchange fecha a conexão antiga. O futuro cliente de interface precisa pausar o executor e oferecer reabertura; não deve apagar pendências. Se uma aba antiga perdeu a conexão durante HTTP, sua intenção permanece para reconciliação pela nova versão.
+A atualização adiciona stores sem apagar os anteriores. O evento versionchange fecha a conexão antiga. O cliente informa mudança de versão e oferece reabertura da página, preservando as pendências. Se uma aba antiga perdeu a conexão durante HTTP, sua intenção permanece para reconciliação pela nova versão.
 
 Snapshot exige usuario.id da conta aberta. Campos de sessão não pertencem aos payloads de fila; refresh/access/senhas nunca são persistidos. Snapshot e páginas privadas ficam no IndexedDB, fora de CacheStorage. Partição por usuário e guarda de geração evitam misturar dados; isto não é uma credencial online nem uma promessa de criptografia do navegador.
 
@@ -46,7 +46,7 @@ Após resposta válida, uma única transação registra recibo e mapeamento, vin
 
 Nunca mudar payload ou revisão de uma intenção que já foi enviada. Uma reaplicação após revisão de conflito precisa de nova intenção aprovada pela pessoa, preservando o texto anterior.
 
-Recibos confirmados não são removidos por refresh do bootstrap. O cache fica marcado staleAfterMutation até nova consulta canônica; a futura interface deve separar evento confirmado de indicadores ainda não atualizados. Snapshot/bootstrap não comprova histórico completo ou todas as páginas.
+Recibos confirmados não são removidos por refresh do bootstrap. O cache fica marcado staleAfterMutation até nova consulta canônica; a interface separa recibos confirmados das pendências e informa a data/cobertura da cópia local. Snapshot/bootstrap não comprova histórico completo ou todas as páginas.
 
 O processamento conserva a ordem e pausa no primeiro conflito, impedimento permanente ou dependência não resolvida. Estados: pending, sending, retry e recovery. Falha conhecida conserva status/código, sem conteúdo privado em logs. Falha após commit remoto e antes de recibo local usa o mesmo UUID para obter a resposta anterior. Envio interrompido é recuperado apenas pelo dono do lock.
 
@@ -62,7 +62,7 @@ Retenção local não tem expiração automática nesta versão. Os recibos do s
 
 Somente arquivos públicos conhecidos entram no cache; /api e métodos diferentes de GET seguem a rede. Navegação indisponível/5xx volta ao index público. Respostas privadas nunca são colocadas em CacheStorage pelo worker. Conserva um shell anterior para assets de abas abertas e não força recarga da página; IndexedDB não é modificado pela ativação.
 
-main registra updateViaCache=none; [Vercel](../vercel.json) evita cache HTTP permanente do script/manifesto. Desenvolvimento Vite continua sem service worker. A ativação/instalação pode falhar por falta de armazenamento: a futura interface não deve anunciar reabertura offline sem verificar disponibilidade.
+main registra updateViaCache=none; [Vercel](../vercel.json) evita cache HTTP permanente do script/manifesto. Desenvolvimento Vite continua sem service worker. A ativação/instalação pode falhar por falta de armazenamento: a interface não promete reabertura offline quando o shell não foi instalado; uma cópia IndexedDB, isoladamente, não garante a disponibilidade dos arquivos públicos.
 
 ## Evidências reais desta preparação
 
@@ -89,15 +89,37 @@ node tests/browser/offline-shell.cjs
 
 REVIVE_BROWSER_EVIDENCE salva apenas resumos. A prova do shell inicia/encerra sua própria fixture em porta livre; não derruba o servidor em 3177. Os comandos usam browsers gerenciados pelo Playwright. Para reproduzir também no Edge instalado, defina PLAYWRIGHT_CHANNEL=msedge. A suíte está disponível em npm run test:browser, com os servidores indicados em execução, e no job dedicado do CI. Estes testes são automatizados, não homologação de navegadores/aparelhos reais do [gate #7](https://github.com/vitoradriao/revive/issues/7).
 
-Validação local desta preparação: npm run validate passou com 80 testes API, 89 painel e build; lint do painel e 258 links passaram. npm run test:browser passou com o Playwright fixado do projeto nas três engines gerenciadas; a proteção adicional de limpeza/upgrade bloqueado foi retestada nas três. CI do PR registra a validação Linux e suas limitações.
+Registro histórico da preparação (839f240): validação local npm run validate passou com 80 testes API, 89 painel e build; lint do painel e links passaram. npm run test:browser passou com o Playwright fixado do projeto nas três engines gerenciadas; a proteção adicional de limpeza/upgrade bloqueado foi retestada nas três. CI do PR registra a validação Linux e suas limitações.
 
-## Pendências obrigatórias para fechar #58
+## Integração de produto e recuperação
 
-1. Integrar cliente/contexto por conta: abrir/cachear bootstrap após autenticação, guardar somente ponteiro de usuário/geração para reabertura local e separar claramente acesso offline de sessão autorizada no servidor. Troca de geração fecha handles antigos e invalida resultados atrasados. Novas escritas de cache também precisam do lock de conta e guarda de geração; uma resposta atrasada não pode recriar páginas depois da limpeza de logout/exclusão.
-2. Exibir tela Sincronização com pendências, falhas, datas/cobertura, consulta da intenção e ações explícitas de recuperação/descarte. Não mostrar controles de fluxos ainda não integrados como se funcionassem.
-3. Implementar sincronizar/cancelar/descartar no logout. Manter o mesmo lock de conta durante a verificação final, logout remoto e limpeza. enqueue já compartilha esse lock. Preservar o handle necessário até terminar a limpeza; a troca de sessão não pode fechá-lo antes. Falha remota mantém sessão/fila e não anuncia saída.
-4. Integrar retomada com aplicação aberta/retorno de rede, respeitando pausa/backoff e storage indisponível. Não prometer sincronização com navegador fechado.
-5. Provar UI com offline real/reabertura, atualização pendente, conflito e A/B, além de teclado/leitor de tela e três escolhas de logout. Revisar casos de cache/limpeza após exclusão em #64.
-6. Validar API/painel/build/lint/docs e CI PostgreSQL/mobile no head final. A preparação usa Refs; somente o aceite completo pode usar Closes.
+[client.js](../revive-painel/src/offline/client.js) mantém a conexão por usuário/geração, cacheia o bootstrap sob o lock da conta e invalida respostas atrasadas. O ponteiro local contém apenas UUID e geração; a identidade e os dados ficam no IndexedDB. Uma falha de rede ao restaurar permite consultar essa última cópia. Uma resposta 401 confirmada bloqueia o acesso local e exige novo login; não apaga a fila. Não há autenticação remota por esse ponteiro.
+
+[OfflineContext](../revive-painel/src/contexts/OfflineContext.jsx), AuthContext e DataContext integram essa cópia às telas. Uma mutação primeiro confirma o commit local; o aviso diz “salvo neste navegador”, sem alegar confirmação remota. O detalhe mostra registros pendentes. Falha de armazenamento conserva o formulário e não cria uma intenção aparente. Cliques simultâneos com o mesmo conteúdo compartilham a gravação em curso; novos registros deliberados continuam possíveis.
+
+A [tela Sincronização](../revive-painel/src/pages/SyncPage.jsx), em /sincronizacao e na navegação, mostra pendências, estados, tentativas, recibos, data da cópia e cobertura parcial. O conteúdo privado só aparece ao expandir o item. É possível tentar novamente com a mesma chave ou confirmar descarte; o aviso explica que descartar não desfaz um commit remoto incerto. Dependências impedem descarte incompatível. Conflitos e falhas permanentes pausam a ordem, com rascunho preservado; edição comparada do diário pertence à #61.
+
+A saída verifica a fila sob o mesmo lock de escrita. Com pendências, um dialog nativo oferece sincronizar e sair, descartar e sair, ou cancelar. Foco inicial em Cancelar e contenção de Tab são exercitados por automação. A limpeza ocorre somente após confirmação da revogação, mantendo o handle aberto até o commit local. Falha remota mantém a fila; cancelamento não modifica dados. Troca de conta invalida também o dialog anterior. A exclusão confirmada da conta continua na #64.
+
+Com o aplicativo aberto, online/focus e uma verificação a cada 15 segundos retomam a sincronização respeitando backoff e pausas. Sem Web Locks a gravação falha explicitamente; nenhum fallback permite dois processadores concorrentes. Não há envio garantido com navegador fechado.
+
+Consultas paginadas futuras devem capturar accountKey antes do HTTP e fornecê-lo a client.savePage(kind, filters, data, accountKey). Uma resposta de geração antiga é rejeitada antes da gravação; getPage também revalida a geração após a leitura. Atualizar o bootstrap não declara histórico completo nem dispensa paginação nas issues seguintes.
+
+## Evidências complementares e limites
+
+- [offline-ui.cjs](../tests/browser/offline-ui.cjs): produto compilado e Service Worker real, com servidor próprio desligado; criação pela tela, falha de armazenamento injetada sem limpar o formulário, fechamento/reabertura do perfil, UUID preservado, um evento remoto, 401 bloqueando a cópia local, três escolhas de saída, falha de saída preservando pendência e isolamento A/B. Executado em Chromium, Firefox e WebKit. O teste não depende somente de emular offline no protocolo do browser.
+- [offline-client.cjs](../tests/browser/offline-client.cjs): IndexedDB real nas três engines, bootstrap A atrasado depois de B, rejeição de página com geração antiga e limpeza após logout. Sessão/transporte sintéticos nesse teste; os handlers HTTP e sessões reais são verificados nas suítes complementares.
+- A fixture HTTP usa RPC sintética. A suíte PostgreSQL real no CI permanece obrigatória e separada. Nenhum dado/credencial de produção é usado nas evidências.
+- Leitor de tela humano e navegadores/aparelhos físicos não foram homologados nesta rodada. Dialog nativo, foco, teclado, roles, textos e estados têm verificação automatizada; o aceite físico mais amplo permanece no [gate #7](https://github.com/vitoradriao/revive/issues/7).
+
+Para executar a rodada completa, mantenha a fixture HTTP e o Vite indicados acima, compile o painel e rode npm run test:browser. As provas de shell/UI iniciam e encerram suas próprias fixtures em portas livres. REVIVE_BROWSER_ARTIFACTS grava capturas e um resumo da UI apenas com conteúdo sintético; REVIVE_BROWSER_EVIDENCE continua disponível para os resumos das suítes anteriores. CI executa todas as suítes.
+
+## Implantação, compatibilidade e recuperação
+
+Sem nova migration SQL, flag de produção ou mudança de contrato mobile nesta entrega. Requer a sessão web v2 já habilitada na #57. A publicação troca os arquivos públicos e instala o worker versionado sem recarregar forçadamente as abas. IndexedDB é aditivo e por conta; não limpar caches privados para reparar uma versão.
+
+Em bloqueio de upgrade, feche a aba antiga e reabra. Em mudança de versão, use Reabrir página. Em quota/armazenamento indisponível, o formulário não é salvo: preserve seu texto e disponibilize armazenamento antes de repetir. Em erro de rede/recibo incerto, use a intenção existente na Sincronização. Em conflito permanente, revise a origem antes de tentar novamente ou descarte explicitamente. Rollback de arquivos públicos não deve remover bancos ou filas; uma versão anterior incapaz de abrir o esquema precisa informar a incompatibilidade e aguardar versão compatível.
+
+Integração em main dispara Vercel Production e exige autorização específica do usuário, conforme o plano. Encerrar esta issue não autoriza publicação em lojas nem contato com participantes.
 
 Referências: [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB), [Web Locks](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) e [plugins Vite](https://vite.dev/guide/api-plugin.html).

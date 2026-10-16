@@ -37,7 +37,7 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 - [Cadastro de hábitos no web](web-habit-creation-validation.md): confirmação de envio, validação e recuperação de falhas da issue #56.
 
-- [Preparação de offline web](web-offline.md): IndexedDB, fila/recibos e shell; integração de produto da #58 ainda pendente.
+- [Offline web](web-offline.md): IndexedDB, fila/recibos, shell, acesso local e Sincronização da #58; PR #73 aguarda integração.
 
 ## Evidências e entregas anteriores
 
