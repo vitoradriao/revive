@@ -43,9 +43,9 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.goto(base); await login(page);
       await page.waitForFunction(() => !!localStorage.getItem('revive_offline_account'));
       await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-      await page.goto(base + '/vicios/' + habit);
+      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
-      // Block only API access; public files are cached by the real production service worker.
+      // Stop only this test's server; the production service worker already cached the public shell.
       await stop(fixture); fixture = null;
       await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
@@ -102,12 +102,13 @@ const login = async (page, email = 'a@example.invalid') => {
       // Fixture restart has no server sessions: confirmed 401 must lock the local data.
       await page.getByRole('heading', { name: 'Bem-vindo de volta', exact: true }).waitFor();
       await login(page);
-      await page.goto(base + '/sincronizacao');
+      await page.getByRole('button', { name: 'Sincronização', exact: true }).first().click();
       await page.getByRole('button', { name: 'Sincronizar agora', exact: true }).click();
       await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       const stats = await (await fetch(base + '/__test/status')).json();
       assert.equal(stats.events.registros, 1); assert.equal(stats.counts.writes, 1);
-      await page.goto(base + '/vicios/' + habit);
+      await page.getByRole('button', { name: 'Jornada', exact: true }).first().click();
+      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
       await fetch(base + '/__test/block-mutations', { method: 'POST' });
       await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
@@ -120,9 +121,10 @@ const login = async (page, email = 'a@example.invalid') => {
       assert.equal((await queue(page)).length, 0);
       assert.equal(await page.evaluate(() => localStorage.getItem('revive_offline_account')), null);
       await login(page, 'b@example.invalid');
-      await page.goto(base + '/sincronizacao');
+      await page.getByRole('button', { name: 'Sincronização', exact: true }).first().click();
       await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
       await page.getByText('Conta B sintética', { exact: true }).waitFor();
+      await page.getByText('Última cópia local: ainda não disponível.', { exact: false }).waitFor({ state: 'hidden' });
       await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       assert.equal(await page.getByText('synthetic offline persisted UI', { exact: false }).count(), 0);
       assert.equal(await page.locator('pre').count(), 0);
