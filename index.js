@@ -237,6 +237,9 @@ app.use('/api/auth/cadastro', cadastroLimiter);
 app.use('/api/v2/auth/login', loginLimiter);
 app.use('/api/v2/auth/cadastro', cadastroLimiter);
 app.use('/api/v2/auth/refresh', loginLimiter);
+app.use('/api/v2/web-auth/login', loginLimiter);
+app.use('/api/v2/web-auth/cadastro', cadastroLimiter);
+app.use('/api/v2/web-auth/refresh', loginLimiter);
 
 /** Aplica rate limiter geral em todas as rotas /api */
 app.use('/api', (req, res, next) => {

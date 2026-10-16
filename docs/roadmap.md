@@ -1,6 +1,6 @@
 # Acompanhamento do roadmap
 
-Estado consultado em **16/10/2026**, main `e454726`. A sequência, as dependências e os critérios de fechamento ficam na [issue #10](https://github.com/vitoradriao/revive/issues/10). A [matriz de paridade](matriz-paridade.md) distingue implementação, integração, ambiente habilitado e homologação de API, web, Android e iOS.
+Estado consultado em **16/10/2026**, main `d9e5d62`. A sequência, as dependências e os critérios de fechamento ficam na [issue #10](https://github.com/vitoradriao/revive/issues/10). A [matriz de paridade](matriz-paridade.md) distingue implementação, integração, ambiente habilitado e homologação de API, web, Android e iOS.
 
 ## Fundação já integrada
 
@@ -12,8 +12,8 @@ Em particular, o diário completo foi integrado no [PR #48](https://github.com/v
 
 | Grupo | Issues e estado |
 | --- | --- |
-| Preparação | [#55](https://github.com/vitoradriao/revive/issues/55) documentação/matriz; [#56](https://github.com/vitoradriao/revive/issues/56) cadastro concluído no [PR #70](https://github.com/vitoradriao/revive/pull/70); [#50](https://github.com/vitoradriao/revive/issues/50) investigação Android |
-| Fundação web | [#57](https://github.com/vitoradriao/revive/issues/57) sessões v2 → [#58](https://github.com/vitoradriao/revive/issues/58) persistência/fila offline |
+| Preparação | [#55](https://github.com/vitoradriao/revive/issues/55) concluída no [PR #71](https://github.com/vitoradriao/revive/pull/71); [#56](https://github.com/vitoradriao/revive/issues/56) cadastro concluído no [PR #70](https://github.com/vitoradriao/revive/pull/70); [#50](https://github.com/vitoradriao/revive/issues/50) investigação Android |
+| Fundação web | [#57](https://github.com/vitoradriao/revive/issues/57) sessões v2 implementadas na branch `feature/57-web-sessoes`, integração/rollout pendentes ([evidências](web-sessions.md)) → [#58](https://github.com/vitoradriao/revive/issues/58) persistência/fila offline |
 | Paridade web | [#59](https://github.com/vitoradriao/revive/issues/59) progresso, [#60](https://github.com/vitoradriao/revive/issues/60) hábitos, [#61](https://github.com/vitoradriao/revive/issues/61) diário, [#62](https://github.com/vitoradriao/revive/issues/62) vontades, [#63](https://github.com/vitoradriao/revive/issues/63) metas/recaídas e [#64](https://github.com/vitoradriao/revive/issues/64) conta |
 | Web e mobile | [#26](https://github.com/vitoradriao/revive/issues/26) resumo canônico, [#27](https://github.com/vitoradriao/revive/issues/27) exportação seletiva, [#65](https://github.com/vitoradriao/revive/issues/65) motivo, [#66](https://github.com/vitoradriao/revive/issues/66) preferências, [#67](https://github.com/vitoradriao/revive/issues/67) introdução e [#68](https://github.com/vitoradriao/revive/issues/68) busca |
 | Visual mobile | [#53](https://github.com/vitoradriao/revive/issues/53), [PR #54 aberto](https://github.com/vitoradriao/revive/pull/54); não integrado na referência desta consulta |

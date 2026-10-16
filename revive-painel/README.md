@@ -15,13 +15,9 @@ Abra o endereço exibido pelo Vite, normalmente `http://localhost:5173`.
 
 ## Endereço da API
 
-A configuração fica em `src/config/env.js`:
+O navegador usa `/api` no mesmo domínio do painel em todos os ambientes. Em desenvolvimento, o proxy Vite encaminha para `http://127.0.0.1:3000`; copie [`.env.example`](.env.example) para `.env.local` para definir `REVIVE_API_PROXY_TARGET` com outro destino, sem o sufixo `/api`, e reinicie o Vite. `VITE_API_URL` não é mais utilizado.
 
-- Desenvolvimento: porta `3000` no mesmo host utilizado pelo navegador.
-- Produção: `/api` no mesmo domínio do painel.
-- Endereço personalizado: copie [`.env.example`](.env.example) para `.env.local` e defina `VITE_API_URL`, por exemplo `VITE_API_URL=http://localhost:3000/api`, e reinicie o Vite.
-
-Variáveis `VITE_*` são públicas no navegador. Não inclua chaves privilegiadas do Supabase nem segredos JWT.
+As [sessões web v2](../docs/web-sessions.md) exigem as migrations e `WEB_AUTH_ENABLED=true` na API, além de HTTPS (ou localhost) e suporte a Web Locks/BroadcastChannel no navegador. O refresh fica em cookie HttpOnly e o access token somente em memória. Sessões legadas exigem novo login. Não inclua chaves privilegiadas do Supabase nem segredos JWT no frontend.
 
 ## Verificações
 

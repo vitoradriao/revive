@@ -134,6 +134,14 @@ export function UIProvider({ children }) {
     });
   }, []);
 
+  const resetSessionUI = useCallback(() => {
+    setAlert(null);
+    setLoading(false);
+    setConfirmModal({ isOpen: false });
+    setToasts([]);
+    setIsNewAddictionOpen(false);
+  }, []);
+
   const openNewAddictionWizard = useCallback(() => setIsNewAddictionOpen(true), []);
   const closeNewAddictionWizard = useCallback(() => setIsNewAddictionOpen(false), []);
 
@@ -143,7 +151,7 @@ export function UIProvider({ children }) {
       loading, setLoading,
       confirmModal, setConfirmModal, showConfirm,
       toasts, showToast, removeToast,
-      theme, toggleTheme,
+      theme, toggleTheme, resetSessionUI,
       isNewAddictionOpen, openNewAddictionWizard, closeNewAddictionWizard
     }}>
       {children}

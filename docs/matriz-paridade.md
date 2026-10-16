@@ -1,6 +1,6 @@
 # Matriz de implementação, ambiente e homologação
 
-Consulta em **16/10/2026**, base `main e4547262387e2cf5c901d1c8a9137960e26407d7`. O [roadmap #10](https://github.com/vitoradriao/revive/issues/10) concentra prioridade, dependências e critérios; esta matriz registra evidências. Atualizar os três quadros juntos a cada entrega.
+Consulta em **16/10/2026**, base `main d9e5d62bdf8e306d5eb596208ce2812f72941666`; implementação #57 na branch `feature/57-web-sessoes` ainda sem integração. O [roadmap #10](https://github.com/vitoradriao/revive/issues/10) concentra prioridade, dependências e critérios; esta matriz registra evidências. Atualizar os três quadros juntos a cada entrega.
 
 ## Como interpretar os estados
 
@@ -18,7 +18,7 @@ Cada célula informa I/G. Ambiente (A) e homologação (H/P) ficam nos quadros s
 
 | Funcionalidade | API | Web React/Vite | Android | iOS |
 | --- | --- | --- | --- | --- |
-| Conta e sessões | I/G v2 e legado | I/G legado; v2 P [#57](https://github.com/vitoradriao/revive/issues/57) | I/G v2 | I/G compartilhado |
+| Conta e sessões | I/G v2 e legado; adaptador web I, G pendente | I v2 [#57](https://github.com/vitoradriao/revive/issues/57), G pendente; [contrato e evidências](web-sessions.md) | I/G v2 | I/G compartilhado |
 | Cadastro de hábito | I/G | I/G; [correção #56](web-habit-creation-validation.md) integrada pelo [PR #70](https://github.com/vitoradriao/revive/pull/70) | I/G | I/G compartilhado |
 | Edição/archive/reativação | I/G [#21](https://github.com/vitoradriao/revive/issues/21) | P [#60](https://github.com/vitoradriao/revive/issues/60) | I/G [#21](https://github.com/vitoradriao/revive/issues/21) | I/G compartilhado |
 | Progresso histórico e awards permanentes | I/G [#16](https://github.com/vitoradriao/revive/issues/16) | I/G indicadores legados; alinhamento P [#59](https://github.com/vitoradriao/revive/issues/59) | I/G [#17](https://github.com/vitoradriao/revive/issues/17) | I/G compartilhado |
@@ -68,7 +68,7 @@ Cada célula informa I/G. Ambiente (A) e homologação (H/P) ficam nos quadros s
 | Android: diário corrigível | [PostgreSQL/SQLite reais e Jest #22](../revive-mobile/docs/diary-validation.md) | Matriz física complementar não executada naquela entrega; [#7](https://github.com/vitoradriao/revive/issues/7) |
 | Android: vontades | [Matriz física #25](../revive-mobile/docs/urge-events-android-validation.md): offline/processo morto/fuso/archive/A-B no cenário descrito | Fonte/densidade/resolução falharam [#50](https://github.com/vitoradriao/revive/issues/50); itens não executados continuam no gate |
 | Web legado | Build/testes de componentes integram o CI; o código existe na main | Não há homologação geral entre navegadores. [#56](https://github.com/vitoradriao/revive/issues/56) integrada e [validada em Edge com HTTP sintético](web-habit-creation-validation.md); não equivale à homologação geral |
-| Web v2/offline e fluxos novos | Ainda P nas issues de implementação | Storage/navegadores reais, múltiplas abas e teste cruzado web/mobile exigidos [#7](https://github.com/vitoradriao/revive/issues/7) |
+| Web v2/offline e fluxos novos | Sessões #57: Edge 155 com HTTP real sintético, duas abas e PostgreSQL 17.6 separados; [limites e rollout](web-sessions.md). Offline e demais fluxos ainda P | Storage/navegadores reais, múltiplas abas e teste cruzado web/mobile exigidos [#7](https://github.com/vitoradriao/revive/issues/7) |
 | iOS | Nenhuma homologação física encontrada para esta versão | Marcar não executado; build e cenários próprios [#7](https://github.com/vitoradriao/revive/issues/7) |
 | Resumo/exportação seletiva | Preparação de exportação no [PR #36](https://github.com/vitoradriao/revive/pull/36) | Implementação/aceite [#26](https://github.com/vitoradriao/revive/issues/26)/[#27](https://github.com/vitoradriao/revive/issues/27), sem declarar concluído por preparação |
 | Público/distribuição | [Checklist](../revive-mobile/docs/release-checklist.md) | Privacidade/suporte/exclusão, acessibilidade e loja [#7](https://github.com/vitoradriao/revive/issues/7). Pesquisa [#69](https://github.com/vitoradriao/revive/issues/69) é independente |

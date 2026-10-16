@@ -62,6 +62,11 @@ export async function verifyPasswordRecovery(app, sql, second) {
   const legacy = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   const mobile = await request(app).post('/api/v2/auth/login').send({ email: address, senha: password });
   assert.equal(mobile.status, 200);
+  const browser = await request(app).post('/api/v2/web-auth/login')
+    .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+    .send({ email: address, senha: password });
+  assert.equal(browser.status, 200);
+  const browserCookie = browser.headers['set-cookie'][0].split(';')[0];
   const habit = await request(app).post('/api/vicios').set('Authorization', `Bearer ${legacy}`)
     .send({ nome_vicio: 'Synthetic recovery history', data_inicio: '2026-09-01' });
   assert.equal(habit.status, 201);
@@ -131,6 +136,10 @@ export async function verifyPasswordRecovery(app, sql, second) {
     const webLogin = await request(app).post('/api/auth/login').send({ email: address, senha: newPassword });
     assert.equal(webLogin.status, 200);
     assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${legacy}`)).status, 401);
+    assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${browser.body.access_token}`)).status, 401);
+    assert.equal((await request(app).post('/api/v2/web-auth/refresh')
+      .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+      .set('Cookie', browserCookie).send({})).status, 401);
     assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${registered.body.token}`)).status, 401);
     assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${mobile.body.access_token}`)).status, 401);
     assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${mobile.body.access_token}`)).status, 401);
