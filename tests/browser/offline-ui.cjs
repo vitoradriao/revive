@@ -30,17 +30,24 @@ const login = async (page, email = 'a@example.invalid') => {
     const number = await port(), base = 'http://127.0.0.1:' + number;
     const options = { headless: true, viewport: { width: 1280, height: 900 }, locale: 'pt-BR' };
     let context, fixture;
-    const errors = [];
+    const errors = [], networkDiagnostics = [];
+    let networkDown = false;
+    const observeError = error => {
+      const expected = ['registros', 'bootstrap', 'web-auth/refresh', 'web-auth/logout'].some(endpoint => error.message.endsWith('/127.0.0.1:' + number + '/api/v2/' + endpoint + ' due to access control checks.'));
+      if (engine === 'webkit' && networkDown && expected) networkDiagnostics.push(error.message);
+      else errors.push(error.message);
+    };
     try {
       fixture = await launchFixture(number);
       context = await playwright[engine].launchPersistentContext(profile, options);
-      let page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+      let page = await context.newPage(); page.on('pageerror', observeError);
       await page.goto(base); await login(page);
       await page.waitForFunction(() => !!localStorage.getItem('revive_offline_account'));
       await page.waitForFunction(() => !!navigator.serviceWorker.controller);
       await page.goto(base + '/vicios/' + habit);
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
       // Block only API access; public files are cached by the real production service worker.
+      networkDown = true;
       await stop(fixture); fixture = null;
       await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
@@ -80,7 +87,7 @@ const login = async (page, email = 'a@example.invalid') => {
       await stop(fixture); fixture = null;
       await context.close();
       context = await playwright[engine].launchPersistentContext(profile, options);
-      page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+      page = await context.newPage(); page.on('pageerror', observeError);
       await page.goto(base + '/sincronizacao');
       await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor({ timeout: 30000 });
       await page.getByText('Modo local:', { exact: false }).waitFor();
@@ -92,7 +99,7 @@ const login = async (page, email = 'a@example.invalid') => {
         await page.screenshot({ path: path.join(process.env.REVIVE_BROWSER_ARTIFACTS, 'offline-ui-' + engine + '.png'), fullPage: true });
       }
       // Restart the fixture on the same origin. The persisted intent keeps its UUID.
-      fixture = await launchFixture(number);
+      fixture = await launchFixture(number); networkDown = false;
       await page.getByRole('button', { name: 'Restaurar sessão', exact: true }).click();
       // Fixture restart has no server sessions: confirmed 401 must lock the local data.
       await page.getByRole('heading', { name: 'Bem-vindo de volta', exact: true }).waitFor();
@@ -116,10 +123,13 @@ const login = async (page, email = 'a@example.invalid') => {
       assert.equal(await page.evaluate(() => localStorage.getItem('revive_offline_account')), null);
       await login(page, 'b@example.invalid');
       await page.goto(base + '/sincronizacao');
+      await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
+      await page.getByText('Conta B sintética', { exact: true }).waitFor();
+      await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       assert.equal(await page.getByText('synthetic offline persisted UI', { exact: false }).count(), 0);
       assert.equal(await page.locator('pre').count(), 0);
       assert.deepEqual(errors, []);
-      results.push({ engine, offlineReopen: true, durableId: true, failedLogoutPreserves: true, storageFailureKeepsDraft: true, explicitCancel: true, explicitDiscard: true, confirmed401Locks: true, singleRemoteEvent: true, accountIsolation: true });
+      results.push({ engine, expectedWebKitNetworkDiagnostics: networkDiagnostics.length, offlineReopen: true, durableId: true, failedLogoutPreserves: true, storageFailureKeepsDraft: true, explicitCancel: true, explicitDiscard: true, confirmed401Locks: true, singleRemoteEvent: true, accountIsolation: true });
       console.log(engine + ': offline UI passed');
     } catch (error) {
       console.error('UI state:', await context?.pages().at(-1)?.locator('body').innerText());
