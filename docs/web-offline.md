@@ -114,6 +114,8 @@ Consultas paginadas futuras devem capturar accountKey antes do HTTP e fornecê-l
 
 Para executar a rodada completa, mantenha a fixture HTTP e o Vite indicados acima, compile o painel e rode npm run test:browser. As provas de shell/UI iniciam e encerram suas próprias fixtures em portas livres. REVIVE_BROWSER_ARTIFACTS grava capturas e um resumo da UI apenas com conteúdo sintético; REVIVE_BROWSER_EVIDENCE continua disponível para os resumos das suítes anteriores. CI executa todas as suítes.
 
+Validação da integração no código b64cf31: npm run validate (80 API / 89 painel / build), integração do painel após os ajustes, lint e documentação aprovados. As seis suítes de navegador passaram: sessões, storage, replay, shell, cliente por geração e UI. [Captura da reabertura local com dados sintéticos](evidencias-testes/web-offline-ui-20261016.png). A [síntese da UI por engine](evidencias-testes/web-offline-ui-20261016.json) não contém credenciais nem dados de usuários.
+
 ## Implantação, compatibilidade e recuperação
 
 Sem nova migration SQL, flag de produção ou mudança de contrato mobile nesta entrega. Requer a sessão web v2 já habilitada na #57. A publicação troca os arquivos públicos e instala o worker versionado sem recarregar forçadamente as abas. IndexedDB é aditivo e por conta; não limpar caches privados para reparar uma versão.
