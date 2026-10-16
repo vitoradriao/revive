@@ -172,10 +172,15 @@ export function createSessionManager(environment = {}) {
     applyResponse(response, meta);
     return { ...response, token: response.access_token };
   });
-  const logout = () => locked(async () => {
-    await authRequest('logout');
-    transition();
-  });
+  const logout = () => {
+    const initial = { epoch: snapshot.epoch };
+    return locked(async () => {
+      if (syncMeta().epoch !== initial.epoch) throw changedError();
+      await authRequest('logout');
+      if (!stillCurrent(initial)) throw changedError();
+      transition();
+    });
+  };
   const authenticatedRequest = async (endpoint, options, providedToken) => {
     const meta = syncMeta();
     if (tokenEpochs.get(providedToken) !== meta.epoch) throw changedError();

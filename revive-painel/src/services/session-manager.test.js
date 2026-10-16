@@ -73,6 +73,26 @@ describe('web session generations and tab coordination', () => {
     expect(b.getSnapshot().token).toBe('');
     await expect(b.authenticatedRequest('/me', {}, old)).rejects.toMatchObject({ code: 'SESSAO_ALTERADA' });
   });
+  it('does not let an A logout queued behind a B login revoke B', async () => {
+    const h = harness();
+    let release, entered, block = false;
+    const gate = new Promise(done => { release = done; });
+    const arrived = new Promise(done => { entered = done; });
+    const a = h.tab(), b = h.tab({ request: async (path, options, token) => {
+      if (block && path.endsWith('/logout')) { block = false; entered(); await gate; }
+      return h.request(path, options, token);
+    } });
+    await Promise.all([a.start(), b.start()]);
+    block = true;
+    const login = b.login('account-b', 'Synthetic!1');
+    await arrived;
+    const oldLogout = a.logout().catch(error => error);
+    release(); await login;
+    expect(await oldLogout).toMatchObject({ code: 'SESSAO_ALTERADA' });
+    expect(b.getSnapshot().user.id).toBe('account-b');
+    await expect(b.authenticatedRequest('/me', {}, b.getSnapshot().token)).resolves.toEqual({ user: 'account-b' });
+  });
+
   it('does not apply a delayed account-A result after login as B', async () => {
     const h = harness();
     let resolve;

@@ -15,7 +15,7 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
 
 (async () => {
   await fetch(fixture + '/__test/reset', { method: 'POST' });
-  const browser = await playwright.chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', headless: true });
+  const browser = await playwright.chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}) });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'pt-BR' });
   const errors = [], tokenUrls = [];
   context.on('page', page => {

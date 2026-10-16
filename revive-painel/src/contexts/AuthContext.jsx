@@ -33,7 +33,8 @@ export function AuthProvider({ children }) {
       await manager.logout();
       if (showMessage) showToast('info', 'Sessão encerrada.');
       return true;
-    } catch {
+    } catch (error) {
+      if (error.code === 'SESSAO_ALTERADA') return false;
       showToast('error', 'Não foi possível confirmar a saída. Verifique a conexão e tente novamente.');
       return false;
     }

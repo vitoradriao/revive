@@ -61,7 +61,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
  */
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {
       // Falha silenciosa: a app continua funcionando sem offline.
     });
   });

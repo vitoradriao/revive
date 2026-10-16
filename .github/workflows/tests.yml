@@ -85,3 +85,39 @@ jobs:
           REVIVE_CI_POSTGREST_IMAGE: mirror.gcr.io/postgrest/postgrest:v12.2.12
           REVIVE_CI_MAILPIT_IMAGE: ghcr.io/axllent/mailpit:v1.31.4
         run: sh supabase/verification/run_ci.sh
+
+  browser:
+    name: Web — sessões, IndexedDB e shell offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            revive-painel/package-lock.json
+      - name: Instalar dependências
+        run: |
+          npm ci
+          npm ci --prefix revive-painel
+      - name: Instalar Chromium, Firefox e WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Compilar shell público
+        run: npm run build:web
+      - name: Validar sessões, IndexedDB, replay e reabertura offline
+        shell: bash
+        run: |
+          node tests/browser/session-fixture.cjs > "$RUNNER_TEMP/revive-browser-api.log" 2>&1 &
+          fixture_pid=$!
+          REVIVE_API_PROXY_TARGET=http://127.0.0.1:3177 npm run dev --prefix revive-painel -- --host 127.0.0.1 --port 4177 --strictPort > "$RUNNER_TEMP/revive-browser-vite.log" 2>&1 &
+          vite_pid=$!
+          trap 'kill "$fixture_pid" "$vite_pid" 2>/dev/null || true' EXIT
+          node -e 'const pause=()=>new Promise(r=>setTimeout(r,250)); (async()=>{for(let n=0;n<120;n++){try{if((await fetch("http://127.0.0.1:4177")).ok && (await fetch("http://127.0.0.1:3177/__test/status")).ok)return}catch{}await pause()}throw Error("Browser fixtures unavailable")})().catch(e=>{console.error(e.message);process.exitCode=1})'
+          npm run test:browser
