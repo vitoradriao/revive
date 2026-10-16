@@ -38,6 +38,8 @@ A [migration aditiva de logout](../supabase/migrations/20261016170000_web_sessio
 3. Publicar o painel que usa /api mesma origem e conferir os cenários da issue. No monorepositório/Vercel, preparar SQL e flag antes de autorizar a integração que promove o frontend.
 4. Não fazer rollback para código que ignore credential_version após redefinição de senhas. Preservar a migration aditiva e as revogações; corrigir adiante. Se o problema for no transporte web, suspender a promoção ou desabilitar a flag enquanto disponibiliza cliente compatível, sem apagar histórico/fila.
 
+O [rollout autorizado de 16/10/2026](web-sessions-rollout.md) registra migrations, flag, integração e limites do smoke Production.
+
 A configuração de SMTP/recovery é independente. Habilitar sessões web não habilita recuperação de senha automaticamente.
 
 ## Evidência local de 16/10/2026

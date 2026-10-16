@@ -1,6 +1,6 @@
 # Matriz de implementação, ambiente e homologação
 
-Consulta em **16/10/2026**, base `main d9e5d62bdf8e306d5eb596208ce2812f72941666`; implementação #57 na branch `feature/57-web-sessoes` ainda sem integração. O [roadmap #10](https://github.com/vitoradriao/revive/issues/10) concentra prioridade, dependências e critérios; esta matriz registra evidências. Atualizar os três quadros juntos a cada entrega.
+Consulta em **16/10/2026**, base `main 5ca7db48fe691d6cf78e1b50df99fd3251c7dbc8`; [#57 integrada e rollout autorizado verificado](web-sessions-rollout.md). O [roadmap #10](https://github.com/vitoradriao/revive/issues/10) concentra prioridade, dependências e critérios; esta matriz registra evidências. Atualizar os três quadros juntos a cada entrega.
 
 ## Como interpretar os estados
 
@@ -18,7 +18,7 @@ Cada célula informa I/G. Ambiente (A) e homologação (H/P) ficam nos quadros s
 
 | Funcionalidade | API | Web React/Vite | Android | iOS |
 | --- | --- | --- | --- | --- |
-| Conta e sessões | I/G v2 e legado; adaptador web I, G pendente | I v2 [#57](https://github.com/vitoradriao/revive/issues/57), G pendente; [contrato e evidências](web-sessions.md) | I/G v2 | I/G compartilhado |
+| Conta e sessões | I/G v2, legado e adaptador web | I/G v2 [#57](https://github.com/vitoradriao/revive/issues/57); [contrato e evidências](web-sessions.md) | I/G v2 | I/G compartilhado |
 | Cadastro de hábito | I/G | I/G; [correção #56](web-habit-creation-validation.md) integrada pelo [PR #70](https://github.com/vitoradriao/revive/pull/70) | I/G | I/G compartilhado |
 | Edição/archive/reativação | I/G [#21](https://github.com/vitoradriao/revive/issues/21) | P [#60](https://github.com/vitoradriao/revive/issues/60) | I/G [#21](https://github.com/vitoradriao/revive/issues/21) | I/G compartilhado |
 | Progresso histórico e awards permanentes | I/G [#16](https://github.com/vitoradriao/revive/issues/16) | I/G indicadores legados; alinhamento P [#59](https://github.com/vitoradriao/revive/issues/59) | I/G [#17](https://github.com/vitoradriao/revive/issues/17) | I/G compartilhado |
@@ -48,6 +48,7 @@ Cada célula informa I/G. Ambiente (A) e homologação (H/P) ficam nos quadros s
 | API/painel de demonstração | [Registro de publicação de setembro](../revive-mobile/docs/deployment-validation.md); deployment Production de e454726 aprovado na consulta GitHub de 16/10 | Código publicado não comprova esquema/configuração de cada recurso: A funcional **?**, conferir ambiente antes de afirmar suporte |
 | Banco novo e upgrade legado | [Baseline e procedimento](../supabase/README.md), [#6](https://github.com/vitoradriao/revive/issues/6) encerrada / [PR #30](https://github.com/vitoradriao/revive/pull/30) | I/G confirmados; replay de setembro foi isolado. Instalação nova possui caminho versionado; cada ambiente exige inventário/rollout |
 | Sessões, atomicidade, progresso, edição e diário | Migrations e testes PostgreSQL em CI; [sync](mobile-sync.md), [edição](habit-edit-archive.md), [diário](../revive-mobile/docs/diary-validation.md) | A remoto **?** para cada migration; não executar SQL automaticamente. API pode declarar indisponibilidade quando contrato obrigatório ainda não foi habilitado |
+| Sessões web v2 | [Rollout autorizado de 16/10](web-sessions-rollout.md), esquema até 20261016170000, WEB_AUTH_ENABLED=true e Production success | A do transporte básico confirmada por smoke público; autenticação/duas abas têm evidência local, sem alegar aceite autenticado Production |
 | Recuperação de senha | [Implementação e aceite Westmail/Android de 09/10](password-recovery.md), [PR #45](https://github.com/vitoradriao/revive/pull/45) | I/G e H do ambiente de teste confirmados. SQL remoto/habilitação Production **não comprovados**; conferir credential_version, configuração SMTP e flag de rollout pelo procedimento |
 | Android de teste | APK isolado/debug e backend descartável na [matriz de 13/10](../revive-mobile/docs/urge-events-android-validation.md) | A somente no cenário datado; recursos temporários removidos. Não equivale a aplicativo distribuído/loja |
 | Android release | Build/matriz Expo e configuração variam por entrega | A/H atuais pendentes [#7](https://github.com/vitoradriao/revive/issues/7), inclusive regressão [#50](https://github.com/vitoradriao/revive/issues/50) |
