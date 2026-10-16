@@ -35,6 +35,7 @@ import Alert from '../ui/Alert';
 import NovoVicioWizard from '../modals/NovoVicioWizard';
 import { useUI } from '../../contexts/UIContext';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Layout principal que envolve todas as paginas autenticadas da aplicacao.
@@ -50,25 +51,23 @@ const AppShell = () => {
     confirmModal,
     alert,
     setAlert,
-    loading,
     isNewAddictionOpen,
     closeNewAddictionWizard
   } = useUI();
-  const { createAddiction } = useData();
+  const { createAddiction, checkCreatedAddictions } = useData();
+  const { token, user } = useAuth();
 
   return (
     <div className="min-h-screen text-app relative">
       <ConfirmModal {...confirmModal} />
-      <NovoVicioWizard
-        isOpen={isNewAddictionOpen}
+      {isNewAddictionOpen && <NovoVicioWizard
+        key={user?.id || token}
+        isOpen
         onClose={closeNewAddictionWizard}
-        onSubmit={async (payload) => {
-          await createAddiction(payload);
-          closeNewAddictionWizard();
-        }}
-        loading={loading}
-      />
-      <div className="revive-app-frame">
+        onSubmit={createAddiction}
+        onCheckHabits={checkCreatedAddictions}
+      />}
+      <div className="revive-app-frame" inert={isNewAddictionOpen}>
         <NavBar variant="sidebar" />
         <main className="revive-shell">
           <Header />

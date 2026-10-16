@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, useData } from './DataContext';
 
@@ -8,7 +8,8 @@ const {
   mockShowToast,
   mockSetLoading,
   mockShowConfirm,
-  mockListarVicios
+  mockListarVicios,
+  mockCriarVicio
 } = vi.hoisted(() => ({
   mockAuthState: {
     token: 'test-token',
@@ -17,7 +18,8 @@ const {
   mockShowToast: vi.fn(),
   mockSetLoading: vi.fn(),
   mockShowConfirm: vi.fn(),
-  mockListarVicios: vi.fn()
+  mockListarVicios: vi.fn(),
+  mockCriarVicio: vi.fn()
 }));
 
 vi.mock('./AuthContext', () => ({
@@ -35,7 +37,7 @@ vi.mock('./UIContext', () => ({
 vi.mock('../services/vicios.service', () => ({
   listarVicios: mockListarVicios,
   buscarVicio: vi.fn(),
-  criarVicio: vi.fn(),
+  criarVicio: mockCriarVicio,
   excluirVicio: vi.fn(),
   registrarRecaida: vi.fn()
 }));
@@ -125,5 +127,73 @@ describe('DataContext error handling', () => {
     await waitFor(() => {
       expect(getByTestId('addictions')).toHaveTextContent('');
     });
+  });
+});
+
+describe('DataContext confirmed creation', () => {
+  const payload = { nome_vicio: 'Café', data_inicio: '2026-10-01', valor_economizado_por_dia: 12.5 };
+  const habit = { ...payload, id: 'habit-1' };
+  const wrapper = ({ children }) => <DataProvider>{children}</DataProvider>;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthState.token = 'test-token';
+    mockAuthState.user = { id: 'user-1' };
+    mockListarVicios.mockReset().mockResolvedValue({ vicios: [] });
+    mockCriarVicio.mockReset();
+  });
+  it('propagates creation failure instead of reporting success', async () => {
+    mockCriarVicio.mockRejectedValue(new Error('Não foi possível salvar'));
+    const { result } = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(mockListarVicios).toHaveBeenCalled());
+    await act(async () => { await expect(result.current.createAddiction(payload)).rejects.toThrow('Não foi possível salvar'); });
+    expect(mockShowToast).not.toHaveBeenCalledWith('success', expect.anything());
+    expect(result.current.addictions).toEqual([]);
+  });
+  it('keeps confirmed habit when the subsequent refresh fails', async () => {
+    mockCriarVicio.mockResolvedValue({ vicio: habit });
+    const { result } = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(mockListarVicios).toHaveBeenCalledOnce());
+    mockListarVicios.mockRejectedValueOnce(new Error('network'));
+    await act(async () => { await expect(result.current.createAddiction(payload)).resolves.toEqual({ vicio: habit }); });
+    expect(result.current.addictions).toEqual([expect.objectContaining(habit)]);
+    expect(mockCriarVicio).toHaveBeenCalledOnce();
+    expect(mockShowToast).toHaveBeenCalledWith('success', 'Hábito criado com sucesso!');
+  });
+  it('returns the POST confirmation without waiting for a stalled list refresh', async () => {
+    mockCriarVicio.mockResolvedValue({ vicio: habit });
+    const { result } = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(mockListarVicios).toHaveBeenCalledOnce());
+    mockListarVicios.mockReturnValueOnce(new Promise(() => {}));
+    await act(async () => {
+      await expect(result.current.createAddiction(payload)).resolves.toEqual({ vicio: habit });
+    });
+    expect(result.current.addictions).toEqual([expect.objectContaining(habit)]);
+  });
+  it('loads the confirmed habit again after a provider remount', async () => {
+    mockCriarVicio.mockImplementation(async () => {
+      mockListarVicios.mockResolvedValue({ vicios: [habit] });
+      return { vicio: habit };
+    });
+    const first = renderHook(() => useData(), { wrapper });
+    await act(async () => { await first.result.current.createAddiction(payload); });
+    expect(first.result.current.addictions).toHaveLength(1);
+    first.unmount();
+    const second = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(second.result.current.addictions).toEqual([expect.objectContaining(habit)]));
+    expect(mockCriarVicio).toHaveBeenCalledOnce();
+  });
+  it('does not publish a previous account confirmation into the new account', async () => {
+    let resolve;
+    mockCriarVicio.mockReturnValue(new Promise(done => { resolve = done; }));
+    const { result, rerender } = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(mockListarVicios).toHaveBeenCalledOnce());
+    const pending = result.current.createAddiction(payload).catch(error => error);
+    mockAuthState.token = 'second-token';
+    mockAuthState.user = { id: 'user-2' };
+    rerender();
+    await act(async () => { resolve({ vicio: habit }); await pending; });
+    expect(await pending).toBeInstanceOf(Error);
+    expect(result.current.addictions).toEqual([]);
+    expect(mockShowToast).not.toHaveBeenCalledWith('success', expect.anything());
   });
 });

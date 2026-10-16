@@ -76,6 +76,7 @@ const DataContext = createContext(null);
 export function DataProvider({ children }) {
   const { token, user } = useAuth();
   const { showToast, setLoading, showConfirm } = useUI();
+  const addictionsReadRef = useRef(0);
   const activeTokenRef = useRef(token);
   activeTokenRef.current = token;
 
@@ -175,8 +176,9 @@ export function DataProvider({ children }) {
    */
   const loadAddictions = useCallback(() => withLoading(async () => {
     const requestToken = token;
+    const readId = ++addictionsReadRef.current;
     const data = await viciosService.listarVicios(requestToken);
-    if (!isCurrentToken(requestToken)) return;
+    if (!isCurrentToken(requestToken) || readId !== addictionsReadRef.current) return;
     // Processamento O(n): itera sobre cada vicio aplicando sanitizacao e formatacao
     const processed = (data.vicios || []).map(addiction => ({
       ...addiction,
@@ -301,13 +303,35 @@ export function DataProvider({ children }) {
    * @param {string} [payload.data_inicio] - Data de inicio da abstinencia (ISO 8601)
    * @returns {Promise<void>}
    */
+  const checkCreatedAddictions = useCallback(async () => {
+    const requestToken = token;
+    const data = await viciosService.listarVicios(requestToken);
+    if (!isCurrentToken(requestToken)) throw new Error('A sessão mudou. Abra o formulário novamente.');
+    if (!Array.isArray(data.vicios)) throw new Error('Não foi possível consultar os hábitos.');
+    return data.vicios;
+  }, [token, isCurrentToken]);
+
+  // Creation rejects so the form keeps its draft. A failed list refresh is not a failed POST.
   const createAddiction = useCallback(async (payload) => {
-    await withLoading(async () => {
-      await viciosService.criarVicio(payload, token);
-      showToast('success', 'Vicio criado com sucesso!');
-      await loadAddictions();
-    }, 'Nao foi possivel criar o vicio.');
-  }, [token, showToast, loadAddictions, withLoading]);
+    const requestToken = token;
+    const response = await viciosService.criarVicio(payload, requestToken);
+    if (!isCurrentToken(requestToken)) throw new Error('A sessão mudou. Consulte seus hábitos ao entrar novamente.');
+    const created = response.vicio;
+    const keepConfirmedHabit = () => {
+      if (!isCurrentToken(requestToken)) return;
+      setAddictions(previous => previous.some(item => item.id === created.id) ? previous : [{
+        ...created,
+        dias_abstinencia: Math.max(0, created.dias_abstinencia || 0),
+        valor_economizado: Math.max(0, created.valor_economizado || 0),
+        tempo_formatado: created.tempo_formatado || calcularTempoDecorrido(created.data_inicio)
+      }, ...previous]);
+    };
+    keepConfirmedHabit();
+    showToast('success', 'Hábito criado com sucesso!');
+    // A slow/failed GET cannot turn a confirmed POST into an apparent failed creation.
+    void loadAddictions();
+    return response;
+  }, [token, isCurrentToken, showToast, loadAddictions]);
 
   /**
    * Exclui um vicio apos confirmacao do usuario via modal.
@@ -519,6 +543,7 @@ export function DataProvider({ children }) {
         loadGoals,
         loadRelapses,
         createAddiction,
+        checkCreatedAddictions,
         deleteAddiction,
         registerRelapse,
         createRecord,

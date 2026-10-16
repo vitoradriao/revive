@@ -58,10 +58,12 @@ export async function apiCall(endpoint, options = {}, token = null) {
       headers: { ...headers, ...options.headers }
     });
   } catch {
-    throw new Error('Nao foi possivel conectar ao servidor. Tente novamente em alguns segundos.');
+    throw Object.assign(new Error('Não foi possível confirmar a resposta do servidor.'), { outcomeUnknown: true });
   }
 
-  const text = await response.text();
+  let text;
+  try { text = await response.text(); }
+  catch { throw Object.assign(new Error('A conexão foi interrompida antes da confirmação.'), { outcomeUnknown: true }); }
   let data = {};
 
   if (text) {
@@ -73,7 +75,9 @@ export async function apiCall(endpoint, options = {}, token = null) {
   }
 
   if (!response.ok) {
-    throw new Error(data.mensagem || data.erro || `Erro na requisicao (${response.status})`);
+    throw Object.assign(new Error(data.mensagem || data.erro || `Erro na requisição (${response.status})`), {
+      status: response.status, code: data.codigo, outcomeUnknown: response.status >= 500
+    });
   }
 
   return data;
