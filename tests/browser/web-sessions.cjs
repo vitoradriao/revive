@@ -92,6 +92,12 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       { name: managerModule, token: networkToken });
 
     const c = await context.newPage(); await c.goto(base); await waitUser(c, accountA);
+    await b.getByRole('button', { name: 'Novo hábito', exact: true }).first().click();
+    await b.getByLabel('Nome do hábito', { exact: true }).fill('synthetic-private-draft-A');
+    const draftToken = (await snapshot(b)).token;
+    await b.evaluate(async ({ name, token }) => (await import(name)).getSessionManager().ensureToken(token),
+      { name: managerModule, token: draftToken });
+    assert.equal(await b.getByLabel('Nome do hábito', { exact: true }).inputValue(), 'synthetic-private-draft-A');
     let release, received;
     const gate = new Promise(done => { release = done; });
     const arrived = new Promise(done => { received = done; });
@@ -108,6 +114,10 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
     await c.evaluate(async name => (await import(name)).getSessionManager().login('b@example.invalid', 'Synthetic!1'), managerModule);
     await waitUser(c, accountB); await waitUser(b, accountB);
     release(); assert.equal(await lateResult, 'SESSAO_ALTERADA'); await b.unroute('**/api/me');
+    assert.equal(await b.getByLabel('Nome do hábito', { exact: true }).count(), 0);
+    await b.getByRole('button', { name: 'Novo hábito', exact: true }).first().click();
+    assert.equal(await b.getByLabel('Nome do hábito', { exact: true }).inputValue(), '');
+    await b.getByRole('button', { name: 'Fechar', exact: true }).click();
 
     const csrf = await context.request.post(base + '/api/v2/web-auth/refresh', {
       headers: { Origin: 'https://hostile.example.invalid' }, data: {}
@@ -119,7 +129,7 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
     const revoked = await b.evaluate(async name => {
       const manager = (await import(name)).getSessionManager();
       try { await manager.authenticatedRequest('/me', {}, manager.getSnapshot().token); return false; }
-      catch (error) { return error.status === 401; }
+      catch (error) { return error.status === 401 || error.code === 'SESSAO_ALTERADA'; }
     }, managerModule);
     assert.equal(revoked, true);
     await b.getByRole('heading', { name: 'Bem-vindo de volta', exact: true }).waitFor(); await c.getByRole('heading', { name: 'Bem-vindo de volta', exact: true }).waitFor();
@@ -130,7 +140,7 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       passed: ['HttpOnly cookie and no JS credential persistence', 'two tabs and one concurrent rotation',
         'concurrent authenticated requests', 'reload restoration', 'cross-tab logout and revocation',
         'lock recovery after closing owner', 'network failure preserves account', 'account-B login rejects delayed A response',
-        'cross-origin request refused', 'server revocation clears both tabs', 'no page errors or tokens in URLs'],
+        'draft survives refresh and is removed on account switch', 'cross-origin request refused', 'server revocation clears both tabs', 'no page errors or tokens in URLs'],
       limitations: ['PostgreSQL is verified separately; this browser fixture uses synthetic storage.', 'No production accounts used.']
     };
     if (process.env.REVIVE_BROWSER_EVIDENCE) {

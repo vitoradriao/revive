@@ -25,6 +25,8 @@ Antes/depois de respostas, o cliente compara a geração da sessão. Troca de co
 
 O navegador precisa de HTTPS (ou localhost) e suporte a Web Locks/BroadcastChannel. Sem coordenação segura, o cliente mostra indisponibilidade e não tenta uma rotação concorrente insegura. A API não expõe token em URLs ou logs. HTTP 204 não exige JSON; status, codigo, campos, request_id e Retry-After são preservados quando fornecidos.
 
+A geração, e não a troca do access token, determina a limpeza dos dados da interface. Renovar em segundo plano preserva seleção e confirmação de criação na mesma conta; logout e novo login iniciam outra geração. O limite React por sessão desmonta páginas/rascunhos antigos e limpa modais, alertas e toasts antes de exibir a próxima conta.
+
 Logout só é anunciado após confirmação remota. Sem rede, a conta permanece localmente e a interface informa que não confirmou a saída. A fila/decisões de pendências serão integradas pela [#58](https://github.com/vitoradriao/revive/issues/58); esta entrega não afirma persistência offline do painel.
 
 ## Migration e implantação
@@ -38,13 +40,19 @@ A [migration aditiva de logout](../supabase/migrations/20261016170000_web_sessio
 
 A configuração de SMTP/recovery é independente. Habilitar sessões web não habilita recuperação de senha automaticamente.
 
+## Evidência local de 16/10/2026
+
+Na branch feature/57-web-sessoes, sobre main d9e5d62, passaram: validação da raiz (80 testes API, 88 painel e build, com a integração React final retestada), lint do painel e 239 links locais. OpenAPI gerado teve 30 referências resolvidas. A suíte PostgreSQL 17.6 passou instalação nova, atualização legada, permissões, API, SMTP Mailpit e revogação web/mobile, incluindo as duas ordens de concorrência logout/refresh com conexões reais. Migration máxima: 20261016170000.
+
+Edge 155.0.4283.45 passou os cenários da fixture local descritos abaixo, inclusive o rascunho durante refresh/troca de conta. Não houve uso de contas de produção, SQL remoto, homologação Firefox/WebKit nem teste físico mobile nesta entrega. Regressão mobile compartilhada é verificada no CI do PR; não é aceite de aparelho.
+
 ## Verificações
 
 - [Transporte HTTP/API](../tests/integration/web-session.test.js): atributos de cookie, origem, refresh somente via cookie, erro/revogação e compatibilidade mobile.
 - [Coordenador](../revive-painel/src/services/session-manager.test.js): duas abas, refresh único, geração de conta, startup offline, revogação e armazenamento sem tokens.
 - [Contexto React](../revive-painel/src/contexts/AuthContext.test.jsx): restauração, retirada do JWT legado, memória, erro de rede e saída não confirmada.
 - [PostgreSQL real](../tests/db/web-sessions.mjs): hash do refresh, API/ownership, grants, duas ordens de corrida logout/refresh com duas conexões; [recovery](../tests/db/password-recovery.mjs) confirma revogação de cookie/access após redefinição real.
-- [Navegador real](../tests/browser/web-sessions.cjs) com [fixture HTTP local](../tests/browser/session-fixture.cjs): cookie real, duas abas, reload, lock liberado ao fechar a aba, A/B com resposta atrasada, rede e logout. A fixture usa armazenamento sintético; não substitui a suíte PostgreSQL.
+- [Navegador real](../tests/browser/web-sessions.cjs) com [fixture HTTP local](../tests/browser/session-fixture.cjs): cookie real, duas abas, reload, lock liberado ao fechar a aba, A/B com resposta atrasada, rascunho preservado no refresh e removido ao trocar conta, rede e logout. A fixture usa armazenamento sintético; não substitui a suíte PostgreSQL.
 
 Comandos usuais: `npm run validate`, `npm run lint --prefix revive-painel` e `npm run test:db`. No Windows sem sh no PATH, executar `& 'C:\Program Files\Git\bin\bash.exe' supabase/verification/run_ci.sh`; usar COMPOSE_PROJECT_NAME exclusivo para o teste. Os containers/bancos desse projeto são descartados ao final, sem tocar outros projetos Docker.
 

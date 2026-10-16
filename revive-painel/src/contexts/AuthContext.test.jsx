@@ -1,5 +1,5 @@
-import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import { createSessionManager } from '../services/session-manager';
@@ -11,8 +11,10 @@ vi.mock('../services/session-manager', async importOriginal => ({
 }));
 
 function Consumer() {
+  const [draft, setDraft] = useState('');
   const { login, logout, restoreSession, token, user, authLoading, authError } = useAuth();
   return <div>
+    <input aria-label="Rascunho sintético" value={draft} onChange={event => setDraft(event.target.value)} />
     <button disabled={authLoading} onClick={() => login('synthetic@example.invalid', 'Synthetic!1')}>Login</button>
     <button onClick={() => logout()}>Logout</button>
     <button onClick={restoreSession}>Restaurar</button>
@@ -65,6 +67,22 @@ describe('AuthContext cookie session', () => {
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+  it('preserves a draft on refresh and removes it before the next login', async () => {
+    cookie = true;
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    fireEvent.change(screen.getByLabelText('Rascunho sintético'), { target: { value: 'private synthetic draft' } });
+    const old = managerRef.current.getSnapshot().token;
+    await act(async () => { await managerRef.current.ensureToken(old); });
+    expect(screen.getByLabelText('Rascunho sintético')).toHaveValue('private synthetic draft');
+    fireEvent.click(screen.getByText('Logout'));
+    await waitFor(() => expect(screen.getByTestId('user')).toBeEmptyDOMElement());
+    expect(screen.getByLabelText('Rascunho sintético')).toHaveValue('');
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('synthetic-user'));
+    expect(screen.getByLabelText('Rascunho sintético')).toHaveValue('');
+  });
+
   it('does not announce a successful logout on network failure', async () => {
     cookie = true;
     render(<AuthProvider><Consumer /></AuthProvider>);

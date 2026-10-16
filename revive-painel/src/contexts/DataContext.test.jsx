@@ -182,6 +182,24 @@ describe('DataContext confirmed creation', () => {
     await waitFor(() => expect(second.result.current.addictions).toEqual([expect.objectContaining(habit)]));
     expect(mockCriarVicio).toHaveBeenCalledOnce();
   });
+  it('keeps selection and a confirmed creation across a background token refresh', async () => {
+    let resolve;
+    mockCriarVicio.mockReturnValue(new Promise(done => { resolve = done; }));
+    const { result, rerender } = renderHook(() => useData(), { wrapper });
+    await waitFor(() => expect(mockListarVicios).toHaveBeenCalledOnce());
+    act(() => result.current.setSelectedAddiction(habit));
+    const pending = result.current.createAddiction(payload);
+    mockAuthState.token = 'refreshed-token';
+    mockAuthState.user = { id: 'user-1' };
+    rerender();
+    expect(result.current.selectedAddiction).toEqual(habit);
+    mockListarVicios.mockResolvedValue({ vicios: [habit] });
+    await act(async () => { resolve({ vicio: habit }); await pending; });
+    await expect(pending).resolves.toEqual({ vicio: habit });
+    expect(result.current.addictions).toEqual([expect.objectContaining(habit)]);
+    expect(mockShowToast).toHaveBeenCalledWith('success', 'Hábito criado com sucesso!');
+  });
+
   it('does not publish a previous account confirmation into the new account', async () => {
     let resolve;
     mockCriarVicio.mockReturnValue(new Promise(done => { resolve = done; }));

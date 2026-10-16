@@ -21,6 +21,7 @@ O REVIVE usa PostgreSQL no Supabase. A API Express acessa as tabelas privadas co
 | 13 | [20261006130000](migrations/20261006130000_password_recovery.sql) | Recuperação de senha e versão de credenciais |
 | 14 | [20261009120000](migrations/20261009120000_habit_edit_archive.sql) | Revisão, edição e arquivamento de hábitos |
 | 15 | [20261013120215](migrations/20261013120215_diary_record_edit.sql) | Correção versionada e idempotente do diário |
+| 16 | [20261016170000](migrations/20261016170000_web_session_logout.sql) | Logout web de família serializado com refresh/recovery; [rollout](../docs/web-sessions.md) |
 
 Não renumere migrations já aplicadas. Os identificadores das cinco migrations antigas no projeto de desenvolvimento são diferentes dos nomes versionados neste repositório; compare o histórico antes de reparar qualquer versão. O baseline só deve executar em banco vazio.
 

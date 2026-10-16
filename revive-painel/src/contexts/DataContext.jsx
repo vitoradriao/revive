@@ -74,11 +74,18 @@ const DataContext = createContext(null);
  * </DataProvider>
  */
 export function DataProvider({ children }) {
-  const { token, user } = useAuth();
+  const { token, user, sessionEpoch } = useAuth();
+  const accountKey = user ? `${user.id}:${sessionEpoch || ''}` : '';
   const { showToast, setLoading, showConfirm } = useUI();
   const addictionsReadRef = useRef(0);
-  const activeTokenRef = useRef(token);
-  activeTokenRef.current = token;
+  const activeSessionRef = useRef({ accountKey, tokens: new Set() });
+  if (activeSessionRef.current.accountKey !== accountKey) {
+    activeSessionRef.current = { accountKey, tokens: new Set() };
+  }
+  if (token) activeSessionRef.current.tokens.add(token);
+  if (activeSessionRef.current.tokens.size > 3) {
+    activeSessionRef.current.tokens.delete(activeSessionRef.current.tokens.values().next().value);
+  }
 
   // ─── Estado Local (React useState) ────────────────────────────────────
   /** @type {[Array<Object>, Function]} Lista de vicios do usuario autenticado */
@@ -106,8 +113,11 @@ export function DataProvider({ children }) {
     setMotivationalMessage('');
   }, []);
 
+  // A refresh keeps the account generation and must preserve selection/drafts.
+  useEffect(() => { resetDataState(); }, [accountKey, resetDataState]);
+
   const isCurrentToken = useCallback((requestToken) => (
-    activeTokenRef.current === requestToken
+    !!requestToken && activeSessionRef.current.tokens.has(requestToken)
   ), []);
 
   // ─── Funcoes Auxiliares Internas ───────────────────────────────────────
@@ -199,7 +209,9 @@ export function DataProvider({ children }) {
   const loadAddictionDetails = useCallback(async (id) => {
     return await withLoading(async () => {
       // Primeira chamada: busca dados do vicio
-      const data = await viciosService.buscarVicio(id, token);
+      const requestToken = token;
+      const data = await viciosService.buscarVicio(id, requestToken);
+      if (!isCurrentToken(requestToken)) return null;
       const processedAddiction = {
         ...data.vicio,
         dias_abstinencia: Math.max(0, data.vicio.dias_abstinencia || 0),
@@ -208,11 +220,12 @@ export function DataProvider({ children }) {
       };
       setSelectedAddiction(processedAddiction);
       // Segunda chamada: busca registros diarios do vicio
-      const regData = await registrosService.listarRegistros(id, token);
+      const regData = await registrosService.listarRegistros(id, requestToken);
+      if (!isCurrentToken(requestToken)) return null;
       setSelectedAddictionRecords(regData.registros || []);
       return processedAddiction;
     }, 'Nao foi possivel carregar os detalhes do vicio.');
-  }, [token, withLoading]);
+  }, [token, isCurrentToken, withLoading]);
 
   /**
    * Carrega a lista de metas do usuario a partir da API.
@@ -489,13 +502,12 @@ export function DataProvider({ children }) {
    * Na pratica, executa uma vez apos o login bem-sucedido.
    */
   useEffect(() => {
-    resetDataState();
     if (!user || !token) return;
     loadAddictions();
     loadMotivationalMessage();
     loadGoals();
     loadRelapses();
-  }, [user, token, resetDataState, loadAddictions, loadMotivationalMessage, loadGoals, loadRelapses]);
+  }, [user, token, loadAddictions, loadMotivationalMessage, loadGoals, loadRelapses]);
 
   /**
    * Efeito secundario: carrega registros de todos os vicios apos a lista de vicios estar disponivel.
