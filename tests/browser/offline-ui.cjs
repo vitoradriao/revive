@@ -32,15 +32,19 @@ const login = async (page, email = 'a@example.invalid') => {
     let context, fixture;
     const errors = [], networkDiagnostics = [];
     let networkDown = false;
+    const offlineRequests = new Set();
+    const watchRequests = page => page.on('request', request => {
+      if (networkDown && request.url().startsWith(base + '/api/v2/')) offlineRequests.add(new URL(request.url()).pathname.slice('/api/v2/'.length));
+    });
     const observeError = error => {
-      const expected = ['registros', 'bootstrap', 'web-auth/refresh', 'web-auth/logout'].some(endpoint => error.message.endsWith('/127.0.0.1:' + number + '/api/v2/' + endpoint + ' due to access control checks.'));
-      if (engine === 'webkit' && networkDown && expected) networkDiagnostics.push(error.message);
+      const expected = ['registros', 'bootstrap', 'web-auth/refresh', 'web-auth/logout'].find(endpoint => error.message.trim().endsWith('/127.0.0.1:' + number + '/api/v2/' + endpoint + ' due to access control checks.'));
+      if (engine === 'webkit' && expected && (networkDown || offlineRequests.has(expected))) networkDiagnostics.push(error.message);
       else errors.push(error.message);
     };
     try {
       fixture = await launchFixture(number);
       context = await playwright[engine].launchPersistentContext(profile, options);
-      let page = await context.newPage(); page.on('pageerror', observeError);
+      let page = await context.newPage(); page.on('pageerror', observeError); watchRequests(page);
       await page.goto(base); await login(page);
       await page.waitForFunction(() => !!localStorage.getItem('revive_offline_account'));
       await page.waitForFunction(() => !!navigator.serviceWorker.controller);
@@ -87,7 +91,7 @@ const login = async (page, email = 'a@example.invalid') => {
       await stop(fixture); fixture = null;
       await context.close();
       context = await playwright[engine].launchPersistentContext(profile, options);
-      page = await context.newPage(); page.on('pageerror', observeError);
+      page = await context.newPage(); page.on('pageerror', observeError); watchRequests(page);
       await page.goto(base + '/sincronizacao');
       await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor({ timeout: 30000 });
       await page.getByText('Modo local:', { exact: false }).waitFor();

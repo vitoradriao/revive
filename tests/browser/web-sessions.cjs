@@ -111,6 +111,11 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       catch (error) { return error.code; }
     }, managerModule);
     await arrived;
+    await b.evaluate(async name => {
+      const manager = (await import(name)).getSessionManager();
+      window.testAuthTrace = [];
+      manager.subscribe(() => { const s = manager.getSnapshot(); window.testAuthTrace.push({ user: s.user?.id, epoch: s.epoch, revision: s.revision, loading: s.authLoading, error: s.authError?.code }); });
+    }, managerModule);
     await c.evaluate(async name => (await import(name)).getSessionManager().login('b@example.invalid', 'Synthetic!1'), managerModule);
     await waitUser(c, accountB); await waitUser(b, accountB);
     release(); assert.equal(await lateResult, 'SESSAO_ALTERADA'); await b.unroute('**/api/me');
@@ -149,8 +154,12 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
     }
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
-    console.error('Synthetic session UI:', await context.pages().at(-1)?.locator('body').innerText());
-    console.error('Synthetic offline state:', await context.pages().at(-1)?.evaluate(async () => { const state = (await import('/src/offline/client.js')).getOfflineClient().getSnapshot(); return { loading: state.loading, user: state.user?.id, error: state.error?.code }; }));
+    for (const page of context.pages()) console.error('Synthetic page diagnostic:', await page.evaluate(async () => {
+      const actualUrl = performance.getEntriesByType('resource').map(item => item.name).find(name => name.includes('/src/offline/client.js'));
+      const state = (await import(actualUrl || '/src/offline/client.js')).getOfflineClient().getSnapshot();
+      const auth = (await import('/src/services/session-manager.js')).getSessionManager().getSnapshot();
+      return { trace: window.testAuthTrace, metadata: localStorage.getItem('revive_auth_metadata'), body: document.body.innerText.slice(0, 500), loading: state.loading, user: state.user?.id, authUser: auth.user?.id, moduleUrls: performance.getEntriesByType('resource').map(item => item.name).filter(name => name.includes('offline/client') || name.includes('session-manager')), authLoading: auth.authLoading, authError: auth.authError?.code, inert: [...document.querySelectorAll('[inert]')].map(item => item.className), dialogs: [...document.querySelectorAll('dialog,[role=dialog]')].map(item => ({ open: item.open, text: item.textContent.slice(0, 80) })) };
+    }));
     throw error;
   } finally { await browser.close(); await fetch(fixture + '/__test/reset', { method: 'POST' }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
