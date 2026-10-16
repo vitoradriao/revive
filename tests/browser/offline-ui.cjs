@@ -31,16 +31,11 @@ const login = async (page, email = 'a@example.invalid') => {
     const options = { headless: true, viewport: { width: 1280, height: 900 }, locale: 'pt-BR' };
     let context, fixture;
     const errors = [], networkDiagnostics = [];
-    let networkDown = false;
     const offlineRequests = new Set();
-    const watchRequests = page => page.on('request', request => {
-      if (networkDown && request.url().startsWith(base + '/api/v2/')) offlineRequests.add(new URL(request.url()).pathname.slice('/api/v2/'.length));
+    const watchRequests = page => page.on('requestfailed', request => {
+      if (request.url().startsWith(base + '/api/v2/')) offlineRequests.add(new URL(request.url()).pathname.slice('/api/v2/'.length));
     });
-    const observeError = error => {
-      const expected = ['registros', 'bootstrap', 'web-auth/refresh', 'web-auth/logout'].find(endpoint => error.message.trim().endsWith('/127.0.0.1:' + number + '/api/v2/' + endpoint + ' due to access control checks.'));
-      if (engine === 'webkit' && expected && (networkDown || offlineRequests.has(expected))) networkDiagnostics.push(error.message);
-      else errors.push(error.message);
-    };
+    const observeError = error => errors.push(error.message);
     try {
       fixture = await launchFixture(number);
       context = await playwright[engine].launchPersistentContext(profile, options);
@@ -51,7 +46,6 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.goto(base + '/vicios/' + habit);
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
       // Block only API access; public files are cached by the real production service worker.
-      networkDown = true;
       await stop(fixture); fixture = null;
       await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
@@ -103,7 +97,7 @@ const login = async (page, email = 'a@example.invalid') => {
         await page.screenshot({ path: path.join(process.env.REVIVE_BROWSER_ARTIFACTS, 'offline-ui-' + engine + '.png'), fullPage: true });
       }
       // Restart the fixture on the same origin. The persisted intent keeps its UUID.
-      fixture = await launchFixture(number); networkDown = false;
+      fixture = await launchFixture(number);
       await page.getByRole('button', { name: 'Restaurar sessão', exact: true }).click();
       // Fixture restart has no server sessions: confirmed 401 must lock the local data.
       await page.getByRole('heading', { name: 'Bem-vindo de volta', exact: true }).waitFor();
@@ -132,7 +126,12 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       assert.equal(await page.getByText('synthetic offline persisted UI', { exact: false }).count(), 0);
       assert.equal(await page.locator('pre').count(), 0);
-      assert.deepEqual(errors, []);
+      const unexpected = errors.filter(message => {
+        const endpoint = ['registros', 'bootstrap', 'web-auth/refresh', 'web-auth/logout'].find(endpoint => message.trim().endsWith('/127.0.0.1:' + number + '/api/v2/' + endpoint + ' due to access control checks.'));
+        if (engine === 'webkit' && endpoint && offlineRequests.has(endpoint)) { networkDiagnostics.push(message); return false; }
+        return true;
+      });
+      assert.deepEqual(unexpected, []);
       results.push({ engine, expectedWebKitNetworkDiagnostics: networkDiagnostics.length, offlineReopen: true, durableId: true, failedLogoutPreserves: true, storageFailureKeepsDraft: true, explicitCancel: true, explicitDiscard: true, confirmed401Locks: true, singleRemoteEvent: true, accountIsolation: true });
       console.log(engine + ': offline UI passed');
     } catch (error) {
