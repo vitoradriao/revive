@@ -22,6 +22,7 @@ const {
   mockCriarVicio: vi.fn()
 }));
 
+vi.mock('./OfflineContext', () => ({ useOffline: () => ({}) }));
 vi.mock('./AuthContext', () => ({
   useAuth: () => mockAuthState
 }));

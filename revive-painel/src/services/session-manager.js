@@ -148,7 +148,12 @@ export function createSessionManager(environment = {}) {
         } catch (error) { publish({ authError: error, authLoading: false }); }
       };
       unlisten = listenStorage(() => {
-        try { syncMeta(); } catch (error) { publish({ authError: error, authLoading: false }); }
+        try {
+          const meta = syncMeta();
+          // Broadcast and storage notifications can arrive in either order. Ask the
+          // current owner again once coordination metadata is visible in this tab.
+          if (!fresh(meta)) void peerSession();
+        } catch (error) { publish({ authError: error, authLoading: false }); }
       });
     } catch (error) {
       publish({ authLoading: false, authError: error });
@@ -172,10 +177,15 @@ export function createSessionManager(environment = {}) {
     applyResponse(response, meta);
     return { ...response, token: response.access_token };
   });
-  const logout = () => locked(async () => {
-    await authRequest('logout');
-    transition();
-  });
+  const logout = () => {
+    const initial = { epoch: snapshot.epoch };
+    return locked(async () => {
+      if (syncMeta().epoch !== initial.epoch) throw changedError();
+      await authRequest('logout');
+      if (!stillCurrent(initial)) throw changedError();
+      transition();
+    });
+  };
   const authenticatedRequest = async (endpoint, options, providedToken) => {
     const meta = syncMeta();
     if (tokenEpochs.get(providedToken) !== meta.epoch) throw changedError();

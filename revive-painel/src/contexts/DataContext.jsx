@@ -34,7 +34,8 @@
  * @see {@link module:contexts/UIContext} - Fornece feedback visual (toasts, loading)
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useOffline } from './OfflineContext';
 import { useAuth } from './AuthContext';
 import { useUI } from './UIContext';
 import * as viciosService from '../services/vicios.service';
@@ -75,6 +76,8 @@ const DataContext = createContext(null);
  */
 export function DataProvider({ children }) {
   const { token, user, sessionEpoch } = useAuth();
+  const offline = useOffline();
+  const offlineClient = offline.client;
   const accountKey = user ? `${user.id}:${sessionEpoch || ''}` : '';
   const { showToast, setLoading, showConfirm } = useUI();
   const addictionsReadRef = useRef(0);
@@ -114,7 +117,11 @@ export function DataProvider({ children }) {
   }, []);
 
   // A refresh keeps the account generation and must preserve selection/drafts.
-  useEffect(() => { resetDataState(); }, [accountKey, resetDataState]);
+  const previousAccount = useRef(accountKey);
+  useLayoutEffect(() => {
+    if (previousAccount.current !== accountKey) resetDataState();
+    previousAccount.current = accountKey;
+  }, [accountKey, resetDataState]);
 
   const isCurrentToken = useCallback((requestToken) => (
     !!requestToken && activeSessionRef.current.tokens.has(requestToken)
@@ -130,7 +137,7 @@ export function DataProvider({ children }) {
    * @param {string} userMessage - Mensagem amigavel exibida ao usuario via toast
    */
   const handleDataError = useCallback((error, userMessage) => {
-    console.error(error);
+    if (error.code === 'SESSAO_ALTERADA') return;
     showToast('error', userMessage);
   }, [showToast]);
 
@@ -184,7 +191,9 @@ export function DataProvider({ children }) {
    *
    * @returns {Promise<void>}
    */
-  const loadAddictions = useCallback(() => withLoading(async () => {
+  const loadAddictions = useCallback(() => {
+    if (offlineClient) return offlineClient.refresh();
+    return withLoading(async () => {
     const requestToken = token;
     const readId = ++addictionsReadRef.current;
     const data = await viciosService.listarVicios(requestToken);
@@ -197,7 +206,8 @@ export function DataProvider({ children }) {
       tempo_formatado: addiction.tempo_formatado || calcularTempoDecorrido(addiction.data_inicio)
     }));
     setAddictions(processed);
-  }, 'Nao foi possivel carregar seus vicios.'), [token, isCurrentToken, withLoading]);
+  }, 'Nao foi possivel carregar seus vicios.');
+  }, [offlineClient, token, isCurrentToken, withLoading]);
 
   /**
    * Carrega os detalhes completos de um vicio especifico, incluindo seus registros diarios.
@@ -207,6 +217,13 @@ export function DataProvider({ children }) {
    * @returns {Promise<Object|null>} Objeto do vicio processado, ou `null` em caso de erro
    */
   const loadAddictionDetails = useCallback(async (id) => {
+    if (offlineClient) {
+      const data = offline.snapshot?.data;
+      const habit = data?.vicios.find(item => item.id === id);
+      setSelectedAddiction(habit ? { ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) } : null);
+      setSelectedAddictionRecords((data?.registros || []).filter(item => item.vicio_id === id));
+      return habit;
+    }
     return await withLoading(async () => {
       // Primeira chamada: busca dados do vicio
       const requestToken = token;
@@ -225,7 +242,7 @@ export function DataProvider({ children }) {
       setSelectedAddictionRecords(regData.registros || []);
       return processedAddiction;
     }, 'Nao foi possivel carregar os detalhes do vicio.');
-  }, [token, isCurrentToken, withLoading]);
+  }, [offlineClient, offline.snapshot, token, isCurrentToken, withLoading]);
 
   /**
    * Carrega a lista de metas do usuario a partir da API.
@@ -233,6 +250,7 @@ export function DataProvider({ children }) {
    * @returns {Promise<void>}
    */
   const loadGoals = useCallback(async () => {
+    if (offlineClient) return offlineClient.refresh();
     try {
       const requestToken = token;
       const data = await metasService.listarMetas(requestToken);
@@ -241,13 +259,14 @@ export function DataProvider({ children }) {
     } catch (error) {
       handleDataError(error, 'Nao foi possivel carregar suas metas.');
     }
-  }, [token, isCurrentToken, handleDataError]);
+  }, [offlineClient, token, isCurrentToken, handleDataError]);
 
   /**
    * Carrega o historico de recaidas do usuario.
    * @returns {Promise<void>}
    */
   const loadRelapses = useCallback(async () => {
+    if (offlineClient) return offlineClient.refresh();
     try {
       const requestToken = token;
       const data = await recaidasService.listarRecaidas(requestToken);
@@ -256,7 +275,7 @@ export function DataProvider({ children }) {
     } catch (error) {
       handleDataError(error, 'Nao foi possivel carregar as recaidas.');
     }
-  }, [token, isCurrentToken, handleDataError]);
+  }, [offlineClient, token, isCurrentToken, handleDataError]);
 
   /**
    * Carrega a mensagem motivacional diaria da API.
@@ -272,7 +291,7 @@ export function DataProvider({ children }) {
       setMotivationalMessage(data.mensagem?.mensagem || 'Voce esta no caminho certo! Continue firme!');
     } catch (error) {
       if (!isCurrentToken(requestToken)) return;
-      console.error(error);
+      void error;
       // Graceful degradation: exibe mensagem local em caso de falha na API
       setMotivationalMessage('Cada dia e uma vitoria! Parabens pela sua jornada!');
       showToast('error', 'Nao foi possivel carregar a mensagem do dia.');
@@ -389,6 +408,12 @@ export function DataProvider({ children }) {
    */
   const registerRelapse = useCallback(async (addiction, { resetCounter = false } = {}) => {
     await withLoading(async () => {
+      if (offlineClient) {
+        await offlineClient.enqueue('relapse.create', { addictionId: addiction.id, resetarContador: resetCounter, motivo: '', occurred_at: new Date().toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
+        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+        showToast('info', 'Recaída salva neste navegador. Acompanhe a confirmação em Sincronização.');
+        return;
+      }
       await viciosService.registrarRecaida(addiction.id, '', resetCounter, token);
       showToast('success', resetCounter
         ? 'Contador resetado! Um novo capitulo comeca.'
@@ -401,7 +426,7 @@ export function DataProvider({ children }) {
         await loadAddictionDetails(addiction.id);
       }
     }, 'Nao foi possivel registrar a recaida.');
-  }, [token, showToast, loadAddictions, loadRelapses, loadAddictionDetails, selectedAddiction, withLoading]);
+  }, [offlineClient, accountKey, token, showToast, loadAddictions, loadRelapses, loadAddictionDetails, selectedAddiction, withLoading]);
 
   /**
    * Cria um registro diario para o vicio atualmente selecionado.
@@ -424,6 +449,14 @@ export function DataProvider({ children }) {
       return false;
     }
     const result = await withLoading(async () => {
+      if (offlineClient) {
+        const now = new Date();
+        const data_registro = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+        await offlineClient.enqueue('record.create', { ...recordForm, vicio_id: addictionId, data_registro, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
+        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+        showToast('info', 'Registro salvo neste navegador. Acompanhe a confirmação em Sincronização.');
+        return true;
+      }
       await registrosService.criarRegistro({ ...recordForm, vicio_id: addictionId }, token);
       showToast('success', 'Registro diario criado!');
       if (selectedAddiction?.id && String(selectedAddiction.id) === String(addictionId)) {
@@ -434,7 +467,7 @@ export function DataProvider({ children }) {
     }, 'Nao foi possivel criar o registro diario.');
     // O operador ?? garante retorno false se withLoading retornar null (erro)
     return result ?? false;
-  }, [token, selectedAddiction, showToast, loadAddictionDetails, loadAllRecords, withLoading]);
+  }, [offlineClient, accountKey, token, selectedAddiction, showToast, loadAddictionDetails, loadAllRecords, withLoading]);
 
   const createRecord = useCallback(async (recordForm) => (
     createRecordForAddiction(recordForm, selectedAddiction?.id)
@@ -448,7 +481,13 @@ export function DataProvider({ children }) {
    * @returns {Promise<void>}
    */
   const createGoal = useCallback(async (goalForm) => {
-    await withLoading(async () => {
+    const result = await withLoading(async () => {
+      if (offlineClient) {
+        await offlineClient.enqueue('goal.create', goalForm);
+        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+        showToast('info', 'Meta salva neste navegador. Acompanhe a confirmação em Sincronização.');
+        return true;
+      }
       const response = await metasService.criarMeta(goalForm, token);
       showToast('success', 'Meta criada com sucesso!');
       if (response?.meta) {
@@ -456,8 +495,10 @@ export function DataProvider({ children }) {
       } else {
         await loadGoals();
       }
+      return true;
     }, 'Nao foi possivel criar a meta.');
-  }, [token, showToast, loadGoals, withLoading]);
+    return result ?? false;
+  }, [offlineClient, accountKey, token, showToast, loadGoals, withLoading]);
 
   /**
    * Marca uma meta como concluida.
@@ -466,11 +507,18 @@ export function DataProvider({ children }) {
    */
   const completeGoal = useCallback(async (goalId) => {
     await withLoading(async () => {
+      if (offlineClient) {
+        const parent = goalId.startsWith('local:') ? goalId.slice(6) : null;
+        await offlineClient.enqueue('goal.complete', { goalId }, parent ? { dependsOn: parent } : undefined);
+        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+        showToast('info', 'Conclusão salva neste navegador. Acompanhe a confirmação em Sincronização.');
+        return;
+      }
       await metasService.completarMeta(goalId, token);
       showToast('success', 'Parabens! Meta concluida!');
       await loadGoals();
     }, 'Nao foi possivel concluir a meta.');
-  }, [token, showToast, loadGoals, withLoading]);
+  }, [offlineClient, accountKey, token, showToast, loadGoals, withLoading]);
 
   /**
    * Exclui uma meta apos confirmacao do usuario via modal.
@@ -502,12 +550,12 @@ export function DataProvider({ children }) {
    * Na pratica, executa uma vez apos o login bem-sucedido.
    */
   useEffect(() => {
-    if (!user || !token) return;
+    if (offlineClient || !user || !token) return;
     loadAddictions();
     loadMotivationalMessage();
     loadGoals();
     loadRelapses();
-  }, [user, token, loadAddictions, loadMotivationalMessage, loadGoals, loadRelapses]);
+  }, [offlineClient, user, token, loadAddictions, loadMotivationalMessage, loadGoals, loadRelapses]);
 
   /**
    * Efeito secundario: carrega registros de todos os vicios apos a lista de vicios estar disponivel.
@@ -515,12 +563,41 @@ export function DataProvider({ children }) {
    * Se nao houver vicios, limpa o array de registros.
    */
   useEffect(() => {
+    if (offlineClient) return;
     if (addictions.length > 0 && token) {
       loadAllRecords();
     } else {
       setAllRecords([]);
     }
-  }, [addictions, token, loadAllRecords]);
+  }, [offlineClient, addictions, token, loadAllRecords]);
+
+  useEffect(() => {
+    const data = offline.snapshot?.data;
+    if (!offlineClient || !data || data.usuario.id !== user?.id) return;
+    const records = [...data.registros], metas = [...data.metas], recaidas = [...data.recaidas];
+    for (const intent of offline.queue) {
+      const local = { ...intent.payload, id: intent.localId, pending: true, sync_status: intent.status };
+      if (intent.type === 'record.create') records.push(local);
+      if (intent.type === 'record.update') {
+        const index = records.findIndex(item => item.id === intent.payload.recordId);
+        if (index >= 0) records[index] = { ...records[index], ...intent.payload, pending: true };
+      }
+      if (intent.type === 'goal.create') metas.push(local);
+      if (intent.type === 'goal.complete') {
+        const index = metas.findIndex(item => item.id === intent.payload.goalId);
+        if (index >= 0) metas[index] = { ...metas[index], pending: true, sync_status: intent.status };
+      }
+      if (intent.type === 'relapse.create') recaidas.push({ ...local, vicio_id: local.addictionId, data_recaida: local.occurred_at });
+    }
+    setAddictions(data.vicios.map(habit => ({ ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) })));
+    setAllRecords(records); setGoals(metas); setRelapses(recaidas);
+    setMotivationalMessage(data.mensagem?.mensagem || '');
+    setSelectedAddiction(current => {
+      const habit = current && data.vicios.find(item => item.id === current.id);
+      return habit ? { ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) } : null;
+    });
+    setSelectedAddictionRecords(records.filter(record => record.vicio_id === selectedAddiction?.id));
+  }, [offline.snapshot, offline.queue, offlineClient, user?.id, selectedAddiction?.id]);
 
   // ─── Provider Value Object ─────────────────────────────────────────────
   /**

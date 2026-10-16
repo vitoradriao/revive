@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
 import {
+  RefreshCw,
   BarChart3,
   Calendar as CalendarIcon,
   FileText,
@@ -26,6 +27,7 @@ const navItems = [
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/relatorios', label: 'Relatórios', icon: FileText },
   { path: '/dicas', label: 'Dicas', icon: Lightbulb },
+  { path: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
   { path: '/perfil', label: 'Perfil', icon: User },
 ];
 

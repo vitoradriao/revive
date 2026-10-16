@@ -35,6 +35,8 @@ import Alert from '../ui/Alert';
 import NovoVicioWizard from '../modals/NovoVicioWizard';
 import { useUI } from '../../contexts/UIContext';
 import { useData } from '../../contexts/DataContext';
+import { useOffline } from '../../contexts/OfflineContext';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
@@ -55,7 +57,8 @@ const AppShell = () => {
     closeNewAddictionWizard
   } = useUI();
   const { createAddiction, checkCreatedAddictions } = useData();
-  const { token, user } = useAuth();
+  const { token, user, restoreSession } = useAuth();
+  const offline = useOffline();
 
   return (
     <div className="min-h-screen text-app relative">
@@ -72,6 +75,13 @@ const AppShell = () => {
         <main className="revive-shell">
           <Header />
           <div className="revive-content">
+            <aside role="status" className="surface-sand rounded-xl p-3 mb-4">
+              {offline.localOnly ? 'Modo local: os dados podem estar incompletos.' : 'Cópia local e sincronização'}
+              {' · '}{offline.queue.length} pendência(s).{' '}
+              <Link to="/sincronizacao" className="underline">Ver sincronização</Link>
+              {offline.error && <p role="alert">{offline.error.message}</p>}
+              {!token && <button className="underline ml-3" onClick={restoreSession}>Restaurar sessão</button>}
+            </aside>
             {alert && <Alert type={alert.type} onClose={() => setAlert(null)}>{alert.message}</Alert>}
             <NavBar />
             <ErrorBoundary>

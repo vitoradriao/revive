@@ -91,13 +91,14 @@ export default function DetalhesPage() {
    */
   const handleSubmitMeta = async (e) => {
     e.preventDefault();
-    await createGoal({
+    const saved = await createGoal({
       ...formMeta,
       vicio_id: selectedAddiction.id,
       data_inicio_meta: formMeta.iniciar_hoje ? getLocalDateString() : null,
       dias_abstinencia_inicio: formMeta.iniciar_hoje ? selectedAddiction.dias_abstinencia || 0 : 0,
       valor_economizado_inicio: formMeta.iniciar_hoje ? Number(selectedAddiction.valor_economizado) || 0 : 0
     });
+    if (saved === false) return;
     setFormMeta({ descricao_meta: '', dias_objetivo: '', valor_objetivo: '', iniciar_hoje: true });
   };
 
@@ -255,6 +256,7 @@ export default function DetalhesPage() {
                   <span className="text-sm font-medium text-white/70">{new Date(registro.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                   <span className="px-3 py-1 bg-[#7CF6C4]/20 text-[#7CF6C4] rounded-full text-sm font-medium capitalize border border-[#7CF6C4]/30">{registro.humor}</span>
                 </div>
+                {registro.pending && <p role="status">Salvo neste navegador · confirmação pendente</p>}
                 {registro.gatilhos && <p className="text-sm text-white/70 mb-1"><strong className="text-white">Gatilhos:</strong> {registro.gatilhos}</p>}
                 {registro.conquistas && <p className="text-sm text-white/70 mb-1"><strong className="text-white">Conquistas:</strong> {registro.conquistas}</p>}
                 {registro.observacoes && <p className="text-sm text-white/70"><strong className="text-white">Observações:</strong> {registro.observacoes}</p>}

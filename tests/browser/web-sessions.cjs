@@ -9,13 +9,15 @@ const accountA = '00000000-0000-4000-8000-000000000001';
 const accountB = '00000000-0000-4000-8000-000000000002';
 const managerModule = '/src/services/session-manager.js';
 const snapshot = page => page.evaluate(async name => (await import(name)).getSessionManager().getSnapshot(), managerModule);
-const waitUser = (page, expected) => page.waitForFunction(async ({ name, expected }) =>
-  (await import(name)).getSessionManager().getSnapshot().user?.id === expected, { name: managerModule, expected });
+const waitUser = async (page, expected) => {
+  await page.evaluate(async name => { window.browserTestSession = (await import(name)).getSessionManager(); }, managerModule);
+  await page.waitForFunction(user => window.browserTestSession.getSnapshot().user?.id === user, expected);
+};
 const stats = async () => (await fetch(fixture + '/__test/status')).json();
 
 (async () => {
   await fetch(fixture + '/__test/reset', { method: 'POST' });
-  const browser = await playwright.chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge', headless: true });
+  const browser = await playwright.chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}) });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'pt-BR' });
   const errors = [], tokenUrls = [];
   context.on('page', page => {
@@ -111,6 +113,11 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       catch (error) { return error.code; }
     }, managerModule);
     await arrived;
+    await b.evaluate(async name => {
+      const manager = (await import(name)).getSessionManager();
+      window.testAuthTrace = [];
+      manager.subscribe(() => { const s = manager.getSnapshot(); window.testAuthTrace.push({ user: s.user?.id, epoch: s.epoch, revision: s.revision, loading: s.authLoading, error: s.authError?.code }); });
+    }, managerModule);
     await c.evaluate(async name => (await import(name)).getSessionManager().login('b@example.invalid', 'Synthetic!1'), managerModule);
     await waitUser(c, accountB); await waitUser(b, accountB);
     release(); assert.equal(await lateResult, 'SESSAO_ALTERADA'); await b.unroute('**/api/me');
@@ -148,5 +155,13 @@ const stats = async () => (await fetch(fixture + '/__test/status')).json();
       fs.writeFileSync(path.join(process.env.REVIVE_BROWSER_EVIDENCE, 'web-sessions-results.json'), JSON.stringify(result, null, 2));
     }
     console.log(JSON.stringify(result, null, 2));
+  } catch (error) {
+    for (const page of context.pages()) console.error('Synthetic page diagnostic:', await page.evaluate(async () => {
+      const actualUrl = performance.getEntriesByType('resource').map(item => item.name).find(name => name.includes('/src/offline/client.js'));
+      const state = (await import(actualUrl || '/src/offline/client.js')).getOfflineClient().getSnapshot();
+      const auth = (await import('/src/services/session-manager.js')).getSessionManager().getSnapshot();
+      return { trace: window.testAuthTrace, metadata: localStorage.getItem('revive_auth_metadata'), body: document.body.innerText.slice(0, 500), loading: state.loading, user: state.user?.id, authUser: auth.user?.id, moduleUrls: performance.getEntriesByType('resource').map(item => item.name).filter(name => name.includes('offline/client') || name.includes('session-manager')), authLoading: auth.authLoading, authError: auth.authError?.code, inert: [...document.querySelectorAll('[inert]')].map(item => item.className), dialogs: [...document.querySelectorAll('dialog,[role=dialog]')].map(item => ({ open: item.open, text: item.textContent.slice(0, 80) })) };
+    }));
+    throw error;
   } finally { await browser.close(); await fetch(fixture + '/__test/reset', { method: 'POST' }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
