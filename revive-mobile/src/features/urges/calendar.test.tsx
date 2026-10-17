@@ -15,9 +15,10 @@ it('distinguishes three textual types and applies habit, archived history and zo
   await render(<CalendarScreen/>);
   expect(screen.getByText('Recaída registrada · Sintetico')).toBeTruthy();
   expect(screen.getByText('Vontade registrada de Sintetico')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button',{name:'Filtros e fuso'}));
   await fireEvent.press(screen.getByText('Vontades'));
   expect(screen.queryByText('Recaída registrada · Sintetico')).toBeNull();
-  expect(screen.queryByText('Check-in: Bem')).toBeNull();
+  expect(screen.queryByLabelText('Check-in: Bem')).toBeNull();
   await fireEvent.press(screen.getByRole('button',{name:'Antigo · arquivado'}));
   expect(screen.queryByText('Vontade registrada de Sintetico')).toBeNull();
   expect(screen.getByText('Vontade registrada de Antigo')).toBeTruthy();

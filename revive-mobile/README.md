@@ -4,6 +4,8 @@ Aplicativo Expo/React Native integrado à API do REVIVE, com acompanhamento de h
 
 [Projeto principal](../README.md) · [Arquitetura](docs/adr-0001-mobile-architecture.md) · [Contratos da API](docs/api-contracts.md) · [Pendências](docs/implementation-status.md)
 
+Nova identidade visual: [17 telas implementadas, validação e teste no Android](docs/identidade-visual-v2.md).
+
 ## Desenvolvimento
 
 Use Node.js 22 e npm. Nesta pasta:

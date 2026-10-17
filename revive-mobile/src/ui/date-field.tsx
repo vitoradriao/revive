@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useEffect, useState } from 'react';
 import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,10 +10,13 @@ const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 const week = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const minDate = '1900-01-01';
 
-export function DateCalendar({ selected, onSelect, maxDate = localDateKey(), todayKey = localDateKey(), activity }: { selected: string; onSelect: (iso: string) => void; maxDate?: string; todayKey?: string; activity?: Set<string> }) {
+export function DateCalendar({ selected, onSelect, maxDate = localDateKey(), todayKey = localDateKey(), activity, onMonthChange }: { selected: string; onSelect: (iso: string) => void; maxDate?: string; todayKey?: string; activity?: Set<string>; onMonthChange?: (range: { inicio: string; fim: string }) => void }) {
   const [page, setPage] = useState(() => dateFromKey(selected >= minDate && selected <= maxDate ? selected : maxDate));
   const [mode, setMode] = useState<'days' | 'months' | 'years'>('days');
   const year = page.getFullYear(), month = page.getMonth();
+  useEffect(() => {
+    if (mode === 'days') onMonthChange?.({ inicio: localDateKey(new Date(year, month, 1, 12)), fim: localDateKey(new Date(year, month + 1, 0, 12)) });
+  }, [year, month, mode, onMonthChange]);
   const today = todayKey;
   const maximumYear = dateFromKey(maxDate).getFullYear();
   const heading = mode === 'days' ? `${months[month]} ${year}` : mode === 'months' ? `${year}` : 'Escolha o ano';

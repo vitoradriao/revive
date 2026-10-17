@@ -1,16 +1,25 @@
 import React from 'react';
+import { useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs } from 'expo-router';
 import { Heart, ListChecks, Target, ChartNoAxesCombined, UserRound } from 'lucide-react-native';
 import { colors } from '@/ui/theme';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const contentHeight = 72 + Math.max(0, fontScale - 1) * 28;
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border } }}>
-      <Tabs.Screen name="index" options={{ title: 'Jornada', tabBarIcon: ({ color, size }) => <Heart color={color} size={size} /> }} />
-      <Tabs.Screen name="habits" options={{ title: 'Hábitos', tabBarIcon: ({ color, size }) => <ListChecks color={color} size={size} /> }} />
-      <Tabs.Screen name="goals" options={{ title: 'Metas', tabBarIcon: ({ color, size }) => <Target color={color} size={size} /> }} />
-      <Tabs.Screen name="insights" options={{ title: 'Insights', tabBarIcon: ({ color, size }) => <ChartNoAxesCombined color={color} size={size} /> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Perfil', tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} /> }} />
+    <Tabs screenOptions={{ headerShown: false, tabBarHideOnKeyboard: true, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border, paddingTop: 8, height: contentHeight + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }, tabBarLabelStyle: { fontSize: 10, marginTop: 5, marginBottom: 0 } }}>
+      <Tabs.Screen name="index" options={{ title: 'Jornada', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><Heart color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
+      <Tabs.Screen name="habits" options={{ title: 'Hábitos', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><ListChecks color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
+      <Tabs.Screen name="goals" options={{ title: 'Metas', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><Target color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
+      <Tabs.Screen name="insights" options={{ title: 'Insights', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><ChartNoAxesCombined color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
+      <Tabs.Screen name="profile" options={{ title: 'Perfil', tabBarIcon: ({ focused }) => <TabIcon focused={focused}><UserRound color={focused ? colors.background : colors.text} size={21} /></TabIcon> }} />
     </Tabs>
   );
+}
+
+function TabIcon({ focused, children }: React.PropsWithChildren<{ focused: boolean }>) {
+  return <View style={{ width: 48, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? colors.primary : 'transparent' }}>{children}</View>;
 }
