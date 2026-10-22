@@ -32,7 +32,9 @@ export default function DashboardPage() {
   const [recaidaVicio, setRecaidaVicio] = useState(null);
   const [moodCheckIn, setMoodCheckIn] = useState({ humor: '', vicio_id: '' });
 
+  const [habitFilter, setHabitFilter] = useState('active');
   const progress = useProgress();
+  const visibleHabits = progress.habits.filter(habit => habitFilter === 'archived' ? habit.ativo === false : habit.ativo !== false);
   const addictions = progress.habits.filter(habit => habit.ativo !== false);
   const { records: allRecords, relapses, goals } = progress;
   const heatmapData = useMemo(() => activityDays(allRecords, relapses), [allRecords, relapses]);
@@ -74,7 +76,7 @@ export default function DashboardPage() {
   }, [allRecords, relapses, goals]);
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const selectedMoodAddictionId = moodCheckIn.vicio_id || (addictions[0]?.id ? String(addictions[0].id) : '');
+  const selectedMoodAddictionId = addictions.some(habit => String(habit.id) === moodCheckIn.vicio_id) ? moodCheckIn.vicio_id : (addictions[0]?.id ? String(addictions[0].id) : '');
   const todayMoodRecord = useMemo(
     () => allRecords.find(r => String(r.data_registro).slice(0, 10) === todayStr && r.humor),
     [allRecords, todayStr]
@@ -266,17 +268,23 @@ export default function DashboardPage() {
         </article>
       </section>
 
-      {addictions.length === 0 && !loading ? (
+      <label className="block">Exibir hábitos
+        <select className="ml-3 p-2 rounded-xl surface-card" value={habitFilter} onChange={event => setHabitFilter(event.target.value)}>
+          <option value="active">Ativos</option>
+          <option value="archived">Arquivados</option>
+        </select>
+      </label>
+      {visibleHabits.length === 0 && !loading ? (
         <EmptyState
           icon={Heart}
-          title="Nenhum hábito ativo disponível"
-          description="Cadastre um hábito para acompanhar uma sequência ativa. O histórico dos arquivados permanece nos relatórios."
-          action={openNewAddictionWizard}
+          title={habitFilter === 'archived' ? 'Nenhum hábito arquivado' : 'Nenhum hábito ativo disponível'}
+          description={habitFilter === 'archived' ? 'Seus hábitos arquivados aparecerão aqui. Abra os detalhes para reativar.' : 'Cadastre um hábito para acompanhar uma sequência ativa. O histórico dos arquivados permanece nos relatórios.'}
+          action={habitFilter === 'active' ? openNewAddictionWizard : undefined}
           actionLabel="Cadastrar hábito"
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
-          {addictions.map(vicio => (
+          {visibleHabits.map(vicio => (
             <VicioCard
               key={vicio.id}
               vicio={vicio}

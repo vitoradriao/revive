@@ -1,3 +1,5 @@
+import { requestSnapshot } from './request-snapshot.js';
+import { manageHabit } from './habit-management.js';
 import { apiCall } from '../services/api.js';
 import { getSessionManager } from '../services/session-manager.js';
 
@@ -33,61 +35,62 @@ export function createSyncCoordinator({
   };
   const active = () => !disposed && isAccountActive();
   const notify = () => { if (active()) onChange(); };
+  const reconcile = async initial => {
+    const current = () => active() && session.getSnapshot().user?.id === store.userId &&
+      session.getSnapshot().epoch === initial.epoch && !!session.getSnapshot().token;
+    if (!current() || !isOnline()) return { synced: 0, paused: true };
+    // Only the holder of the account lock may recover an interrupted sender.
+    await store.recoverInterrupted();
+    await session.ensureToken();
+    if (!current()) throw changed();
+    let synced = 0;
+    for (;;) {
+      if (!current() || !isOnline()) break;
+      const [intent] = await store.getQueue();
+      if (!intent || intent.status === 'recovery' || intent.dependsOn || intent.nextRetryAt > Date.now()) break;
+      const sending = await store.markSending(intent.id);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        if (!current()) throw changed();
+        const [path, method, body] = mutationRequest(sending);
+        const response = await request(path, {
+          method, body: JSON.stringify(body), signal: controller.signal,
+          headers: { 'Idempotency-Key': sending.id }
+        }, session.getSnapshot().token);
+        if (!current()) throw changed();
+        // Receipt, ID binding, cached pages and queue removal share one native transaction.
+        await store.acknowledge(sending.id, response);
+        synced++; notify();
+      } catch (error) {
+        // Leave a sender interrupted if another account owns the UI; A will reconcile with the same key.
+        if (!current()) break;
+        await store.markFailed(sending.id, error);
+        notify();
+        return { synced, error, paused: true };
+      } finally { clearTimeout(timeout); }
+    }
+    if (!current()) return { synced, paused: true, error: changed() };
+    if (synced && current()) {
+      try {
+        const snapshot = await requestSnapshot((path, options) => request(path, options, session.getSnapshot().token));
+        if (!current()) throw changed();
+        await store.saveSnapshot(snapshot);
+      } catch (error) {
+        notify();
+        return { synced, refreshError: error, paused: true };
+      }
+    }
+    const pending = (await store.getQueue()).length;
+    notify();
+    return { synced, pending, paused: pending > 0 };
+  };
   const run = () => {
     if (running) return running;
     const initial = session.getSnapshot();
-    const current = () => active() && session.getSnapshot().user?.id === store.userId &&
-      session.getSnapshot().epoch === initial.epoch && !!session.getSnapshot().token;
     running = (async () => {
-      if (!current() || !isOnline()) return { synced: 0, paused: true };
-      return lock(async () => {
-        if (!current()) return { synced: 0, paused: true };
-        // Only the holder of the account lock may recover an interrupted sender.
-        await store.recoverInterrupted();
-        await session.ensureToken();
-        if (!current()) throw changed();
-        let synced = 0;
-        for (;;) {
-          if (!current() || !isOnline()) break;
-          const [intent] = await store.getQueue();
-          if (!intent || intent.status === 'recovery' || intent.dependsOn || intent.nextRetryAt > Date.now()) break;
-          const sending = await store.markSending(intent.id);
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 20000);
-          try {
-            if (!current()) throw changed();
-            const [path, method, body] = mutationRequest(sending);
-            const response = await request(path, {
-              method, body: JSON.stringify(body), signal: controller.signal,
-              headers: { 'Idempotency-Key': sending.id }
-            }, session.getSnapshot().token);
-            if (!current()) throw changed();
-            // Receipt, ID binding, cached pages and queue removal share one native transaction.
-            await store.acknowledge(sending.id, response);
-            synced++; notify();
-          } catch (error) {
-            // Leave a sender interrupted if another account owns the UI; A will reconcile with the same key.
-            if (!current()) break;
-            await store.markFailed(sending.id, error);
-            notify();
-            return { synced, error, paused: true };
-          } finally { clearTimeout(timeout); }
-        }
-        if (!current()) return { synced, paused: true, error: changed() };
-        if (synced && current()) {
-          try {
-            const snapshot = await request('/v2/bootstrap', {}, session.getSnapshot().token);
-            if (!current()) throw changed();
-            await store.saveSnapshot(snapshot);
-          } catch (error) {
-            notify();
-            return { synced, refreshError: error, paused: true };
-          }
-        }
-        const pending = (await store.getQueue()).length;
-        notify();
-        return { synced, pending, paused: pending > 0 };
-      });
+      if (!active() || !initial.token || initial.user?.id !== store.userId || !isOnline()) return { synced: 0, paused: true };
+      return lock(() => reconcile(initial));
     })().finally(() => { running = null; });
     return running;
   };
@@ -100,7 +103,28 @@ export function createSyncCoordinator({
   });
   return {
     run,
-    enqueue: (type, payload, options) => localAction(() => store.enqueue(type, payload, options)),
+    manageHabit: (habitId, draftId, input) => {
+      const initial = session.getSnapshot();
+      const check = () => {
+        if (!active() || session.getSnapshot().user?.id !== store.userId ||
+            session.getSnapshot().epoch !== initial.epoch || !session.getSnapshot().token) throw changed();
+      };
+      return localAction(() => manageHabit({
+        store, habitId, draftId, input, check, isOnline,
+        reconcile: () => reconcile(initial),
+        request: (path, options) => request(path, options, session.getSnapshot().token)
+      }));
+    },
+    enqueue: (type, payload, options) => localAction(async () => {
+      const snapshot = await store.getSnapshot();
+      const habitId = payload.vicio_id || payload.addictionId ||
+        snapshot?.data.metas?.find(goal => goal.id === payload.goalId)?.vicio_id;
+      if (snapshot?.data.vicios?.some(habit => habit.id === habitId && habit.ativo === false)) {
+        throw Object.assign(new Error('Reative o hábito antes de criar novos eventos.'), { code: 'HABITO_ARQUIVADO' });
+      }
+      if (!active()) throw changed();
+      return store.enqueue(type, payload, options);
+    }),
     retry: async id => { await localAction(() => store.retry(id)); return run(); },
     discard: id => localAction(() => store.discard(id)),
     discardAll: () => localAction(() => store.discardAll()),

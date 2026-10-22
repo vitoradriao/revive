@@ -1,3 +1,4 @@
+import { requestSnapshot } from './request-snapshot';
 import { getSessionManager } from '../services/session-manager';
 import { apiCall } from '../services/api';
 import { openAccountDatabase } from './account-database';
@@ -39,9 +40,12 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
     if (!db || !auth.token || auth.user?.id !== db.userId || navigator.onLine === false) return Promise.resolve();
     const task = (async () => {
       try {
-        const snapshot = await request('/v2/bootstrap', {}, auth.token);
-        if (db !== store || key !== currentKey || session.getSnapshot().epoch !== auth.epoch) throw changed();
-        await coordinator.withAccountLock(() => db.saveSnapshot(snapshot));
+        await coordinator.withAccountLock(async () => {
+          if (db !== store || key !== currentKey || session.getSnapshot().epoch !== auth.epoch) throw changed();
+          const snapshot = await requestSnapshot((path, options) => request(path, options, auth.token));
+          if (db !== store || key !== currentKey || session.getSnapshot().epoch !== auth.epoch) throw changed();
+          await db.saveSnapshot(snapshot);
+        });
         if (db !== store || key !== currentKey) return;
         storage.setItem(POINTER, JSON.stringify({ userId: db.userId, epoch: auth.epoch }));
         await update(); if (db === store && key === currentKey) publish({ error: null });
@@ -110,6 +114,31 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       void connect();
     },
     refresh, sync,
+    getHabitDraft: async (draftId, accountKey) => {
+      const db = store;
+      if (!accountKey || accountKey !== currentKey) throw changed();
+      const draft = await db.getHabitDraft(draftId);
+      if (db !== store || accountKey !== currentKey) throw changed();
+      return draft;
+    },
+    saveHabitDraft: (draftId, draft, accountKey) => {
+      const db = store;
+      if (!accountKey || accountKey !== currentKey) throw changed();
+      return requireCoordinator().withAccountLock(async () => {
+        if (db !== store || accountKey !== currentKey) throw changed();
+        await db.saveHabitDraft(draftId, draft);
+        if (db !== store || accountKey !== currentKey) throw changed();
+        return draft;
+      });
+    },
+    manageHabit: async (habitId, draftId, input, accountKey) => {
+      if (!accountKey || accountKey !== currentKey) throw changed();
+      const result = await requireCoordinator().manageHabit(habitId, draftId, input);
+      if (accountKey !== currentKey) throw changed();
+      await update();
+      if (accountKey !== currentKey) throw changed();
+      return result;
+    },
     enqueue: (type, payload, options) => {
       const key = currentKey + ':' + type + ':' + JSON.stringify(payload) + ':' + JSON.stringify(options);
       if (enqueuing.has(key)) return enqueuing.get(key);

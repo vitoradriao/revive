@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Edição e arquivamento web](web-habit-management.md): revisão concorrente, rascunhos duráveis, pendências e recuperação da #60.
+
 - [Progresso histórico web](web-progress-history.md): indicadores canônicos, conquistas permanentes, cobertura, fixtures de paridade e verificação da #59.
 
 - [Sessões web v2](web-sessions.md): contrato, concorrência entre abas e verificações da issue #57; [rollout autorizado de 16/10](web-sessions-rollout.md).

@@ -15,11 +15,14 @@
  * @see {@link useUI} Hook para estado de carregamento (loading)
  */
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
 import { Calendar, DollarSign, TrendingUp, Trash2, Target, BookOpen } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useOffline } from '../contexts/OfflineContext';
+import HabitManagement from '../components/habits/HabitManagement';
 import RecaidaModal from '../components/modals/RecaidaModal';
 import SelectHumor from '../components/ui/SelectHumor';
 import { InputField } from '../components/ui/Field';
@@ -39,7 +42,9 @@ import { getLocalDateString } from '../utils/goalProgress';
  */
 export default function DetalhesPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const { user, sessionEpoch } = useAuth();
+  const offline = useOffline();
+  const accountKey = user ? `${user.id}:${sessionEpoch || ''}` : '';
   const { loading } = useUI();
   const {
     selectedAddiction, selectedAddictionRecords, goals,
@@ -65,10 +70,10 @@ export default function DetalhesPage() {
     if (id) loadAddictionDetails(id);
   }, [id, loadAddictionDetails]);
 
-  if (!selectedAddiction) {
+  if (!selectedAddiction || selectedAddiction.id !== id) {
     return (
       <div className="text-center py-12">
-        <p className="text-white/60">Carregando detalhes...</p>
+        <p role="status" className="text-muted">{offline.loading ? 'Carregando detalhes…' : offline.error ? 'Não foi possível carregar o hábito. Tente consultar os dados novamente.' : 'Hábito indisponível nesta cópia. Conecte-se e atualize os dados.'}</p>
       </div>
     );
   }
@@ -146,7 +151,7 @@ export default function DetalhesPage() {
             title={selectedAddiction.nome_vicio}
             description={selectedAddiction.tempo_formatado}
           />
-          <button onClick={() => { deleteAddiction(selectedAddiction); navigate('/'); }} className="p-3 text-rose-200 hover:bg-rose-500/15 rounded-lg transition border border-rose-300/30">
+          <button aria-label="Excluir hábito definitivamente" onClick={() => deleteAddiction(selectedAddiction)} className="p-3 text-rose-200 hover:bg-rose-500/15 rounded-lg transition border border-rose-300/30">
             <Trash2 className="w-6 h-6" />
           </button>
         </div>
@@ -173,17 +178,19 @@ export default function DetalhesPage() {
             <p className="text-4xl font-bold text-app">R$ {Number(selectedAddiction.valor_economizado_por_dia).toFixed(2)}</p>
           </div>
         </div>
-        <button onClick={() => setRecaidaVicio(selectedAddiction)} className="w-full mt-6 px-6 py-3 bg-rose-500/15 text-rose-100 rounded-xl hover:bg-rose-500/25 transition font-semibold border border-rose-300/30">
+        <button disabled={selectedAddiction.ativo === false} onClick={() => setRecaidaVicio(selectedAddiction)} className="w-full mt-6 px-6 py-3 bg-rose-500/15 text-rose-100 rounded-xl hover:bg-rose-500/25 transition font-semibold border border-rose-300/30">
           Registrar Recaída
         </button>
       </div>
+
+      <HabitManagement key={accountKey + ':' + id} habit={selectedAddiction} accountKey={accountKey} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Meta + Metas ativas */}
         <div className="space-y-6">
           <div className={`${glassSurface} rounded-3xl p-6 border border-white/10`}>
             <h3 className="text-xl font-bold text-app mb-4 flex items-center gap-2"><Target className="w-6 h-6 text-teal-300" />Nova meta para "{selectedAddiction.nome_vicio}"</h3>
-            <form onSubmit={handleSubmitMeta} className="space-y-4">
+            <form onSubmit={handleSubmitMeta} className="space-y-4"><fieldset disabled={selectedAddiction.ativo === false} className="space-y-4">
               <InputField type="text" value={formMeta.descricao_meta} onChange={(e) => setFormMeta({ ...formMeta, descricao_meta: e.target.value })} required label="Descrição da meta" placeholder="Algo que motive você" />
               <div className="grid grid-cols-2 gap-3">
                 <InputField type="number" min="1" value={formMeta.dias_objetivo} onChange={(e) => setFormMeta({ ...formMeta, dias_objetivo: e.target.value })} label="Dias objetivo" placeholder="Ex: 30" />
@@ -202,7 +209,7 @@ export default function DetalhesPage() {
                 </span>
               </label>
               <Button type="submit" disabled={loading} variant="primary" size="lg" className="w-full">Criar meta</Button>
-            </form>
+            </fieldset></form>
           </div>
 
           {addictionGoals.length > 0 && (
@@ -231,7 +238,7 @@ export default function DetalhesPage() {
         {/* Daily Registry Form */}
         <div id="form-registro" className={`${glassSurface} rounded-3xl p-6 border border-white/10`}>
           <h3 className="text-xl font-bold text-app mb-4 flex items-center gap-2"><BookOpen className="w-6 h-6 text-teal-300" />Novo registro diário</h3>
-          <form onSubmit={handleSubmitRegistro} className="space-y-4">
+          <form onSubmit={handleSubmitRegistro} className="space-y-4"><fieldset disabled={selectedAddiction.ativo === false} className="space-y-4">
             <SelectHumor
               value={formRegistro.humor}
               onChange={(valor) => setFormRegistro({ ...formRegistro, humor: valor })}
@@ -241,7 +248,7 @@ export default function DetalhesPage() {
             <textarea value={formRegistro.conquistas} onChange={(e) => setFormRegistro({ ...formRegistro, conquistas: e.target.value })} className={fieldBase} placeholder="Conquistas do dia..." rows="2" />
             <textarea value={formRegistro.observacoes} onChange={(e) => setFormRegistro({ ...formRegistro, observacoes: e.target.value })} className={fieldBase} placeholder="Observações..." rows="2" />
             <Button type="submit" disabled={loading} variant="primary" size="lg" className="w-full">Salvar registro</Button>
-          </form>
+          </fieldset></form>
         </div>
       </div>
 

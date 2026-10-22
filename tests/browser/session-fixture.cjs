@@ -19,11 +19,22 @@ const receipts = new Map();
 let dropNextResponse = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
-    nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1
+    nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
 }));
+const initialHabits = structuredClone(habits);
 database.tables.vicios = habits;
 const originalRpc = database.client.rpc;
 database.client.rpc = async (name, args) => {
+    if (name === 'edit_revive_habit') {
+        const habit = habits.find(item => item.id === args.p_vicio_id && item.usuario_id === args.p_usuario_id);
+        const result = !habit ? { status: 404, codigo: 'VICIO_NAO_ENCONTRADO' }
+            : habit.revision !== args.p_revision ? { status: 409, codigo: 'REVISAO_CONFLITO' }
+            : args.p_patch.data_inicio && !habit.inicio_editavel ? { status: 409, codigo: 'INICIO_COM_HISTORICO' } : null;
+        if (result) return { data: result, error: null };
+        Object.assign(habit, args.p_patch, { revision: habit.revision + 1 });
+        counts.writes++;
+        return { data: { status: 200, vicio: structuredClone(habit) }, error: null };
+    }
     if (!['execute_mobile_mutation', 'execute_diary_record_update', 'execute_mobile_urge_mutation'].includes(name)) return originalRpc(name, args);
     const key = args.p_usuario_id + ':' + args.p_idempotency_key;
     const prior = receipts.get(key);
@@ -35,6 +46,7 @@ database.client.rpc = async (name, args) => {
     const problem = (status_code, codigo) => ({ status_code, response_body: { codigo, mensagem: 'Erro sintético de teste.' } });
     let result;
     const habit = habits.find(item => item.id === (p.vicio_id || p.addictionId) && item.usuario_id === userId);
+    if (habit?.ativo === false) return { data: problem(409, 'HABITO_ARQUIVADO'), error: null };
     const base = { id: randomUUID(), usuario_id: userId, vicio_id: habit?.id };
     if (type === 'record.update') {
         const record = events.registros.get(p.recordId);
@@ -56,6 +68,7 @@ database.client.rpc = async (name, args) => {
         if (!target) return { data: null, error: new Error('Unsupported synthetic operation') };
         const entity = { ...p, ...base, ...(type === 'record.create' ? { revision: 1 } : {}), ...(type === 'goal.create' ? { concluida: false } : {}) };
         events[target[0]].set(entity.id, entity); counts.writes++;
+        if (habit) habit.inicio_editavel = false;
         result = { status_code: 201, response_body: { [target[1]]: entity } };
     }
     receipts.set(key, { hash: args.p_request_hash, result: structuredClone(result) });
@@ -84,7 +97,7 @@ app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true;
 app.get('/__test/status', (_req, res) => res.json({
     counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
-app.post('/__test/reset', (_req, res) => { database.tables.app_sessions.length = 0; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; res.sendStatus(204); });
+app.post('/__test/reset', (_req, res) => { database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
     database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     res.sendStatus(204);
