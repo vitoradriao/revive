@@ -109,9 +109,10 @@ const login = async (page, email) => {
             assert.match(await notice.textContent(), /Offline/);
             assert.equal(await heatmap.getByText('2/28 dias com check-in. Uma recaída não remove a presença.', { exact: true }).count(), 1);
             if (output) await page.screenshot({ path: path.join(output, `progresso-offline-${engine}.png`), fullPage: true, animations: 'disabled' });
-            // O WebKit no Linux relata a falha de rede intencional como erro de controle de acesso.
-            const unexpected = errors.filter(error => !(engine === 'webkit' && error.offline
-                && ['bootstrap', 'registros'].some(endpoint => error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/${endpoint} due to access control checks.`))))
+            // O WebKit no Linux relata como controle de acesso o bootstrap interrompido por navegação, troca de conta
+            // ou rede desligada; registros só são aceitos após desligar a rede.
+            const unexpected = errors.filter(error => !(engine === 'webkit'
+                && (error.offline ? ['bootstrap', 'registros'] : ['bootstrap']).some(endpoint => error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/${endpoint} due to access control checks.`))))
                 .map(error => error.message);
             assert.deepEqual(unexpected, []);
             results.push({ engine, passed: true, scenarios: ['five-pages', 'reset-record', 'permanent-awards', 'archive', 'legacy', 'partial-export', 'account-switch', 'offline-pending', 'accessible-heatmap'] });
