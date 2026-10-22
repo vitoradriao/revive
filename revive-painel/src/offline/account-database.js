@@ -108,6 +108,7 @@ function accountStore(db, userId, onVersionChange) {
     const safe = { usuario: { id: userId, nome: snapshot.usuario.nome, email: snapshot.usuario.email }, server_time: snapshot.server_time, mensagem: snapshot.mensagem || null };
     try {
       for (const key of ['vicios', 'registros', 'recaidas', 'metas', 'conquistas', 'vontades']) {
+        if (key === 'conquistas' && snapshot[key] === undefined) continue;
         const rows = snapshot[key] || [];
         if (!Array.isArray(rows)) throw fail('SNAPSHOT_INVALID', 'Resposta local inválida.');
         rows.forEach(own); safe[key] = clone(rows);

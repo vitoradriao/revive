@@ -31,7 +31,8 @@
     "test:browser:shell": "node tests/browser/offline-shell.cjs",
     "test:browser:offline-ui": "node tests/browser/offline-ui.cjs",
     "test:browser:client": "node tests/browser/offline-client.cjs",
-    "test:browser": "npm run test:browser:sessions && npm run test:browser:storage && npm run test:browser:sync && npm run test:browser:shell && npm run test:browser:client && npm run test:browser:offline-ui"
+    "test:browser:progress": "node tests/browser/progress-ui.cjs",
+    "test:browser": "npm run test:browser:sessions && npm run test:browser:storage && npm run test:browser:sync && npm run test:browser:shell && npm run test:browser:client && npm run test:browser:offline-ui && npm run test:browser:progress"
   },
   "keywords": [
     "revive",
@@ -63,8 +64,8 @@
     "postcss": "^8.5.6",
     "supertest": "^7.1.4",
     "tailwindcss": "^4.1.14",
-    "vite": "6.4.3",
-    "vitest": "4.1.11"
+    "vite": "6.4.4",
+    "vitest": "4.1.12"
   },
   "overrides": {
     "shell-quote": "1.12.0"

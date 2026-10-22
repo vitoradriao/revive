@@ -16,11 +16,13 @@
  */
 
 import React, { useMemo } from 'react';
-import { BarChart3, Calendar, DollarSign, Flame, Repeat, Trash2 } from 'lucide-react';
+import { BarChart3, Flame, Repeat, Trash2 } from 'lucide-react';
 import {
   glassSurface,
 } from '../../utils/constants';
 import { calculateGoalProgress } from '../../utils/goalProgress';
+import HabitProgress from './HabitProgress';
+import { currentStreak } from '../../utils/progressMetrics';
 
 /**
  * Renderiza card com informacoes e acoes de um vicio individual.
@@ -78,7 +80,7 @@ export default function VicioCard({
   return (
     <div className={`${glassSurface} rounded-[34px] p-6 flex flex-col relative overflow-hidden group transition hover:-translate-y-0.5`}>
       {/* Icone de chama exibido como badge quando usuario atinge 7+ dias de abstinencia */}
-      {vicio.dias_abstinencia >= 7 && (
+      {currentStreak(vicio).coverage !== 'unknown' && currentStreak(vicio).value >= 7 && (
         <div className="absolute top-3 right-3">
           <div className="text-amber-400">
             <Flame className="w-5 h-5" />
@@ -127,29 +129,8 @@ export default function VicioCard({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-3">
-          <div className="p-3 rounded-2xl surface-muted">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Calendar className="w-4 h-4 text-teal-300" />
-              <p className="text-[10px] uppercase font-black tracking-[0.14em] text-muted">Dias</p>
-              <p className="text-lg font-black text-app tabular-nums">{vicio.dias_abstinencia}</p>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl surface-muted">
-            <div className="flex flex-col items-center text-center gap-2">
-              <DollarSign className="w-4 h-4 text-sky-300" />
-              <p className="text-[10px] uppercase font-black tracking-[0.14em] text-muted">R$</p>
-              <p className="text-lg font-black text-app tabular-nums">{Number(vicio.valor_economizado).toFixed(0)}</p>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl surface-muted">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Repeat className="w-4 h-4 text-amber-300" />
-              <p className="text-[10px] uppercase font-black tracking-[0.14em] text-muted">30d</p>
-              <p className="text-lg font-black text-app tabular-nums">{recaidasVicio30dias}</p>
-            </div>
-          </div>
-        </div>
+        <HabitProgress habit={vicio} />
+        <p className="mt-3 text-sm text-muted"><Repeat className="inline w-4 h-4" /> {recaidasVicio30dias} recaída(s) disponível(is) nos últimos 30 dias</p>
       </div>
 
       <button
