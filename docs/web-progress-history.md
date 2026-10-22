@@ -66,7 +66,7 @@ REVIVE_BROWSER_ARTIFACTS=/tmp/revive-progress-evidence npm run test:browser:prog
 
 A [suíte de navegador](../tests/browser/progress-ui.cjs) usa build de produção, autenticação HTTP da fixture existente e snapshots exclusivamente sintéticos gerados pelas métricas canônicas. Verifica cinco telas, arquivo JSON, arquivamento, legado, A/B e intenção offline no IndexedDB real. Produz seis capturas por navegador: cinco páginas e dashboard offline. O service worker é desabilitado nessa suíte para interceptar os snapshots sintéticos; a reabertura com shell offline continua nas suítes já existentes da #58. A RPC e os snapshots são sintéticos: essa execução não é prova de banco real nem de homologação em produção.
 
-`npm run test:browser` inclui essa regressão nas três engines. Para guardar as imagens, defina `REVIVE_BROWSER_ARTIFACTS`. Não há captura ou execução de CI confirmada desta branch neste registro.
+`npm run test:browser` inclui essa regressão nas três engines. No CI, as imagens geradas são anexadas ao artefato `progresso-web-sintetico`. Não há captura ou execução de CI confirmada desta branch neste registro.
 
 Verificações locais de 22/10/2026: `npm run validate` aprovado (API: 23 unitários e 57 de integração; painel: 80 unitários e 55 de integração; documentação e build) e `npm run lint:web` aprovado. A paridade importa somente domínio puro do mobile, com configuração de transformação exclusiva do Vitest, sem instalar ou modificar o aplicativo.
 
