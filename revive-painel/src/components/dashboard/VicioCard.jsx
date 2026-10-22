@@ -91,7 +91,7 @@ export default function VicioCard({
       <div className="flex-grow">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="eyebrow">Em progresso</p>
+            <p className="eyebrow">{vicio.ativo === false ? 'Arquivado' : 'Em progresso'}</p>
             <h3 className="text-2xl font-black tracking-[-0.055em] text-app">{vicio.nome_vicio}</h3>
             <p className="text-sm text-muted mt-1">{vicio.tempo_formatado}</p>
           </div>
@@ -106,7 +106,7 @@ export default function VicioCard({
             <button
               onClick={onDelete}
               className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition border border-rose-300/30"
-              title="Excluir"
+              title="Excluir definitivamente"
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -133,12 +133,12 @@ export default function VicioCard({
         <p className="mt-3 text-sm text-muted"><Repeat className="inline w-4 h-4" /> {recaidasVicio30dias} recaída(s) disponível(is) nos últimos 30 dias</p>
       </div>
 
-      <button
+      {vicio.ativo !== false && <button
         onClick={onRegisterRelapse}
         className="w-full mt-4 px-4 py-2 btn-secondary"
       >
         Registrar Recaída
-      </button>
+      </button>}
     </div>
   );
 }

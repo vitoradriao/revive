@@ -118,3 +118,18 @@ export async function registrarRecaida(vicioId, motivo, resetarContador, token) 
     body: JSON.stringify({ motivo, resetarContador })
   }, token);
 }
+
+// O PATCH não entra na fila: a revisão e a recuperação pertencem à edição online.
+export async function patchHabit(id, payload, request = apiCall) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+        const result = await request(`/v2/vicios/${encodeURIComponent(id)}`, {
+            method: 'PATCH', body: JSON.stringify(payload), signal: controller.signal
+        });
+        if (result?.vicio?.id !== id || result.vicio.revision !== payload.revision + 1) {
+            throw Object.assign(new Error('A resposta não confirmou a alteração. Consulte o estado remoto.'), { outcomeUnknown: true });
+        }
+        return result.vicio;
+    } finally { clearTimeout(timeout); }
+}

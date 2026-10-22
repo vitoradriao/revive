@@ -154,3 +154,18 @@ it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendênci
     expect(csv).toContain('Cópia parcial');
     expect(csv).not.toContain('2026-02-03');
 });
+
+
+describe('filtro de hábitos', () => {
+    it('mostra arquivados para consulta, sem oferecer recaída ou selecioná-los para novo humor', () => {
+        const archived = { ...state.source.data.vicios[0], id: 'archived', nome_vicio: 'Hábito arquivado', ativo: false };
+        state.source.data.vicios.push(archived);
+        mount(DashboardPage);
+        expect(screen.queryByRole('heading', { name: 'Hábito arquivado' })).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Exibir hábitos'), { target: { value: 'archived' } });
+        expect(screen.getByRole('heading', { name: 'Hábito arquivado' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Registrar Recaída' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Ver detalhes' })).toBeInTheDocument();
+        expect(screen.getByText('Hábito sintético', { exact: true })).toBeInTheDocument();
+    });
+});

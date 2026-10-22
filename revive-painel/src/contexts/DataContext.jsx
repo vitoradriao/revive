@@ -218,7 +218,7 @@ export function DataProvider({ children }) {
    */
   const loadAddictionDetails = useCallback(async (id) => {
     if (offlineClient) {
-      const data = offline.snapshot?.data;
+      const data = offline.accountKey === accountKey && offline.snapshot?.data?.usuario?.id === user?.id ? offline.snapshot.data : null;
       const habit = data?.vicios.find(item => item.id === id);
       setSelectedAddiction(habit ? { ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) } : null);
       setSelectedAddictionRecords((data?.registros || []).filter(item => item.vicio_id === id));
@@ -242,7 +242,7 @@ export function DataProvider({ children }) {
       setSelectedAddictionRecords(regData.registros || []);
       return processedAddiction;
     }, 'Nao foi possivel carregar os detalhes do vicio.');
-  }, [offlineClient, offline.snapshot, token, isCurrentToken, withLoading]);
+  }, [offlineClient, offline.snapshot, offline.accountKey, accountKey, user?.id, token, isCurrentToken, withLoading]);
 
   /**
    * Carrega a lista de metas do usuario a partir da API.
@@ -573,7 +573,7 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     const data = offline.snapshot?.data;
-    if (!offlineClient || !data || data.usuario.id !== user?.id) return;
+    if (!offlineClient || !data || data.usuario.id !== user?.id || offline.accountKey !== accountKey) return;
     const records = [...data.registros], metas = [...data.metas], recaidas = [...data.recaidas];
     for (const intent of offline.queue) {
       const local = { ...intent.payload, id: intent.localId, pending: true, sync_status: intent.status };
@@ -597,7 +597,7 @@ export function DataProvider({ children }) {
       return habit ? { ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) } : null;
     });
     setSelectedAddictionRecords(records.filter(record => record.vicio_id === selectedAddiction?.id));
-  }, [offline.snapshot, offline.queue, offlineClient, user?.id, selectedAddiction?.id]);
+  }, [offline.snapshot, offline.queue, offline.accountKey, accountKey, offlineClient, user?.id, selectedAddiction?.id]);
 
   // ─── Provider Value Object ─────────────────────────────────────────────
   /**

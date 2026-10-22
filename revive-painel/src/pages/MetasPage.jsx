@@ -36,7 +36,7 @@ export default function MetasPage() {
     <Motion.div {...screenTransition}>
       <MetasCard
         metas={goals}
-        vicios={addictions}
+        vicios={addictions.filter(habit => habit.ativo !== false)}
         onAddMeta={createGoal}
         onCompleteMeta={completeGoal}
         onDeleteMeta={deleteGoal}

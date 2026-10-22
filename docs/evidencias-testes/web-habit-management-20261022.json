@@ -1,0 +1,29 @@
+[
+  {
+    "engine": "chromium",
+    "concurrency": true,
+    "draftAfterReload": true,
+    "archive": true,
+    "reactivation": true,
+    "recoveredEvent": true,
+    "focus": true
+  },
+  {
+    "engine": "firefox",
+    "concurrency": true,
+    "draftAfterReload": true,
+    "archive": true,
+    "reactivation": true,
+    "recoveredEvent": true,
+    "focus": true
+  },
+  {
+    "engine": "webkit",
+    "concurrency": true,
+    "draftAfterReload": true,
+    "archive": true,
+    "reactivation": true,
+    "recoveredEvent": true,
+    "focus": true
+  }
+]

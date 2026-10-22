@@ -228,6 +228,11 @@ function accountStore(db, userId, onVersionChange) {
     };
   });
   return {
+    getHabitDraft: async id => (await read('meta', 'habitDraft:' + id))?.value || null,
+    saveHabitDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
+      tx.objectStore('meta').put({ key: 'habitDraft:' + id, value: clone(value) });
+      set(value);
+    }),
     userId, close, saveSnapshot, savePage, enqueue, acknowledge, discard,
     getSnapshot: () => read('snapshots', 'bootstrap'), getIdentity: () => read('meta', 'identity'),
     getPage: (kind, filters) => read('pages', kind + ':' + stable(filters)),
