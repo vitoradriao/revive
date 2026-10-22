@@ -12,8 +12,12 @@
  */
 import React, { useState, useMemo } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { Download, Printer, Calendar, TrendingUp, DollarSign, Repeat } from 'lucide-react';
-import { useData } from '../contexts/DataContext';
+import { Download, Printer, Calendar, Heart, BookOpen, Repeat } from 'lucide-react';
+import { useProgress } from '../contexts/useProgress';
+import ProgressNotice from '../components/dashboard/ProgressNotice';
+import HeroKpis from '../components/dashboard/HeroKpis';
+import HabitProgress from '../components/dashboard/HabitProgress';
+import { distinctCheckinDays, recordsInPeriod } from '../utils/progressMetrics';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -23,47 +27,32 @@ import { glassSurface, screenTransition, moodColors } from '../utils/constants';
  * Componente da pagina de Relatorios.
  *
  * Gerencia estado local 'periodo' (7, 30 ou 90 dias) para filtrar dados.
- * Calcula estatisticas derivadas (stats) e data limite (dataLimite) via useMemo.
+ * Calcula contagens dos dados disponíveis por período via useMemo.
  * Oferece exportacao CSV com geracao de Blob e download programatico.
  *
  * @returns {JSX.Element} Pagina de relatorios com filtros, estatisticas e acoes de exportacao
  */
 export default function ReportsPage() {
-  const { addictions, goals, allRecords, relapses } = useData();
+  const progress = useProgress();
+  const { habits: addictions, records: allRecords, relapses } = progress;
   const [periodo, setPeriodo] = useState(30);
 
-  // Calcula a data limite para filtragem baseada no periodo selecionado - O(1)
-  const dataLimite = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - periodo);
-    return d;
-  }, [periodo]);
-
-  /**
-   * Calcula estatisticas agregadas para o periodo selecionado.
-   * Inclui contagens de registros, recaidas, economia, metas e distribuicao de humor.
-   * Complexidade: O(r + s + n + m) onde r = registros, s = recaidas, n = vicios, m = metas.
-   */
   const stats = useMemo(() => {
-    const regsPerido = allRecords.filter(r => new Date(r.data_registro) >= dataLimite);
-    const recaidasPeriodo = relapses.filter(r => new Date(r.data_recaida) >= dataLimite);
-    const totalEconomizado = addictions.reduce((acc, v) => acc + (Number(v.valor_economizado) || 0), 0);
-    const metasConcluidas = goals.filter(m => m.concluida).length;
-
+    const periodRecords = recordsInPeriod(allRecords, 'data_registro', periodo);
+    const periodRelapses = recordsInPeriod(relapses, 'data_recaida', periodo);
     const humorCount = {};
-    regsPerido.forEach(r => {
+    periodRecords.forEach(r => {
       if (r.humor) humorCount[r.humor] = (humorCount[r.humor] || 0) + 1;
     });
 
     return {
-      totalRegistros: regsPerido.length,
-      totalRecaidas: recaidasPeriodo.length,
-      totalEconomizado,
-      metasConcluidas,
+      totalRegistros: periodRecords.length,
+      totalRecaidas: periodRelapses.length,
+      checkinDays: distinctCheckinDays(periodRecords),
+      activeCount: progress.activeCount,
       humorDistribuicao: Object.entries(humorCount).sort((a, b) => b[1] - a[1]),
-      viciosAtivos: addictions.length
     };
-  }, [dataLimite, allRecords, relapses, addictions, goals]);
+  }, [periodo, allRecords, relapses, progress.activeCount]);
 
   /**
    * Exporta registros do periodo como arquivo CSV.
@@ -72,12 +61,12 @@ export default function ReportsPage() {
    * Complexidade: O(n) onde n = registros no periodo.
    */
   const exportCSV = () => {
-    const headers = ['Data', 'Vício ID', 'Humor', 'Gatilhos', 'Conquistas', 'Observações'];
-    const rows = allRecords
-      .filter(r => new Date(r.data_registro) >= dataLimite)
-      .map(r => [r.data_registro, r.vicio_id, r.humor || '', r.gatilhos || '', r.conquistas || '', r.observacoes || '']);
+    const headers = ['Data', 'Vício ID', 'Humor', 'Gatilhos', 'Conquistas', 'Observações', 'Cobertura', 'Consolidado em', 'Período (dias)', 'Pendências locais excluídas'];
+    const rows = recordsInPeriod(allRecords, 'data_registro', periodo)
+      .map(r => [r.data_registro, r.vicio_id, r.humor || '', r.gatilhos || '', r.conquistas || '', r.observacoes || '', progress.scope, progress.updatedAt || '', periodo, progress.pendingCount]);
 
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const escapeCell = value => `"${String(value ?? '').replace(/^[\s]*[=+@-]/, "'$&").replaceAll('"', '""')}"`;
+    const csv = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -112,27 +101,31 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      <ProgressNotice progress={progress} />
+      <HeroKpis progress={progress} />
+      <p className="text-sm text-muted">Registros, presença, humor e recaídas: últimos {periodo} dias, incluindo hoje (UTC). Economias e sequências: snapshot consolidado, sem recorte pelo filtro.</p>
+
+      {/* Resumo do período */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className={`${glassSurface} rounded-2xl p-5 text-center`}>
           <Calendar className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-app">{stats.totalRegistros}</p>
-          <p className="text-xs text-muted">Registros</p>
+          <p className="text-2xl font-bold text-app">{progress.available ? stats.totalRegistros : 'Indisponível'}</p>
+          <p className="text-xs text-muted">Registros disponíveis</p>
         </div>
         <div className={`${glassSurface} rounded-2xl p-5 text-center`}>
-          <DollarSign className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-app">R$ {stats.totalEconomizado.toFixed(0)}</p>
-          <p className="text-xs text-muted">Economizado</p>
+          <BookOpen className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
+          <p className="text-2xl font-bold text-app">{progress.available ? stats.checkinDays : 'Indisponível'}</p>
+          <p className="text-xs text-muted">Dias com check-in disponíveis</p>
         </div>
         <div className={`${glassSurface} rounded-2xl p-5 text-center`}>
           <Repeat className="w-6 h-6 text-rose-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-app">{stats.totalRecaidas}</p>
-          <p className="text-xs text-muted">Recaídas</p>
+          <p className="text-2xl font-bold text-app">{progress.available ? stats.totalRecaidas : 'Indisponível'}</p>
+          <p className="text-xs text-muted">Recaídas disponíveis</p>
         </div>
         <div className={`${glassSurface} rounded-2xl p-5 text-center`}>
-          <TrendingUp className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-app">{stats.metasConcluidas}</p>
-          <p className="text-xs text-muted">Metas concluídas</p>
+          <Heart className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+          <p className="text-2xl font-bold text-app">{progress.available ? stats.activeCount : 'Indisponível'}</p>
+          <p className="text-xs text-muted">Hábitos ativos disponíveis (snapshot)</p>
         </div>
       </div>
 
@@ -160,15 +153,15 @@ export default function ReportsPage() {
       </Card>
 
       {/* Vicios Summary */}
-      <Card title="Resumo por Vício">
+      <Card title="Resumo por hábito (snapshot, incluindo arquivados)">
         <div className="space-y-3">
+          {addictions.length === 0 && <p className="text-muted">Nenhum hábito disponível nesta cópia.</p>}
           {addictions.map(v => (
             <div key={v.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
               <div>
-                <p className="font-semibold text-white">{v.nome_vicio}</p>
-                <p className="text-xs text-white/50">{v.dias_abstinencia} dias limpo</p>
+                <p className="font-semibold text-app">{v.nome_vicio} {v.ativo === false ? '(Arquivado)' : ''}</p>
+                <HabitProgress habit={v} />
               </div>
-              <p className="text-lg font-bold text-[#7CF6C4]">R$ {Number(v.valor_economizado).toFixed(0)}</p>
             </div>
           ))}
         </div>
@@ -178,11 +171,12 @@ export default function ReportsPage() {
       <div className="flex gap-4">
         <Button
           onClick={exportCSV}
+          disabled={!progress.available || progress.loading}
           variant="secondary"
           size="lg"
         >
           <Download className="w-5 h-5" />
-          Exportar CSV
+          Exportar registros disponíveis em CSV
         </Button>
         <Button
           onClick={() => window.print()}

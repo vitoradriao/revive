@@ -1,137 +1,63 @@
-/**
- * @file AchievementsPage.jsx
- * @description Pagina de conquistas (achievements/badges) da aplicacao REVIVE.
- *
- * Exibe sistema de gamificacao com badges organizados por categoria
- * (streak, economia, metas, consistencia). Cada badge possui um requisito
- * numerico e mostra progresso visual (barra de progresso) ate ser desbloqueado.
- *
- * Utiliza useMemo para calcular quais badges foram conquistados e o progresso
- * de cada um. Animacoes escalonadas (stagger) com Framer Motion.
- *
- * @component
- * @see {@link badgeDefinitions} Definicoes estaticas dos badges no constants.js
- * @see {@link useData} Hook para acessar dados de vicios, metas e registros
- */
-import React, { useMemo } from 'react';
+import React from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Trophy, Flame, DollarSign, Target, BookOpen, Lock } from 'lucide-react';
-import { useData } from '../contexts/DataContext';
+import { useProgress } from '../contexts/useProgress';
+import ProgressNotice from '../components/dashboard/ProgressNotice';
+import { coverageLabel, milestoneOriginLabel } from '../utils/progressMetrics';
 import PageHeader from '../components/ui/PageHeader';
 import { glassSurface, screenTransition, badgeDefinitions, staggerContainer, staggerItem } from '../utils/constants';
 
 /** @type {Object.<string, React.Component>} Mapa de nomes de icone para componentes Lucide */
 const iconMap = { Flame, DollarSign, Target, BookOpen };
 
-/**
- * Componente da pagina de Conquistas.
- *
- * Calcula dois conjuntos memorizados:
- * 1. earnedBadges: Set com IDs dos badges ja conquistados
- * 2. progress: Array com dados completos de cada badge incluindo % de progresso
- *
- * Renderiza badges agrupados por categoria com animacao stagger.
- *
- * @returns {JSX.Element} Pagina de conquistas com barra de progresso total e grid de badges
- */
 export default function AchievementsPage() {
-  const { addictions, goals, allRecords } = useData();
-
-  /**
-   * Determina quais badges foram conquistados comparando valores atuais
-   * (maxStreak, totalSavings, completedGoals, totalLogs) com requisitos de cada badge.
-   * Complexidade: O(n + b) onde n = vicios/metas/registros, b = numero de badges definidos.
-   * @type {Set<string>} Conjunto de IDs dos badges conquistados
-   */
-  const earnedBadges = useMemo(() => {
-    const earned = new Set();
-    const maxStreak = addictions.reduce((max, v) => Math.max(max, v.dias_abstinencia || 0), 0);
-    const totalSavings = addictions.reduce((acc, v) => acc + (Number(v.valor_economizado) || 0), 0);
-    const completedGoals = goals.filter(m => m.concluida).length;
-    const totalLogs = allRecords.length;
-
-    badgeDefinitions.forEach(badge => {
-      let value = 0;
-      if (badge.category === 'streak') value = maxStreak;
-      else if (badge.category === 'savings') value = totalSavings;
-      else if (badge.category === 'goals') value = completedGoals;
-      else if (badge.category === 'consistency') value = totalLogs;
-
-      if (value >= badge.requirement) earned.add(badge.id);
-    });
-
-    return earned;
-  }, [addictions, goals, allRecords]);
-
-  /**
-   * Calcula o progresso percentual de cada badge (0-100%).
-   * Reutiliza os mesmos calculos de earnedBadges para determinar o valor atual.
-   * Complexidade: O(n + b) onde n = dados e b = badges.
-   * @type {Array<Object>} Array de badges com campos adicionais: earned, progress, current
-   */
-  const progress = useMemo(() => {
-    const maxStreak = addictions.reduce((max, v) => Math.max(max, v.dias_abstinencia || 0), 0);
-    const totalSavings = addictions.reduce((acc, v) => acc + (Number(v.valor_economizado) || 0), 0);
-    const completedGoals = goals.filter(m => m.concluida).length;
-    const totalLogs = allRecords.length;
-
-    return badgeDefinitions.map(badge => {
-      let value = 0;
-      if (badge.category === 'streak') value = maxStreak;
-      else if (badge.category === 'savings') value = totalSavings;
-      else if (badge.category === 'goals') value = completedGoals;
-      else if (badge.category === 'consistency') value = totalLogs;
-
-      return {
-        ...badge,
-        earned: earnedBadges.has(badge.id),
-        progress: Math.min((value / badge.requirement) * 100, 100),
-        current: value
-      };
-    });
-  }, [earnedBadges, addictions, goals, allRecords]);
+  const history = useProgress();
+  const progress = history.badges;
+  const earnedBadges = new Set(progress.filter(badge => badge.earned).map(badge => badge.id));
 
   const categories = [
-    { id: 'streak', label: 'Streak', icon: Flame },
+    { id: 'streak', label: 'Sequência', icon: Flame },
     { id: 'savings', label: 'Economia', icon: DollarSign },
     { id: 'goals', label: 'Metas', icon: Target },
-    { id: 'consistency', label: 'Consistencia', icon: BookOpen },
+    { id: 'consistency', label: 'Presença', icon: BookOpen },
   ];
 
   return (
     <Motion.div {...screenTransition} className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <PageHeader
-          eyebrow="Gamificação"
+          eyebrow="Histórico permanente"
           title="Conquistas"
-          description="Acompanhe marcos desbloqueados por consistência, economia, metas e streaks."
+          description="Conquistas registradas permanecem após reiniciar uma sequência ou arquivar um hábito."
         />
         <div className={`${glassSurface} rounded-2xl px-4 py-2 flex items-center gap-2`}>
           <Trophy className="w-5 h-5 text-amber-400" />
-          <span className="text-lg font-bold text-app">{earnedBadges.size}</span>
+          <span className="text-lg font-bold text-app">{history.awards === undefined ? 'Indisponível' : earnedBadges.size}</span>
           <span className="text-muted text-sm">/ {badgeDefinitions.length}</span>
         </div>
       </div>
 
-      {/* Points Summary */}
+      <ProgressNotice progress={history} />
+      {history.awards === undefined && <p className="text-muted">Histórico legado: conquistas permanentes indisponíveis nesta cópia.</p>}
+      {/* Resumo dos marcos disponíveis */}
       <div className={`${glassSurface} rounded-3xl p-6`}>
         <div className="flex items-center gap-4 mb-2">
           <div className="w-14 h-14 rounded-2xl bg-amber-500/20 flex items-center justify-center">
             <Trophy className="w-7 h-7 text-amber-400" />
           </div>
           <div>
-            <p className="text-sm text-muted">Progresso Total</p>
-            <p className="text-2xl font-bold text-app">{Math.round((earnedBadges.size / badgeDefinitions.length) * 100)}%</p>
+            <p className="text-sm text-muted">Conquistas registradas nesta cópia</p>
+            <p className="text-2xl font-bold text-app">{history.awards === undefined ? 'Indisponível' : `${Math.round((earnedBadges.size / badgeDefinitions.length) * 100)}%`}</p>
           </div>
         </div>
-        <div className="w-full bg-slate-700/40 rounded-full h-2 mt-3">
+        {history.awards !== undefined && <div className="w-full bg-slate-700/40 rounded-full h-2 mt-3">
           <Motion.div
             initial={{ width: 0 }}
             animate={{ width: `${(earnedBadges.size / badgeDefinitions.length) * 100}%` }}
             transition={{ duration: 1.2, ease: 'easeOut' }}
             className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500"
           />
-        </div>
+        </div>}
       </div>
 
       {/* Badge Grid by Category */}
@@ -173,7 +99,8 @@ export default function AchievementsPage() {
                     </div>
                     <p className="font-semibold text-app text-sm mb-1">{badge.name}</p>
                     <p className="text-xs text-muted mb-3">{badge.description}</p>
-                    {!badge.earned && (
+                    {!badge.earned && <p className="text-xs text-muted mb-2">{badge.current == null ? 'Progresso indisponível' : `${badge.current} / ${badge.requirement} no escopo disponível`}. Sem conquista registrada nesta cópia.</p>}
+                    {!badge.earned && badge.current != null && (
                       <div className="w-full bg-slate-700/40 rounded-full h-1.5">
                         <div
                           className="h-full rounded-full transition-all"
@@ -182,7 +109,11 @@ export default function AchievementsPage() {
                       </div>
                     )}
                     {badge.earned && (
-                      <span className="text-xs text-emerald-400 font-medium">Desbloqueado!</span>
+                      <div className="text-xs text-emerald-400 font-medium">
+                        <p>Conquista permanente</p>
+                        <p>{new Date(badge.award.awarded_at).toLocaleDateString('pt-BR')} · {milestoneOriginLabel(badge.award.origem)}</p>
+                        <p>{coverageLabel(badge.award.cobertura)}</p>
+                      </div>
                     )}
                   </Motion.div>
                 );

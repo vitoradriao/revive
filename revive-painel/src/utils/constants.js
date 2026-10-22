@@ -230,22 +230,22 @@ export const moodOptions = [
  */
 export const badgeDefinitions = [
   // Streak badges
-  { id: 'streak-1', category: 'streak', name: '1 Dia Limpo', description: 'Primeiro dia de abstinencia', icon: 'Flame', requirement: 1, color: '#7CF6C4' },
+  { id: 'streak-1', category: 'streak', name: '1 dia consecutivo', description: 'Primeiro dia de abstinência', icon: 'Flame', requirement: 1, color: '#7CF6C4' },
   { id: 'streak-7', category: 'streak', name: '1 Semana', description: '7 dias consecutivos', icon: 'Flame', requirement: 7, color: '#35D3FF' },
-  { id: 'streak-30', category: 'streak', name: '1 Mes', description: '30 dias consecutivos', icon: 'Flame', requirement: 30, color: '#8b5cf6' },
+  { id: 'streak-30', category: 'streak', name: '1 mês', description: '30 dias consecutivos', icon: 'Flame', requirement: 30, color: '#8b5cf6' },
   { id: 'streak-90', category: 'streak', name: '3 Meses', description: '90 dias consecutivos', icon: 'Flame', requirement: 90, color: '#f59e0b' },
   { id: 'streak-180', category: 'streak', name: '6 Meses', description: '180 dias consecutivos', icon: 'Flame', requirement: 180, color: '#ef4444' },
   { id: 'streak-365', category: 'streak', name: '1 Ano', description: '365 dias consecutivos', icon: 'Flame', requirement: 365, color: '#ec4899' },
   // Savings badges
-  { id: 'savings-50', category: 'savings', name: 'R$50 Economizados', description: 'Primeiros R$50 economizados', icon: 'DollarSign', requirement: 50, color: '#7CF6C4' },
-  { id: 'savings-100', category: 'savings', name: 'R$100 Economizados', description: 'R$100 no bolso', icon: 'DollarSign', requirement: 100, color: '#35D3FF' },
-  { id: 'savings-500', category: 'savings', name: 'R$500 Economizados', description: 'Meio mil economizado', icon: 'DollarSign', requirement: 500, color: '#8b5cf6' },
-  { id: 'savings-1000', category: 'savings', name: 'R$1.000 Economizados', description: 'Mil reais economizados', icon: 'DollarSign', requirement: 1000, color: '#f59e0b' },
+  { id: 'savings-50', category: 'savings', name: 'R$50 Economizados', description: 'R$ 50 de economia estimada acumulada', icon: 'DollarSign', requirement: 50, color: '#7CF6C4' },
+  { id: 'savings-100', category: 'savings', name: 'R$100 Economizados', description: 'R$ 100 de economia estimada acumulada', icon: 'DollarSign', requirement: 100, color: '#35D3FF' },
+  { id: 'savings-500', category: 'savings', name: 'R$500 Economizados', description: 'R$ 500 de economia estimada acumulada', icon: 'DollarSign', requirement: 500, color: '#8b5cf6' },
+  { id: 'savings-1000', category: 'savings', name: 'R$1.000 Economizados', description: 'R$ 1.000 de economia estimada acumulada', icon: 'DollarSign', requirement: 1000, color: '#f59e0b' },
   // Goal badges
   { id: 'goal-first', category: 'goals', name: 'Primeira Meta', description: 'Concluiu a primeira meta', icon: 'Target', requirement: 1, color: '#7CF6C4' },
   { id: 'goal-5', category: 'goals', name: '5 Metas', description: 'Concluiu 5 metas', icon: 'Target', requirement: 5, color: '#35D3FF' },
   { id: 'goal-10', category: 'goals', name: '10 Metas', description: 'Concluiu 10 metas', icon: 'Target', requirement: 10, color: '#8b5cf6' },
   // Consistency badges
-  { id: 'log-7', category: 'consistency', name: '7 Registros', description: '7 registros diarios', icon: 'BookOpen', requirement: 7, color: '#7CF6C4' },
-  { id: 'log-30', category: 'consistency', name: '30 Registros', description: '30 registros diarios', icon: 'BookOpen', requirement: 30, color: '#35D3FF' },
+  { id: 'log-7', category: 'consistency', name: '7 dias com check-in', description: '7 datas distintas com check-in', icon: 'BookOpen', requirement: 7, color: '#7CF6C4' },
+  { id: 'log-30', category: 'consistency', name: '30 dias com check-in', description: '30 datas distintas com check-in', icon: 'BookOpen', requirement: 30, color: '#35D3FF' },
 ];

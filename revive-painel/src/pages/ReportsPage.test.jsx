@@ -2,30 +2,19 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ReportsPage from './ReportsPage';
+import fixtures from '../../../tests/fixtures/progress.cjs';
 
 vi.mock('../contexts/DataContext', () => ({
-  useData: () => ({
-    addictions: [
-      { id: '1', nome_vicio: 'Cigarro', dias_abstinencia: 10, valor_economizado: 120 },
-      { id: '2', nome_vicio: 'Alcool', dias_abstinencia: 5, valor_economizado: 40 }
-    ],
-    goals: [{ id: 'm1', concluida: true }, { id: 'm2', concluida: false }],
-    allRecords: [
-      { id: 'r1', data_registro: new Date().toISOString(), humor: 'bom' },
-      { id: 'r2', data_registro: new Date().toISOString(), humor: 'excelente' }
-    ],
-    relapses: [{ id: 're1', data_recaida: new Date().toISOString() }]
-  })
+    useData: () => ({ progressSource: { data: fixtures.progressFixture() } }),
 }));
 
 describe('ReportsPage', () => {
-  it('renders summary cards from context data', () => {
-    render(<ReportsPage />);
-
-    expect(screen.getByText('Relatórios')).toBeInTheDocument();
-    expect(screen.getByText('R$ 160')).toBeInTheDocument();
-    expect(screen.getByText('Resumo por Vício')).toBeInTheDocument();
-    expect(screen.getByText('Cigarro')).toBeInTheDocument();
-    expect(screen.getByText('Alcool')).toBeInTheDocument();
-  });
+    it('exibe economia acumulada canônica e os escopos do filtro', () => {
+        render(<ReportsPage />);
+        expect(screen.getByText('Relatórios')).toBeInTheDocument();
+        expect(screen.getAllByText(/320,00/).length).toBeGreaterThan(0);
+        expect(screen.getByText('Resumo por hábito (snapshot, incluindo arquivados)')).toBeInTheDocument();
+        expect(screen.getByText('Hábito sintético')).toBeInTheDocument();
+        expect(screen.getByText(/sem recorte pelo filtro/)).toBeInTheDocument();
+    });
 });

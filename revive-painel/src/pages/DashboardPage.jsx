@@ -14,16 +14,15 @@ import { SelectField } from '../components/ui/Field';
 import Button from '../components/ui/Button';
 import { glassSurface, moodOptions } from '../utils/constants';
 import { calculateGoalProgress } from '../utils/goalProgress';
+import { useProgress } from '../contexts/useProgress';
+import ProgressNotice from '../components/dashboard/ProgressNotice';
+import { activityDays } from '../utils/progressMetrics';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { loading, openNewAddictionWizard } = useUI();
   const {
-    addictions,
     motivationalMessage,
-    relapses,
-    allRecords,
-    goals,
     deleteAddiction,
     createRecordForAddiction,
     registerRelapse,
@@ -33,41 +32,10 @@ export default function DashboardPage() {
   const [recaidaVicio, setRecaidaVicio] = useState(null);
   const [moodCheckIn, setMoodCheckIn] = useState({ humor: '', vicio_id: '' });
 
-  const totalDiasLimpos = useMemo(
-    () => addictions.reduce((acc, v) => acc + (v.dias_abstinencia || 0), 0),
-    [addictions]
-  );
-
-  const totalEconomizado = useMemo(
-    () => addictions.reduce((acc, v) => acc + (Number(v.valor_economizado) || 0), 0),
-    [addictions]
-  );
-
-  const maiorStreak = useMemo(
-    () => addictions.reduce((max, v) => Math.max(max, v.dias_abstinencia || 0), 0),
-    [addictions]
-  );
-
-  const metasConcluidas = useMemo(
-    () => goals.filter(m => m.concluida).length,
-    [goals]
-  );
-
-  const heatmapData = useMemo(() => {
-    const days = [];
-    const today = new Date();
-
-    for (let i = 27; i >= 0; i -= 1) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      const count = allRecords.filter(r => r.data_registro === dateStr).length;
-      const hasRelapse = relapses.some(r => r.data_recaida?.split('T')[0] === dateStr);
-      days.push({ date: dateStr, count, hasRelapse, day: date.getDay() });
-    }
-
-    return days;
-  }, [allRecords, relapses]);
+  const progress = useProgress();
+  const addictions = progress.habits.filter(habit => habit.ativo !== false);
+  const { records: allRecords, relapses, goals } = progress;
+  const heatmapData = useMemo(() => activityDays(allRecords, relapses), [allRecords, relapses]);
 
   const recentActivity = useMemo(() => {
     const events = [];
@@ -105,21 +73,10 @@ export default function DashboardPage() {
     return events.sort((a, b) => b.date - a.date).slice(0, 8);
   }, [allRecords, relapses, goals]);
 
-  const moodTrend = useMemo(() => {
-    const moodScore = { excelente: 5, bom: 4, neutro: 3, ruim: 2, pessimo: 1, 'pÃ©ssimo': 1, [`p${'\u00c3\u00a9'}ssimo`]: 1 };
-    const last7 = new Date();
-    last7.setDate(last7.getDate() - 7);
-    const recent = allRecords.filter(r => new Date(r.data_registro) >= last7 && r.humor);
-
-    if (recent.length === 0) return null;
-
-    return recent.reduce((acc, r) => acc + (moodScore[r.humor] || 3), 0) / recent.length;
-  }, [allRecords]);
-
   const todayStr = new Date().toISOString().split('T')[0];
   const selectedMoodAddictionId = moodCheckIn.vicio_id || (addictions[0]?.id ? String(addictions[0].id) : '');
   const todayMoodRecord = useMemo(
-    () => allRecords.find(r => r.data_registro === todayStr && r.humor),
+    () => allRecords.find(r => String(r.data_registro).slice(0, 10) === todayStr && r.humor),
     [allRecords, todayStr]
   );
   const todayMoodOption = moodOptions.find(option => option.value === todayMoodRecord?.humor);
@@ -153,6 +110,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <ProgressNotice progress={progress} />
       <RecaidaModal
         isOpen={recaidaVicio !== null}
         onClose={() => setRecaidaVicio(null)}
@@ -166,7 +124,7 @@ export default function DashboardPage() {
         <article className="revive-hero min-h-[430px] p-7 sm:p-10">
           <div className="relative z-[1] min-h-[360px] flex flex-col justify-between gap-10">
             <div className="flex items-center justify-between gap-4">
-              <span className="revive-tag">Jornada em tempo real</span>
+              <span className="revive-tag">Sua jornada</span>
               <button
                 type="button"
                 onClick={() => navigate('/analytics')}
@@ -187,13 +145,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <HeroKpis
-              totalDiasLimpos={totalDiasLimpos}
-              totalEconomizado={totalEconomizado}
-              maiorStreak={maiorStreak}
-              metasConcluidas={metasConcluidas}
-              moodTrend={moodTrend}
-            />
+            <HeroKpis progress={progress} />
           </div>
         </article>
 
@@ -317,10 +269,10 @@ export default function DashboardPage() {
       {addictions.length === 0 && !loading ? (
         <EmptyState
           icon={Heart}
-          title="Nenhum hábito cadastrado"
-          description="Comece sua jornada adicionando o primeiro hábito que deseja controlar."
+          title="Nenhum hábito ativo disponível"
+          description="Cadastre um hábito para acompanhar uma sequência ativa. O histórico dos arquivados permanece nos relatórios."
           action={openNewAddictionWizard}
-          actionLabel="Cadastrar primeiro hábito"
+          actionLabel="Cadastrar hábito"
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">

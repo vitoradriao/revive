@@ -619,6 +619,16 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider
       value={{
+        progressSource: {
+            data: offlineClient && offline.snapshot?.data?.usuario?.id === user?.id
+                && offline.accountKey === accountKey ? offline.snapshot.data : undefined,
+            loading: offline.loading,
+            error: offline.error,
+            localOnly: offline.localOnly,
+            queue: offline.accountKey === accountKey ? offline.queue || [] : [],
+            updatedAt: offline.accountKey === accountKey ? offline.snapshot?.updatedAt : undefined,
+            stale: offline.accountKey === accountKey && offline.snapshot?.staleAfterMutation,
+        },
         addictions,
         selectedAddiction,
         setSelectedAddiction,
