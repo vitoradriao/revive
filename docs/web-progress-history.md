@@ -66,11 +66,11 @@ REVIVE_BROWSER_ARTIFACTS=/tmp/revive-progress-evidence npm run test:browser:prog
 
 A [suíte de navegador](../tests/browser/progress-ui.cjs) usa build de produção, autenticação HTTP da fixture existente e snapshots exclusivamente sintéticos gerados pelas métricas canônicas. Verifica cinco telas, arquivo JSON, arquivamento, legado, A/B e intenção offline no IndexedDB real. Produz seis capturas por navegador: cinco páginas e dashboard offline. O service worker é desabilitado nessa suíte para interceptar os snapshots sintéticos; a reabertura com shell offline continua nas suítes já existentes da #58. A RPC e os snapshots são sintéticos: essa execução não é prova de banco real nem de homologação em produção.
 
-`npm run test:browser` inclui essa regressão nas três engines. No CI, as imagens geradas são anexadas ao artefato `progresso-web-sintetico`. Não há captura ou execução de CI confirmada desta branch neste registro.
+`npm run test:browser` inclui essa regressão nas três engines. Para guardar as imagens, defina `REVIVE_BROWSER_ARTIFACTS`. Não há captura ou execução de CI confirmada desta branch neste registro.
 
-Verificações locais de 22/10/2026: 80 testes unitários web e 55 de integração web aprovados; build e lint aprovados. A verificação documental inclui arquivos novos não ignorados na árvore de trabalho, preservando a conferência exata de caminhos e acentos antes do commit. A paridade importa somente domínio puro do mobile, com configuração de transformação exclusiva do Vitest, sem instalar ou modificar o aplicativo.
+Verificações locais de 22/10/2026: `npm run validate` aprovado (API: 23 unitários e 57 de integração; painel: 80 unitários e 55 de integração; documentação e build) e `npm run lint:web` aprovado. A paridade importa somente domínio puro do mobile, com configuração de transformação exclusiva do Vitest, sem instalar ou modificar o aplicativo.
 
-Limites do ambiente local: Node.js disponível 20.19.2, abaixo do mínimo do projeto; portas locais recusadas com `listen EPERM`, impedindo integração HTTP/SMTP e navegador real. O navegador instalado também foi impedido de iniciar por restrição de sockets. `npm run validate` não pode ser declarado aprovado: a integração API precisa de execução em ambiente suportado. Não foram produzidas capturas locais. Testes unitários e jsdom não substituem IndexedDB real, navegador ou avaliação com leitor de tela humano.
+A suíte de navegador desta entrega não foi executada localmente e não há capturas locais; ela roda no job de navegadores do CI. Testes unitários e jsdom não substituem IndexedDB real, navegador ou avaliação com leitor de tela humano.
 
 Banco e mobile: sem alterações de SQL, API de produção ou código mobile; validação própria do mobile e PostgreSQL real não se aplica à área alterada. As respectivas regressões permanecem nos jobs existentes do CI. Leitor de tela humano e homologação física não foram executados.
 
