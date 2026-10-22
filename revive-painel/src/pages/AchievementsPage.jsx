@@ -38,7 +38,7 @@ export default function AchievementsPage() {
       </div>
 
       <ProgressNotice progress={history} />
-      {history.awards === undefined && <p className="text-muted">Histórico legado: conquistas permanentes indisponíveis nesta cópia.</p>}
+      {history.available && history.awards === undefined && <p className="text-muted">Histórico legado: conquistas permanentes indisponíveis nesta cópia.</p>}
       {/* Resumo dos marcos disponíveis */}
       <div className={`${glassSurface} rounded-3xl p-6`}>
         <div className="flex items-center gap-4 mb-2">

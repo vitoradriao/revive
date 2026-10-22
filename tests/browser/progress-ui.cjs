@@ -84,6 +84,7 @@ const login = async (page, email) => {
             mode = { legacy: true };
             await page.goto(base + '/conquistas');
             await page.getByText(/Histórico legado/).waitFor();
+            await page.getByText('Indisponível', { exact: true }).first().waitFor();
             assert.equal(await page.getByText('Conquista permanente', { exact: true }).count(), 0);
             mode = {};
             await page.getByRole('button', { name: 'Sair', exact: true }).click();
@@ -114,4 +115,4 @@ const login = async (page, email) => {
         }
     }
     console.log(JSON.stringify(results, null, 2));
-})().catch(error => { console.error(error.message); process.exitCode = 1; });
+})().catch(error => { console.error(error.stack); process.exitCode = 1; });
