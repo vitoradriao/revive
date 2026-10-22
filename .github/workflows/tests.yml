@@ -120,4 +120,11 @@ jobs:
           vite_pid=$!
           trap 'kill "$fixture_pid" "$vite_pid" 2>/dev/null || true' EXIT
           node -e 'const pause=()=>new Promise(r=>setTimeout(r,250)); (async()=>{for(let n=0;n<120;n++){try{if((await fetch("http://127.0.0.1:4177")).ok && (await fetch("http://127.0.0.1:3177/__test/status")).ok)return}catch{}await pause()}throw Error("Browser fixtures unavailable")})().catch(e=>{console.error(e.message);process.exitCode=1})'
-          npm run test:browser
+          REVIVE_BROWSER_ARTIFACTS="$RUNNER_TEMP/revive-browser-artifacts" npm run test:browser
+      - name: Guardar capturas sintéticas do progresso web
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progresso-web-sintetico
+          path: ${{ runner.temp }}/revive-browser-artifacts/progresso-*.png
+          if-no-files-found: ignore
