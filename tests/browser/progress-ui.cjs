@@ -39,7 +39,8 @@ const login = async (page, email) => {
             });
             const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: 'pt-BR', acceptDownloads: true, serviceWorkers: 'block' });
             const page = await context.newPage();
-            page.on('pageerror', error => errors.push(error.message));
+            let offlineSince = null;
+            page.on('pageerror', error => errors.push({ message: error.message, offline: offlineSince !== null }));
             await page.clock.setFixedTime(new Date('2026-02-02T12:00:00Z'));
             let mode = {};
             await context.route('**/api/v2/bootstrap', async route => {
@@ -99,6 +100,7 @@ const login = async (page, email) => {
             await heatmap.getByText('Consultar atividade em texto', { exact: true }).click();
             await heatmap.getByText('2026-02-01: 2 registro(s) de check-in; com recaída registrada.', { exact: true }).waitFor();
             await context.setOffline(true);
+            offlineSince = Date.now();
             await page.getByRole('button', { name: 'Selecione como você está...' }).click();
             await page.getByRole('button', { name: /Bom/ }).click();
             await page.getByRole('button', { name: 'Salvar humor de hoje', exact: true }).click();
@@ -107,7 +109,11 @@ const login = async (page, email) => {
             assert.match(await notice.textContent(), /Offline/);
             assert.equal(await heatmap.getByText('2/28 dias com check-in. Uma recaída não remove a presença.', { exact: true }).count(), 1);
             if (output) await page.screenshot({ path: path.join(output, `progresso-offline-${engine}.png`), fullPage: true, animations: 'disabled' });
-            assert.deepEqual(errors, []);
+            // O WebKit no Linux relata a falha de rede intencional como erro de controle de acesso.
+            const unexpected = errors.filter(error => !(engine === 'webkit' && error.offline
+                && ['bootstrap', 'registros'].some(endpoint => error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/${endpoint} due to access control checks.`))))
+                .map(error => error.message);
+            assert.deepEqual(unexpected, []);
             results.push({ engine, passed: true, scenarios: ['five-pages', 'reset-record', 'permanent-awards', 'archive', 'legacy', 'partial-export', 'account-switch', 'offline-pending', 'accessible-heatmap'] });
         } finally {
             await browser?.close();
