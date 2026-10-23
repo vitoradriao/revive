@@ -135,6 +135,8 @@ it('exclui arquivados da quantidade ativa e os preserva no relatório', () => {
 });
 
 it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendências', async () => {
+    const marker = 'synthetic-private-marker';
+    state.source.data.vicios[0].motivo_pessoal = marker;
     const blobs = [];
     URL.createObjectURL = vi.fn(blob => { blobs.push(blob); return 'blob:synthetic'; });
     URL.revokeObjectURL = vi.fn();
@@ -144,6 +146,9 @@ it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendênci
     fireEvent.click(screen.getByText('Exportar dados'));
     const read = blob => new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsText(blob); });
     const json = JSON.parse(await read(blobs[0]));
+    expect(JSON.stringify(json).includes(marker)).toBe(false);
+    expect(JSON.stringify(json).includes('motivo_pessoal')).toBe(false);
+    expect(state.source.data.vicios[0].motivo_pessoal === marker).toBe(true);
     expect(json.coverage).toBe('partial');
     expect(json.pendingCount).toBe(1);
     expect(json.registros).toHaveLength(3);
@@ -152,6 +157,8 @@ it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendênci
     mount(ReportsPage);
     fireEvent.click(screen.getByRole('button', { name: 'Exportar registros disponíveis em CSV' }));
     const csv = await read(blobs[1]);
+    expect(csv.includes(marker)).toBe(false);
+    expect(csv.includes('motivo_pessoal')).toBe(false);
     expect(csv).toContain('Cobertura');
     expect(csv).toContain('Cópia parcial');
     expect(csv).not.toContain('2026-02-03');

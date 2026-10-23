@@ -1,3 +1,4 @@
+import { normalizePersonalReason, personalReasonLength } from './personalReason';
 import { validateHabitForm } from './habitForm';
 
 export function createHabitDraft(habit) {
@@ -5,6 +6,7 @@ export function createHabitDraft(habit) {
         habitId: habit.id,
         base: { ...habit },
         values: {
+            personalReason: habit.motivo_pessoal || '',
             name: habit.nome_vicio,
             startDate: habit.data_inicio.slice(0, 10),
             dailySavings: Number(habit.valor_economizado_por_dia || 0).toFixed(2).replace('.', ',')
@@ -25,6 +27,12 @@ export function habitEditPatch(draft) {
     if (payload.data_inicio !== draft.base.data_inicio.slice(0, 10)) {
         if (!draft.base.inicio_editavel) throw new Error('A data de início não pode mudar após histórico. Preserve a data remota antes de salvar.');
         patch.data_inicio = payload.data_inicio;
+    }
+    // Rascunhos anteriores não têm este campo e nunca removem o valor remoto.
+    if (draft.values.personalReason !== undefined) {
+        const reason = normalizePersonalReason(draft.values.personalReason);
+        if (personalReasonLength(reason) > 1000 || (reason || '').includes('\0') || /[\uD800-\uDFFF]/u.test(reason || '')) throw new Error('Use até 1000 caracteres válidos no motivo pessoal, sem truncamento.');
+        if (reason !== (draft.base.motivo_pessoal || null)) patch.motivo_pessoal = reason;
     }
     return patch;
 }

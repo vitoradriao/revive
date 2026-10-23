@@ -5,6 +5,7 @@ import { createHabitDraft, habitEditPatch } from '../../utils/habitEdit';
 import { localDateKey } from '../../utils/habitForm';
 import { fieldBase, glassSurface } from '../../utils/constants';
 import Button from '../ui/Button';
+import { personalReasonLength } from '../../utils/personalReason';
 
 export default function HabitManagement({ habit, accountKey }) {
     const { client, localOnly } = useOffline();
@@ -109,8 +110,17 @@ export default function HabitManagement({ habit, accountKey }) {
         <p>A nova economia vale a partir da confirmação. Os valores anteriores permanecem no histórico.</p>
         {localOnly && <p role="status">Conecte-se para editar, arquivar ou reativar. O rascunho local não é uma alteração confirmada.</p>}
         {!draft.base.revision && <p role="status">Consulte o estado remoto para habilitar a edição.</p>}
+        <div aria-label="Motivo pessoal sincronizado" className="space-y-2">
+            <h3 className="font-semibold">Motivo pessoal</h3>
+            <p className="whitespace-pre-wrap break-words">{habit.motivo_pessoal || 'Nenhum motivo pessoal salvo.'}</p>
+            <p>Privado, opcional e disponível offline na última versão sincronizada. Não aparece em notificações ou exportações padrão.</p>
+        </div>
         <form onSubmit={save} className="space-y-4">
             <fieldset disabled={busy || reviewing} className="space-y-4">
+                <label className="block">Motivo pessoal (opcional)<textarea className={fieldBase} rows={5} value={draft.values.personalReason ?? ''} aria-describedby="personal-reason-help personal-reason-count" aria-invalid={personalReasonLength(draft.values.personalReason) > 1000} onChange={event => change('personalReason', event.target.value)} /></label>
+                <p id="personal-reason-help">Deixe vazio para remover. A alteração exige conexão; o rascunho fica neste navegador até a confirmação.</p>
+                <p id="personal-reason-count" role="status">{personalReasonLength(draft.values.personalReason)} / 1000 caracteres</p>
+                <Button type="button" onClick={() => change('personalReason', '')}>Limpar motivo pessoal</Button>
                 <label className="block">Nome do hábito<input className={fieldBase} value={draft.values.name} maxLength={120} onChange={event => change('name', event.target.value)} /></label>
                 <label className="block">Economia diária (R$)<input className={fieldBase} inputMode="decimal" value={draft.values.dailySavings} onChange={event => change('dailySavings', event.target.value)} /></label>
                 <label className="block">Data de início<input className={fieldBase} type="date" max={localDateKey()} disabled={!draft.base.inicio_editavel} value={draft.values.startDate} onChange={event => change('startDate', event.target.value)} /></label>
@@ -122,9 +132,11 @@ export default function HabitManagement({ habit, accountKey }) {
             {error && <p role="alert">{error}</p>}
             {reviewing && <div className="border rounded-xl p-4 space-y-3" role="region" aria-label="Revisão da edição">
                 <p>Seu rascunho: {draft.values.name} · R$ {draft.values.dailySavings} · início {draft.values.startDate}</p>
+                <p className="whitespace-pre-wrap break-words">Motivo no rascunho: {draft.values.personalReason || 'Sem conteúdo'}</p>
                 {draft.attempted?.ativo !== undefined && <p>Ação solicitada: {draft.attempted.ativo ? 'reativar' : 'arquivar'}.</p>}
                 {remote && <>
                     <p>Versão remota (revisão {remote.revision}): {remote.nome_vicio} · R$ {Number(remote.valor_economizado_por_dia).toFixed(2)} · início {remote.data_inicio.slice(0, 10)} · {remote.ativo === false ? 'Arquivado' : 'Ativo'}</p>
+                    <p className="whitespace-pre-wrap break-words">Motivo remoto: {remote.motivo_pessoal || 'Sem conteúdo'}</p>
                     <div className="flex flex-wrap gap-3"><Button type="button" disabled={disabled} onClick={() => rebase(false)}>Manter rascunho e revisar com esta versão</Button>
                     <Button type="button" disabled={disabled} onClick={() => rebase(true)}>Substituir rascunho pela versão remota</Button></div>
                 </>}

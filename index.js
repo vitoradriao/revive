@@ -58,6 +58,7 @@ const { buildProgressSnapshot } = require('./progress-metrics');
 
 /** Instância principal do Express */
 const app = express();
+app.use('/api', require('./habit-edit').privateHabitResponse);
 
 /** Porta em que o servidor HTTP escutará (padrão: 3000) */
 const PORT = process.env.PORT || 3000;

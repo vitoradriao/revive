@@ -4,7 +4,7 @@ const { validateRecordFields, parseRecordCursor } = require('./diary-records');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { buildProgressSnapshot, observedAccountAwards, observedAwards } = require('./progress-metrics');
-const { validateHabitPatch, listEditableHabits, habitEditMessages } = require('./habit-edit');
+const { privateHabitResponse, validateHabitPatch, listEditableHabits, habitEditMessages } = require('./habit-edit');
 const { readCredentialVersion } = require('./credential-auth');
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
@@ -93,6 +93,7 @@ function calculateStats(addiction) {
 function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true', webSecureCookies = process.env.NODE_ENV === 'production', webAuthEnabled = process.env.WEB_AUTH_ENABLED === 'true' }) {
     if (!jwtSecret) throw new Error('JWT_SECRET e obrigatorio para a API mobile');
     const router = express.Router();
+    router.use(privateHabitResponse);
     const webAuth = createWebAuthTransport({ secure: webSecureCookies });
 
     router.use((req, res, next) => {
@@ -414,7 +415,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
                 mensagem: messages.length ? messages[Math.floor(Math.random() * messages.length)] : null
             });
         } catch (error) {
-            console.error('mobile bootstrap failed', { code: error?.code, message: error?.message });
+            console.error('mobile bootstrap failed', { code: error?.code });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel carregar seus dados.');
         }
     });

@@ -109,6 +109,15 @@ const results = [];
         const reopenedDiary = await api.openAccountDatabase(D);
         if ((await reopenedDiary.getQueue())[0].id !== replacement.id || (await reopenedDiary.getRecordDraft('synthetic-draft')).values.observacoes !== record.observacoes) throw Error('diary recovery lost text');
         reopenedDiary.close();
+        const E = '00000000-0000-4000-8000-000000000015';
+        const privateStore = await api.openAccountDatabase(E);
+        await privateStore.saveSnapshot({ usuario: { id: E }, vicios: [{ id: ids.habit, motivo_pessoal: 'synthetic-private-marker' }], registros: [], metas: [], recaidas: [] });
+        await privateStore.saveHabitDraft('deleted', { habitId: ids.habit, values: { personalReason: 'synthetic-private-marker' } });
+        await privateStore.saveHabitDraft('kept', { habitId: 'other', values: { personalReason: 'synthetic-other' } });
+        await privateStore.enqueue('record.create', { vicio_id: 'other' }, { id: crypto.randomUUID() });
+        await privateStore.removeHabit(ids.habit);
+        if (await privateStore.getHabitDraft('deleted') || (await privateStore.getSnapshot()).data.vicios.length || !await privateStore.getHabitDraft('kept') || (await privateStore.getQueue()).length !== 1) throw Error('habit removal did not isolate private content');
+        privateStore.close();
         const C = '00000000-0000-4000-8000-000000000013';
         await seed(C);
         const oldConnection = await new Promise((resolve, reject) => {
@@ -131,7 +140,7 @@ const results = [];
         let oldClosed = false;
         try { await recovered.getQueue(); } catch (error) { oldClosed = error.code === 'STORAGE_VERSION_CHANGED'; }
         if (!versionChanged || !oldClosed) throw Error('old connection still accepts work after upgrade');
-        return { conflictReplacementAtomic: true, diaryDraftReopened: true, preservedLegacy: true, receiptAtomic: true, dependencyBound: true, pagePreserved: true, accountIsolation: true, abortedUpgradePreserved: true, unavailableStorageRejected: true, pendingCleanupRejected: true, blockedUpgradePreserved: true, oldConnectionClosed: true };
+        return { personalReasonRemovalIsolated: true, conflictReplacementAtomic: true, diaryDraftReopened: true, preservedLegacy: true, receiptAtomic: true, dependencyBound: true, pagePreserved: true, accountIsolation: true, abortedUpgradePreserved: true, unavailableStorageRejected: true, pendingCleanupRejected: true, blockedUpgradePreserved: true, oldConnectionClosed: true };
       }, { modulePath, A, B, ids });
       assert.equal(Object.values(first).every(Boolean), true);
       await context.close(); context = await playwright[engine].launchPersistentContext(profile, options);

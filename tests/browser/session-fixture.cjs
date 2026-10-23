@@ -6,6 +6,7 @@ const { createMobileApi } = require('../../mobile-api');
 const { createCredentialAuth } = require('../../credential-auth');
 const { fakeSupabase } = require('../helpers/session-database.cjs');
 const app = express();
+app.use('/api', require('../../habit-edit').privateHabitResponse);
 app.use(express.json());
 let networkUnavailable = false;
 app.post('/__test/network', (req, res) => { networkUnavailable = req.body.offline === true; res.sendStatus(204); });
@@ -26,7 +27,7 @@ const receipts = new Map();
 let dropNextResponse = false, dropRecordResponses = false, dropUrgeResponses = false, holdUrgeResponses = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
-    nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
+    motivo_pessoal: null, nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
 }));
 const initialHabits = structuredClone(habits);
 let goalTransport = 'normal', failGoalDelete = false, revokeOnGoalWrite = false;
