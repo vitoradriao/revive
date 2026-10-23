@@ -128,13 +128,51 @@ describe('gerenciamento de hábitos no painel', () => {
         let finish;
         state.offline.client.manageHabit.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
         const view = renderEditor(); await ready(); await saveDraft('Nome do hábito', 'Texto A');
+        await saveDraft('Motivo pessoal (opcional)', 'synthetic-private-a');
         fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
         await waitFor(() => expect(finish).toBeTypeOf('function'));
         state.offline.client.getHabitDraft.mockResolvedValue(null);
-        view.rerender(<MemoryRouter><HabitManagement key="account-b" accountKey="account-b:generation-b" habit={{ ...fixture.data.vicios[0], nome_vicio: 'Hábito B' }} /></MemoryRouter>);
+        view.rerender(<MemoryRouter><HabitManagement key="account-b" accountKey="account-b:generation-b" habit={{ ...fixture.data.vicios[0], nome_vicio: 'Hábito B', motivo_pessoal: 'synthetic-private-b' }} /></MemoryRouter>);
         await ready(); expect(screen.getByLabelText('Nome do hábito')).toHaveValue('Hábito B');
-        await act(async () => finish({ status: 'confirmed', values: { name: 'Texto A' }, message: 'Alteração confirmada.' }));
+        await act(async () => finish({ status: 'confirmed', values: { name: 'Texto A', personalReason: 'synthetic-private-a' }, message: 'Alteração confirmada.' }));
         expect(screen.getByLabelText('Nome do hábito')).toHaveValue('Hábito B');
         expect(screen.queryByText('Alteração confirmada.')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Motivo pessoal (opcional)')).toHaveValue('synthetic-private-b');
+        expect(screen.queryByText('synthetic-private-a')).not.toBeInTheDocument();
     });
+});
+
+it('lê último motivo sincronizado offline e preserva rascunho acima do limite sem enviar', async () => {
+    fixture.data.vicios[0].motivo_pessoal = 'synthetic-confirmed';
+    fixture.data.vicios[0].ativo = false;
+    state.offline.localOnly = true;
+    const view = renderEditor(); await ready();
+    expect(screen.getByLabelText('Motivo pessoal sincronizado')).toHaveTextContent('synthetic-confirmed');
+    expect(screen.getByRole('button', { name: 'Salvar alterações' })).toBeDisabled();
+    state.offline.localOnly = false; view.unmount(); renderEditor(); await ready();
+    await saveDraft('Motivo pessoal (opcional)', '😀'.repeat(1001));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('1000');
+    expect([...screen.getByLabelText('Motivo pessoal (opcional)').value]).toHaveLength(1001);
+    expect(state.offline.client.manageHabit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar motivo pessoal' }));
+    await waitFor(() => expect(screen.queryByText('Salvando rascunho neste navegador…')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    await screen.findByText('Alteração confirmada. Histórico, metas e conquistas foram preservados.');
+    expect(fixture.data.vicios[0].motivo_pessoal).toBeNull();
+    expect(fixture.data.vicios[0].ativo).toBe(false);
+});
+
+it('preserva e compara o motivo pessoal em conflito após reload', async () => {
+    const view = renderEditor(); await ready();
+    await saveDraft('Motivo pessoal (opcional)', 'synthetic-draft');
+    Object.assign(fixture.data.vicios[0], { motivo_pessoal: 'synthetic-remote', revision: 2 });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    const region = await screen.findByRole('region', { name: 'Revisão da edição' });
+    expect(region).toHaveTextContent('synthetic-draft');
+    expect(region).toHaveTextContent('synthetic-remote');
+    view.unmount(); renderEditor(); await ready();
+    expect(screen.getByLabelText('Motivo pessoal (opcional)')).toHaveValue('synthetic-draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Substituir rascunho pela versão remota' }));
+    await waitFor(() => expect(screen.getByLabelText('Motivo pessoal (opcional)')).toHaveValue('synthetic-remote'));
 });

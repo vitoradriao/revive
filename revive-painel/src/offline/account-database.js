@@ -246,7 +246,14 @@ function accountStore(db, userId, onVersionChange) {
     };
   });
   return {
-    removeHabit: id => run(['snapshots', 'pages'], 'readwrite', tx => {
+    removeHabit: id => run(['snapshots', 'pages', 'meta'], 'readwrite', tx => {
+      const meta = tx.objectStore('meta');
+      meta.openCursor().onsuccess = event => {
+        const cursor = event.target.result;
+        if (!cursor) return;
+        if (String(cursor.key).startsWith('habitDraft:') && cursor.value.value?.habitId === id) cursor.delete();
+        cursor.continue();
+      };
       for (const name of ['snapshots', 'pages']) {
         const rows = tx.objectStore(name);
         rows.getAll().onsuccess = event => {

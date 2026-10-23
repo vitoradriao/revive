@@ -2,7 +2,7 @@ import { API_BASE } from '../config/env';
 
 export async function httpRequest(endpoint, options = {}, token = null) {
   const { expectedStatus, ...fetchOptions } = options;
-  const headers = { Accept: 'application/json', 'Content-Type': 'application/json', ...options.headers };
+  const headers = { Accept: 'application/json', 'X-Revive-Include-Personal-Reason': 'true', 'Content-Type': 'application/json', ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
   let response, text;
   try {

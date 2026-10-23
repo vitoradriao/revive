@@ -26,6 +26,7 @@ import HeroKpis from '../components/dashboard/HeroKpis';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { glassSurface, screenTransition } from '../utils/constants';
+import { exportHabit } from '../utils/personalReason';
 
 /**
  * Componente da pagina de Perfil.
@@ -48,7 +49,7 @@ export default function ProfilePage() {
    * Cria Blob com JSON formatado (2 espacos) e dispara download via <a> programatico.
    */
   const exportData = () => {
-    const data = { addictions, goals, registros: allRecords, relapses, conquistas: progress.awards, coverage: 'partial', scope: progress.scope, consolidatedAt: progress.updatedAt, pendingCount: progress.pendingCount, exportedAt: new Date().toISOString() };
+    const data = { addictions: addictions.map(exportHabit), goals, registros: allRecords, relapses, conquistas: progress.awards, coverage: 'partial', scope: progress.scope, consolidatedAt: progress.updatedAt, pendingCount: progress.pendingCount, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

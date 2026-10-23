@@ -3,8 +3,14 @@
  * /api/v2/vicios/{id}:
  *   patch:
  *     summary: Editar, arquivar ou reativar hábito com revisão
+ *     description: motivo_pessoal privado é opcional e editável inclusive arquivado; omissão preserva, vazio/null remove. Normaliza CRLF/CR para LF e trim ECMAScript; conta pontos de código Unicode, máximo 1000, sem truncar. Respostas de toda a API omitem motivo_pessoal por padrão para proteger exportações de clientes antigos. Leituras e resposta do PATCH de hábito exigem X-Revive-Include-Personal-Reason=true e autenticação/ownership; outras mutações sempre omitem; exportações devem usar projeção explícita mesmo com este cabeçalho.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
+ *       - in: header
+ *         name: X-Revive-Include-Personal-Reason
+ *         required: false
+ *         description: Retorna o motivo privado na resposta autenticada; omitido por padrão
+ *         schema: { type: string, enum: ['true'] }
  *       - in: path
  *         name: id
  *         required: true
@@ -24,6 +30,7 @@
  *               data_inicio: { type: string, format: date, description: Início UTC; correção apenas sem histórico dependente }
  *               valor_economizado_por_dia: { type: number, minimum: 0, maximum: 99999999.99, multipleOf: 0.01 }
  *               ativo: { type: boolean, description: false arquiva e true reativa sem apagar histórico }
+ *               motivo_pessoal: { type: string, nullable: true, maxLength: 1000, description: Texto privado; vazio remove e omissão preserva }
  *     responses:
  *       '200':
  *         description: Alteração confirmada; vicio contém revision incrementada
@@ -92,6 +99,7 @@
  *       properties:
  *         ativo: { type: boolean }
  *         revision: { type: integer, minimum: 1 }
+ *         motivo_pessoal: { type: string, nullable: true, maxLength: 1000, description: Presente apenas com X-Revive-Include-Personal-Reason=true; nunca exportar DTO bruto }
  *         inicio_editavel: { type: boolean, description: Disponível no bootstrap; banco revalida no PATCH }
  *         id:
  *           type: string
@@ -272,6 +280,12 @@
  *   get:
  *     tags: [Mobile v2]
  *     summary: Carrega o snapshot inicial e métricas históricas do usuário
+ *     parameters:
+ *       - in: header
+ *         name: X-Revive-Include-Personal-Reason
+ *         required: false
+ *         description: Capacidade de leitura privada; omitir em clientes que exportam DTO bruto. Não habilita exportação seletiva (#27).
+ *         schema: { type: string, enum: ['true'] }
  *     description: Mantém dias_abstinencia e valor_economizado para clientes antigos; em cada vício, progresso informa sequência atual, recorde, dias distintos com check-in, economia estimada e marcos permanentes com cobertura confirmada, inferida ou desconhecida.
  *     security:
  *       - bearerAuth: []

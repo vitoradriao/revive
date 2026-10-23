@@ -161,3 +161,28 @@ it('paginates urge events with a validated stable cursor and explicit selection 
     expect(second.body.vontades[0].id).not.toBe(first.body.vontades[0].id);
     expect(calls.at(-1).args.p_cursor_id).toBe(first.body.vontades[0].id);
 });
+
+it('normalizes a reason for the owner/revision RPC while default DTOs omit private content', async () => {
+    const { app, token, calls } = createApp();
+    const path = '/api/v2/vicios/10000000-0000-4000-8000-000000000001';
+    const patch = header => {
+        const call = request(app).patch(path).set('Authorization', `Bearer ${token}`);
+        if (header) call.set('X-Revive-Include-Personal-Reason', 'true');
+        return call.send({ revision: 3, motivo_pessoal: '  synthetic-private-marker\r\nlinha  ' });
+    };
+    const legacy = await patch(false);
+    expect(legacy.status).toBe(200);
+    expect(JSON.stringify(legacy.body).includes('synthetic-private-marker')).toBe(false);
+    const web = await patch(true);
+    expect(web.status).toBe(200);
+    expect(web.body.vicio.motivo_pessoal === 'synthetic-private-marker\nlinha').toBe(true);
+    expect(calls[0].args).toMatchObject({ p_usuario_id: 'user-1', p_revision: 3 });
+    expect(calls[0].args.p_patch.motivo_pessoal === web.body.vicio.motivo_pessoal).toBe(true);
+    expect(web.headers['cache-control']).toBe('no-store');
+    expect(web.headers.vary).toContain('X-Revive-Include-Personal-Reason');
+    const oversized = await request(app).patch(path).set('Authorization', `Bearer ${token}`)
+        .send({ revision: 3, motivo_pessoal: '😀'.repeat(1001) });
+    expect(oversized.status).toBe(422);
+    expect(calls).toHaveLength(2);
+    expect(oversized.body.campos).toHaveProperty('motivo_pessoal');
+});
