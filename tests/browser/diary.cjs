@@ -203,8 +203,13 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             await page.getByRole('button', { name: 'Sair', exact: true }).click();
             await login(page, 'b@example.invalid');
             assert.equal(await page.getByText('Correção sintética final', { exact: true }).count(), 0);
-            // Linux WebKit may report failed offline fetches through pageerror; unrelated script failures still fail.
-            const unexpected = errors.filter(error => !(engine === 'webkit' && (failedReads.has(error.message.trim()) || error.expectedNetworkFailure && /\/api\/v2\/(bootstrap|registros|web-auth\/refresh).*due to access control checks\.$/.test(error.message))));
+            // Linux WebKit may omit requestfailed during navigation/reload; accept only known local read diagnostics.
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|(?:registros|vontades)\?[^\s#]+) due to access control checks\.$`);
+            const unexpected = errors.filter(error => !(engine === 'webkit' && (
+                [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
+                || interruptedRead.test(error.message.trim())
+                || error.expectedNetworkFailure && error.message.trim().endsWith(`/127.0.0.1:${port}/api/v2/web-auth/refresh due to access control checks.`)
+            )));
             assert.deepEqual(unexpected, []);
             results.push({ engine, browserVersion: browser.version(), midnight: true, offlineCreateUpdateReload: true, lostResponseReplay: true, canonicalId: true,
                 nativeSessionConflict: true, localAfterReload: true, explicitReapply: true, pagination: true, legacy: true, archived: true, keyboard: true, accountIsolation: true });

@@ -128,9 +128,11 @@ const waitEnabled = locator => locator.evaluate(element => new Promise(resolve =
             const status = await (await fetch(base + '/__test/status')).json();
             assert.equal(status.events.registros, 1);
             // O WebKit no Linux relata como controle de acesso leituras GET interrompidas por navegação ou reload;
-            // só são aceitas mensagens que correspondem a uma requisição de fato falha nesta suíte.
+            // requestfailed pode não chegar. O fallback limita o diagnóstico às leituras da origem local desta suíte.
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros\?[^\s#]+) due to access control checks\.$`);
             assert.deepEqual(errors.filter(message => !(engine === 'webkit'
-                && [...failedReads].some(diagnostic => message.trim().endsWith(diagnostic)))), []);
+                && ([...failedReads].some(diagnostic => message.trim().endsWith(diagnostic))
+                    || interruptedRead.test(message.trim())))), []);
             results.push({ engine, concurrency: true, draftAfterReload: true, archive: true, reactivation: true, recoveredEvent: true, focus: true });
             await context.close();
         } finally {

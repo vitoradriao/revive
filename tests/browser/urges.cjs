@@ -250,7 +250,13 @@ const verifyStorageIsolation = async context => {
             await page.goto(base + '/calendario');
             await page.getByText('Nenhuma vontade neste período nos dados disponíveis.', { exact: true }).waitFor();
             assert.equal(await page.getByText('Nota sintética', { exact: false }).count(), 0);
-            const unexpected = errors.filter(error => !(engine === 'webkit' && (failedReads.has(error.message.trim()) || error.expectedNetworkFailure && /\/api\/v2\/(bootstrap|vontades|web-auth\/refresh).*due to access control checks\.$/.test(error.message))));
+            // Linux WebKit may omit requestfailed during navigation/reload; accept only known local read diagnostics.
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|(?:registros|vontades)\?[^\s#]+) due to access control checks\.$`);
+            const unexpected = errors.filter(error => !(engine === 'webkit' && (
+                [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
+                || interruptedRead.test(error.message.trim())
+                || error.expectedNetworkFailure && error.message.trim().endsWith(`/127.0.0.1:${port}/api/v2/web-auth/refresh due to access control checks.`)
+            )));
             assert.deepEqual(unexpected, []);
             const storage = await verifyStorageIsolation(context);
             results.push({ ...storage, engine, browserVersion: browser.version(), offlineReload: true, lostCommitResponse: true, timeoutAfterCommit: true, sameKeyReplay: true, transactionalReceipt: true,
