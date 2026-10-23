@@ -13,6 +13,11 @@ describe('HTTP session transport semantics', () => {
     }));
   });
 
+  it('requires the declared deletion status before confirming cleanup', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    await expect(httpRequest('/v2/account', { method: 'DELETE', expectedStatus: 204 })).rejects.toMatchObject({ code: 'RESPOSTA_INVALIDA', outcomeUnknown: true });
+  });
+
   it.each([401, 409, 422, 429, 503])('preserves status %i and server details', async status => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       codigo: 'SYNTHETIC_CODE', mensagem: 'Mensagem de teste',

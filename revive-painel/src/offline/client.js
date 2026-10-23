@@ -5,6 +5,7 @@ import { openAccountDatabase } from './account-database';
 import { createSyncCoordinator } from './sync-coordinator';
 
 const POINTER = 'revive_offline_account';
+const CLEANUP_PREFIX = 'revive_confirmed_cleanup:';
 const changed = () => Object.assign(new Error('A conta mudou. Reabra a operação.'), { code: 'SESSAO_ALTERADA' });
 let singleton;
 export function getOfflineClient() { return singleton ||= createOfflineClient(); }
@@ -15,6 +16,27 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
   let store, coordinator, generation = 0, currentKey, started = false, closing = false, refreshPromise, refreshKey;
   const publish = patch => { state = { ...state, ...patch }; listeners.forEach(fn => fn()); };
   const readPointer = () => { try { return JSON.parse(storage.getItem(POINTER)); } catch { return null; } };
+  const clearConfirmedAccount = async (db, { recovering = false } = {}) => {
+    // Written only after the remote operation was confirmed. Never contains credentials or content.
+    const marker = CLEANUP_PREFIX + db.userId;
+    storage.setItem(marker, 'confirmed');
+    if (readPointer()?.userId === db.userId) storage.removeItem(POINTER);
+    if (!recovering) storage.removeItem('revive_theme');
+    await db.clearAccount({ discardPending: true });
+    storage.removeItem(marker);
+  };
+  const recoverConfirmedCleanup = async () => {
+    const markers = Object.keys(storage).filter(key => key.startsWith(CLEANUP_PREFIX) && storage.getItem(key) === 'confirmed');
+    for (const marker of markers) {
+      const userId = marker.slice(CLEANUP_PREFIX.length);
+      if (!navigator.locks?.request) throw new Error('Não foi possível concluir a limpeza local. Reabra em um navegador com coordenação de abas.');
+      await navigator.locks.request('revive-sync-' + userId, async () => {
+        if (storage.getItem(marker) !== 'confirmed') return;
+        const db = await open(userId);
+        try { await clearConfirmedAccount(db, { recovering: true }); } finally { db.close(); }
+      });
+    }
+  };
   const update = async () => {
     const db = store, key = currentKey;
     if (!db) return;
@@ -63,27 +85,34 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       pointer?.epoch === auth.epoch ? pointer.userId : null;
     const userId = auth.user?.id || local;
     const key = userId ? userId + ':' + auth.epoch : null;
-    if (key === currentKey) {
+    if (key === currentKey && (store || !key)) {
       const resumed = auth.token && state.localOnly;
       publish({ localOnly: !!local || navigator.onLine === false, loading: auth.authLoading && !state.snapshot });
       if (resumed) { void sync(); void refresh(); }
+      if (!key) {
+        try { await recoverConfirmedCleanup(); }
+        catch (error) { if (key === currentKey) publish({ loading: false, error }); }
+      }
       return;
     }
     currentKey = key; const ticket = ++generation;
     coordinator?.dispose(); coordinator = null; store?.close(); store = null;
     publish({ accountKey: key, epoch: auth.epoch, loading: !!key || auth.authLoading, user: auth.user || null, snapshot: null, queue: [], receipts: [], error: null, localOnly: !!local });
-    if (!key) {
-      if (!auth.authLoading && !auth.authError) storage.removeItem(POINTER);
-      return;
-    }
     try {
+      await recoverConfirmedCleanup();
+      if (ticket !== generation) return;
+      if (!key) {
+        if (!auth.authLoading && !auth.authError) storage.removeItem(POINTER);
+        return;
+      }
       const db = await open(userId, { onVersionChange: () => {
         if (ticket === generation) publish({ error: Object.assign(new Error('O armazenamento foi atualizado em outra aba. Reabra a página; suas pendências foram preservadas.'), { code: 'STORAGE_VERSION_CHANGED' }) });
       } });
       if (ticket !== generation) { db.close(); return; }
       store = db;
       coordinator = createSyncCoordinator({ store: db, session,
-        isAccountActive: () => currentKey === key && !closing,
+        isAccountActive: () => currentKey === key && !closing && session.getSnapshot().epoch === auth.epoch &&
+          (!session.isCurrentEpoch || session.isCurrentEpoch(auth.epoch)),
         onChange: () => { if (ticket === generation) void update().catch(error => { if (ticket === generation) publish({ error }); }); }
       });
       await update();
@@ -249,23 +278,41 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       if (db !== store || key !== currentKey) throw changed();
       return result;
     },
-    logout: async (choice = 'check') => {
+    deleteAccount: async accountKey => {
       const db = store, syncer = coordinator;
-      if (!db || !syncer) { await session.logout(); return true; }
+      if (!accountKey || accountKey !== currentKey || !db || !syncer || closing) throw changed();
+      return syncer.withAccountLock(async () => {
+        if (db !== store || accountKey !== currentKey || closing ||
+            session.getSnapshot().user?.id !== db.userId || accountKey !== db.userId + ':' + session.getSnapshot().epoch) throw changed();
+        closing = true;
+        try {
+          await session.deleteAccount(() => clearConfirmedAccount(db));
+          return true;
+        } finally { closing = false; void connect(); }
+      });
+    },
+    logout: async (choice = 'check') => {
+      const db = store, syncer = coordinator, key = currentKey, epoch = session.getSnapshot().epoch;
+      if (!db || !syncer) {
+        if (session.getSnapshot().user || state.user) throw new Error('Não foi possível verificar as pendências locais. Reabra a página antes de sair.');
+        await session.logout(async () => { storage.removeItem('revive_theme'); }); return true;
+      }
       if (choice === 'sync') {
         const result = await sync();
         if (result.error || result.refreshError || (await db.getQueue()).length) throw new Error('Ainda há pendências. Revise a tela de Sincronização antes de sair.');
       }
       return syncer.withAccountLock(async () => {
-        if (db !== store) throw changed();
+        if (db !== store || key !== currentKey || epoch !== session.getSnapshot().epoch) throw changed();
         const pending = await db.getQueue();
+        if (db !== store || key !== currentKey || epoch !== session.getSnapshot().epoch) throw changed();
         if (pending.length && choice !== 'discard') return false;
         closing = true;
         try {
           // Keep the handle alive until revocation is confirmed and local cleanup commits.
-          await session.logout();
-          await db.clearAccount({ discardPending: choice === 'discard' });
-          storage.removeItem(POINTER);
+          await session.logout(async () => {
+            // The queue was checked under this same lock; discard is explicit when it exists.
+            await clearConfirmedAccount(db);
+          });
           return true;
         } finally { closing = false; void connect(); }
       });

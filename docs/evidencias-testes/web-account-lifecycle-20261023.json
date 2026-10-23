@@ -1,0 +1,110 @@
+[
+  {
+    "engine": "chromium",
+    "browserVersion": "151.0.7922.34",
+    "keyboard": true,
+    "recovery": [
+      "offline",
+      "neutral SMTP/rollout",
+      "cooldown",
+      "invalid",
+      "expired",
+      "limited",
+      "unavailable",
+      "success",
+      "replay",
+      "old password rejected",
+      "profile reset invalidates both tabs"
+    ],
+    "logout": [
+      "cancel",
+      "sync failure preserved",
+      "sync success",
+      "discard",
+      "confirmed cleanup resumed after interrupted IndexedDB transaction"
+    ],
+    "deletion": [
+      "cancel",
+      "failure preserved",
+      "real timeout preserved",
+      "confirmed cleanup",
+      "cookie expired"
+    ],
+    "tabs": 2,
+    "indexedDB": "real",
+    "locks": "real",
+    "secretsPersisted": false
+  },
+  {
+    "engine": "firefox",
+    "browserVersion": "153.0",
+    "keyboard": true,
+    "recovery": [
+      "offline",
+      "neutral SMTP/rollout",
+      "cooldown",
+      "invalid",
+      "expired",
+      "limited",
+      "unavailable",
+      "success",
+      "replay",
+      "old password rejected",
+      "profile reset invalidates both tabs"
+    ],
+    "logout": [
+      "cancel",
+      "sync failure preserved",
+      "sync success",
+      "discard",
+      "confirmed cleanup resumed after interrupted IndexedDB transaction"
+    ],
+    "deletion": [
+      "cancel",
+      "failure preserved",
+      "real timeout preserved",
+      "confirmed cleanup",
+      "cookie expired"
+    ],
+    "tabs": 2,
+    "indexedDB": "real",
+    "locks": "real",
+    "secretsPersisted": false
+  },
+  {
+    "engine": "webkit",
+    "browserVersion": "26.5",
+    "keyboard": true,
+    "recovery": [
+      "offline",
+      "neutral SMTP/rollout",
+      "cooldown",
+      "invalid",
+      "expired",
+      "limited",
+      "unavailable",
+      "success",
+      "replay",
+      "old password rejected",
+      "profile reset invalidates both tabs"
+    ],
+    "logout": [
+      "cancel",
+      "sync failure preserved",
+      "sync success",
+      "discard",
+      "confirmed cleanup resumed after interrupted IndexedDB transaction"
+    ],
+    "deletion": [
+      "cancel",
+      "failure preserved",
+      "real timeout preserved",
+      "confirmed cleanup",
+      "cookie expired"
+    ],
+    "tabs": 2,
+    "indexedDB": "real",
+    "locks": "real",
+    "secretsPersisted": false
+  }
+]

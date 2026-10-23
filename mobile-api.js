@@ -423,6 +423,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
         try {
             const { error } = await supabase.rpc('delete_revive_account', { p_usuario_id: req.usuarioId });
             if (error) throw error;
+            webAuth.clear(res);
             return res.status(204).send();
         } catch (error) {
             console.error('mobile account deletion failed', { code: error?.code, message: error?.message });

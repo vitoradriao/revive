@@ -22,6 +22,7 @@ export function createSessionManager(environment = {}) {
   // IDs only coordinate generations; they are never authentication credentials.
   const newId = () => crypto.randomUUID?.() || `tab-${Date.now()}-${Math.random()}`;
   const id = newId();
+  const activeRequests = new Set();
   const listeners = new Set(), tokenEpochs = new Map(), peerWaiters = new Set();
   let channel, unlisten, started = false, disposed = false, restoring;
   let snapshot = { token: '', user: null, expiresAt: 0, authLoading: true, authError: null, epoch: '', revision: -1 };
@@ -41,6 +42,8 @@ export function createSessionManager(environment = {}) {
     for (const listener of listeners) listener();
   };
   const clear = (meta, error = null) => {
+    for (const controller of activeRequests) controller.abort();
+    activeRequests.clear();
     tokenEpochs.clear();
     publish({ token: '', user: null, expiresAt: 0, epoch: meta.epoch, revision: meta.revision, authLoading: false, authError: error });
   };
@@ -88,7 +91,7 @@ export function createSessionManager(environment = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      return await request('/v2/web-auth/' + operation, { method: 'POST', body: JSON.stringify(body), signal: controller.signal });
+      return await request('/v2/web-auth/' + operation, { method: 'POST', body: JSON.stringify(body), signal: controller.signal, ...(operation === 'logout' ? { expectedStatus: 204 } : {}) });
     } finally { clearTimeout(timeout); }
   };
   const applyResponse = (response, meta) => {
@@ -177,38 +180,79 @@ export function createSessionManager(environment = {}) {
     applyResponse(response, meta);
     return { ...response, token: response.access_token };
   });
-  const logout = () => {
+  const logout = (cleanup = async () => {}) => {
     const initial = { epoch: snapshot.epoch };
     return locked(async () => {
       if (syncMeta().epoch !== initial.epoch) throw changedError();
       await authRequest('logout');
       if (!stillCurrent(initial)) throw changedError();
-      transition();
+      try { await cleanup(); } finally { transition(); }
+    });
+  };
+  const deleteAccount = async (cleanup = async () => {}) => {
+    const initial = syncMeta();
+    await ensureToken();
+    return locked(async () => {
+      if (!stillCurrent(initial) || !snapshot.user || snapshot.epoch !== initial.epoch) throw changedError();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      try {
+        // The account lock is held by the caller; this auth lock also excludes login/rotation.
+        await request('/v2/account', { method: 'DELETE', signal: controller.signal, expectedStatus: 204 }, snapshot.token);
+        if (!stillCurrent(initial)) throw changedError();
+        try { await cleanup(); } finally { transition(); }
+      } finally { clearTimeout(timeout); }
+    });
+  };
+  const confirmRecovery = body => {
+    const initial = syncMeta();
+    return locked(async () => {
+      if (!stillCurrent(initial)) throw changedError();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      try {
+        const result = await request('/v2/auth/password-recovery/confirm', {
+          method: 'POST', body: JSON.stringify(body), signal: controller.signal, expectedStatus: 200
+        });
+        if (!stillCurrent(initial)) throw changedError();
+        // Password reset revokes credentials on the server; never accept a new session here.
+        transition();
+        return result;
+      } finally { clearTimeout(timeout); }
     });
   };
   const authenticatedRequest = async (endpoint, options, providedToken) => {
     const meta = syncMeta();
     if (tokenEpochs.get(providedToken) !== meta.epoch) throw changedError();
     const token = await ensureToken();
-    let result;
-    try { result = await request(endpoint, options, token); }
-    catch (error) {
-      if (!stillCurrent(meta)) throw changedError();
-      if (error.status !== 401) throw error;
-      const replacement = await ensureToken(token);
-      result = await request(endpoint, options, replacement);
-    }
     if (!stillCurrent(meta)) throw changedError();
-    return result;
+    const controller = new AbortController();
+    activeRequests.add(controller);
+    const signal = options?.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
+    const guardedOptions = { ...options, signal };
+    try {
+      let result;
+      try { result = await request(endpoint, guardedOptions, token); }
+      catch (error) {
+        if (!stillCurrent(meta)) throw changedError();
+        if (error.status !== 401) throw error;
+        const replacement = await ensureToken(token);
+        if (!stillCurrent(meta)) throw changedError();
+        result = await request(endpoint, guardedOptions, replacement);
+      }
+      if (!stillCurrent(meta)) throw changedError();
+      return result;
+    } finally { activeRequests.delete(controller); }
   };
   return {
-    start, restore, ensureToken, logout, authenticatedRequest,
+    start, restore, ensureToken, logout, deleteAccount, confirmRecovery, authenticatedRequest,
     login: (email, senha) => signIn('login', { email, senha }),
     cadastro: (nome, email, senha) => signIn('cadastro', { nome, email, senha }),
     getSnapshot: () => snapshot,
+    isCurrentEpoch: epoch => stillCurrent({ epoch }),
     isStarted: () => started,
     subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
-    dispose: () => { disposed = true; channel?.close(); unlisten?.(); for (const done of peerWaiters) done(); listeners.clear(); }
+    dispose: () => { disposed = true; for (const controller of activeRequests) controller.abort(); activeRequests.clear(); channel?.close(); unlisten?.(); for (const done of peerWaiters) done(); listeners.clear(); }
   };
 }
 

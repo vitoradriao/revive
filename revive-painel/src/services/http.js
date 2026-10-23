@@ -1,11 +1,12 @@
 import { API_BASE } from '../config/env';
 
 export async function httpRequest(endpoint, options = {}, token = null) {
+  const { expectedStatus, ...fetchOptions } = options;
   const headers = { Accept: 'application/json', 'Content-Type': 'application/json', ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
   let response, text;
   try {
-    response = await fetch(`${API_BASE}${endpoint}`, { ...options, credentials: 'same-origin', cache: 'no-store', headers });
+    response = await fetch(`${API_BASE}${endpoint}`, { ...fetchOptions, credentials: 'same-origin', cache: 'no-store', headers });
     text = await response.text();
   } catch {
     throw Object.assign(new Error('Não foi possível confirmar a resposta do servidor.'), { outcomeUnknown: true, code: 'REDE_INDISPONIVEL' });
@@ -23,6 +24,9 @@ export async function httpRequest(endpoint, options = {}, token = null) {
       status: response.status, code: data.codigo, fields: data.campos, requestId: data.request_id,
       retryAfter: response.headers?.get('Retry-After'), outcomeUnknown: response.status >= 500
     });
+  }
+  if (expectedStatus && response.status !== expectedStatus) {
+    throw Object.assign(new Error('Resposta inesperada do servidor. A operação não foi confirmada.'), { code: 'RESPOSTA_INVALIDA', outcomeUnknown: true });
   }
   return data;
 }

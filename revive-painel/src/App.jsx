@@ -31,11 +31,12 @@
  */
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import AppShell from './components/layout/AppShell';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import PasswordRecoveryPage from './pages/PasswordRecoveryPage';
 import DashboardPage from './pages/DashboardPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DetalhesPage from './pages/DetalhesPage';
@@ -57,6 +58,9 @@ import TipsPage from './pages/TipsPage';
  */
 export default function App() {
   const { token, user, sessionEpoch, authLoading, authError, restoreSession, localAccess } = useAuth();
+
+  const location = useLocation();
+  if (location.pathname === '/recuperar-senha') return <PasswordRecoveryPage key={user ? `${user.id}:${sessionEpoch}` : 'public'} />;
 
   if (authLoading) {
     return (

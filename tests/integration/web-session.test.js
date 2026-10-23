@@ -118,6 +118,29 @@ describe('web session transport using native session rules', () => {
             expect(unavailable.body.codigo).toBe('ERRO_INTERNO');
         } finally { logger.mockRestore(); }
     });
+    it('expires the web cookie only after authenticated account deletion is confirmed', async () => {
+        const { app, post, database } = fixture();
+        const login = await post('login', { email: 'web@example.invalid', senha: 'Synthetic!1' });
+        const remove = () => request(app).delete('/api/v2/account').set('Authorization', 'Bearer ' + login.body.access_token);
+        database.state.failAccountDelete = true;
+        const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            const failure = await remove();
+            expect(failure.status).toBe(500);
+            expect(failure.headers['set-cookie']).toBeUndefined();
+            expect(database.tables.usuarios).toHaveLength(1);
+            expect(database.tables.app_sessions[0].revoked_at).toBeNull();
+        } finally { logger.mockRestore(); }
+        database.state.failAccountDelete = false;
+        const deleted = await remove();
+        expect(deleted.status).toBe(204); expect(deleted.text).toBe('');
+        expect(deleted.headers['set-cookie'][0]).toContain('Path=/api/v2/web-auth');
+        expect(deleted.headers['set-cookie'][0]).toContain('Expires=Thu, 01 Jan 1970');
+        expect(deleted.headers['set-cookie'][0]).toContain('HttpOnly');
+        expect((await request(app).get('/api/v2/bootstrap').set('Authorization', 'Bearer ' + login.body.access_token)).status).toBe(401);
+        expect((await post('refresh', {}, cookieOf(login))).status).toBe(401);
+        expect(database.tables.usuarios).toHaveLength(0);
+    });
     it('requires a cookie even if a refresh token is supplied in JSON', async () => {
         const { post } = fixture();
         const missing = await post('refresh', { refresh_token: 'not-a-cookie' });

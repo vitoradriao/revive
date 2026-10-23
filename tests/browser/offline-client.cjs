@@ -16,7 +16,7 @@ const base = process.env.REVIVE_BROWSER_URL || 'http://127.0.0.1:4177';
         const session = {
           getSnapshot: () => state, subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); },
           ensureToken: async () => state.token,
-          logout: async () => { state = { user: null, token: null, epoch: 'logout', authLoading: false }; listeners.forEach(fn => fn()); }
+          logout: async (cleanup = async () => {}) => { await cleanup(); state = { user: null, token: null, epoch: 'logout', authLoading: false }; listeners.forEach(fn => fn()); }
         };
         window.switchClientAccount = () => { state = { user: { id: B }, token: 'synthetic-memory-B', epoch: 'B', authLoading: false }; listeners.forEach(fn => fn()); };
         const held = new Promise(resolve => { window.releaseOldBootstrap = resolve; });

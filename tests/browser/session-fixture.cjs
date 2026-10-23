@@ -176,12 +176,13 @@ app.post('/__test/seed-diary', (_req, res) => {
     }
     res.sendStatus(204);
 });
+app.post('/__test/reset-block-mutations', (_req, res) => { blockMutations = false; res.sendStatus(204); });
 app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
     if (revokeOnGoalWrite && req.method === 'PATCH' && req.path.startsWith('/metas/')) {
         revokeOnGoalWrite = false; database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     }
-    if (blockMutations && req.method !== 'GET' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
+    if (blockMutations && req.method !== 'GET' && req.path !== '/account' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
         if ((req.path === '/metas' || /^\/metas\/[^/]+$/.test(req.path) || req.path.endsWith('/recaida')) && req.method !== 'GET' && res.statusCode < 300) {
@@ -207,9 +208,10 @@ app.post('/__test/revoke', (_req, res) => {
     res.sendStatus(204);
 });
 app.use('/api/v2/web-auth', (req, _res, next) => { if (req.path === '/refresh') counts.refresh++; if (req.path === '/login') counts.login++; next(); });
+const lifecycleBcrypt = require('./account-lifecycle-fixture.cjs')(app, database, secret, events);
 app.use('/api/v2', createMobileApi({
     supabase: database.client, jwtSecret: secret, webSecureCookies: false, webAuthEnabled: true,
-    bcrypt: { compare: async password => password === 'Synthetic!1', hash: async () => 'synthetic' }
+    bcrypt: lifecycleBcrypt
 }));
 app.use('/api', createCredentialAuth({ supabase: database.client, jwtSecret: secret }));
 app.get('/api/me', (req, res) => {
