@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.
+
 - [Motivo pessoal privado](web-motivo-pessoal.md): edição versionada, leitura offline, compatibilidade e privacidade da #65.
 
 - [Recuperação, exclusão e saída web](web-account-lifecycle.md): contratos, confirmação remota, coordenação de abas, limpeza retomável e evidências da #64.

@@ -16,6 +16,7 @@
  */
 import React from 'react';
 import AccountSecurity from '../components/account/AccountSecurity';
+import FirstHabitIntroduction from '../components/journey/FirstHabitIntroduction';
 import { motion as Motion } from 'framer-motion';
 import { User, Sun, Moon, Download, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,6 +70,7 @@ export default function ProfilePage() {
 
       <ProgressNotice progress={progress} />
       <HeroKpis progress={progress} />
+      <FirstHabitIntroduction review />
 
       {/* Dados da conta */}
       <div className={`${glassSurface} rounded-3xl p-6`}>

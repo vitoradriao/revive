@@ -30,6 +30,22 @@ beforeEach(() => {
 });
 
 describe('gerenciamento de hábitos no painel', () => {
+    it('na introdução salva somente o motivo e mantém separado o rascunho de edição completa', async () => {
+        const existing = await fixture.prepare('full-editor', { name: 'Nome ainda não enviado', dailySavings: '23,00' });
+        sessionStorage.setItem('revive-habit-editor:account-a:habit-1', 'full-editor');
+        const onConfirmed = vi.fn();
+        render(<MemoryRouter><HabitManagement habit={fixture.data.vicios[0]} accountKey={key} reasonOnly onConfirmed={onConfirmed} /></MemoryRouter>);
+        await screen.findByRole('button', { name: 'Salvar motivo' });
+        expect(screen.queryByLabelText('Nome do hábito')).not.toBeInTheDocument();
+        await saveDraft('Motivo pessoal (opcional)', 'Motivo sintético');
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar motivo' })).toBeEnabled());
+        fireEvent.click(screen.getByRole('button', { name: 'Salvar motivo' }));
+        await waitFor(() => expect(onConfirmed).toHaveBeenCalledTimes(1));
+        const call = state.offline.client.manageHabit.mock.calls[0];
+        expect(call[2]).toEqual({ revision: 1, motivo_pessoal: 'Motivo sintético' });
+        expect(await fixture.store.getHabitDraft('full-editor')).toEqual(existing);
+        expect(fixture.data.vicios[0].nome_vicio).toBe('Café');
+    });
     it('preserva rascunho e versão remota após conflito e reload, exigindo revisão explícita', async () => {
         const view = renderEditor(); await ready();
         await saveDraft('Nome do hábito', 'Meu nome');

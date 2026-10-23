@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useOffline } from '../../contexts/OfflineContext';
 import { createHabitDraft, habitEditPatch } from '../../utils/habitEdit';
@@ -7,8 +7,9 @@ import { fieldBase, glassSurface } from '../../utils/constants';
 import Button from '../ui/Button';
 import { personalReasonLength } from '../../utils/personalReason';
 
-export default function HabitManagement({ habit, accountKey }) {
+export default function HabitManagement({ habit, accountKey, reasonOnly = false, onConfirmed }) {
     const { client, localOnly } = useOffline();
+    const reasonId = useId();
     const [draft, setDraft] = useState(null);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
@@ -24,7 +25,7 @@ export default function HabitManagement({ habit, accountKey }) {
         const load = async () => {
             try {
                 // Somente o identificador fica na sessão da aba; o conteúdo fica no banco da conta.
-                const key = 'revive-habit-editor:' + accountKey.split(':')[0] + ':' + initialHabit.current.id;
+                const key = (reasonOnly ? 'revive-introduction-reason:' : 'revive-habit-editor:') + accountKey.split(':')[0] + ':' + initialHabit.current.id;
                 const priorId = sessionStorage.getItem(key);
                 const stored = priorId ? await client.getHabitDraft(priorId, accountKey) : null;
                 if (cancelled) return;
@@ -40,7 +41,7 @@ export default function HabitManagement({ habit, accountKey }) {
         };
         void load();
         return () => { cancelled = true; alive.current = false; };
-    }, [accountKey, client]);
+    }, [accountKey, client, reasonOnly]);
     useEffect(() => {
         if (confirmOpen) {
             dialog.current?.showModal();
@@ -76,6 +77,7 @@ export default function HabitManagement({ habit, accountKey }) {
             const result = await client.manageHabit(habit.id, draftId.current, input, accountKey);
             if (!alive.current) return;
             latest.current = result; setDraft(result);
+            if (result.status === 'confirmed') await onConfirmed?.();
         } catch (caught) {
             if (!alive.current) return;
             setError(caught.message);
@@ -90,7 +92,9 @@ export default function HabitManagement({ habit, accountKey }) {
     const save = event => {
         event.preventDefault();
         try {
-            const input = habitEditPatch(draft);
+            const input = habitEditPatch(reasonOnly ? { ...draft, values: {
+                ...createHabitDraft(draft.base).values, personalReason: draft.values.personalReason,
+            } } : draft);
             if (Object.keys(input).length === 1) { setError('Nenhum campo foi alterado.'); return; }
             void run(input);
         } catch (caught) { setError(caught.message); }
@@ -105,9 +109,9 @@ export default function HabitManagement({ habit, accountKey }) {
             message: 'Versão remota adotada como base. Revise os campos e confirme o próximo envio.' });
     };
     return <section className={`${glassSurface} rounded-3xl p-6 space-y-4`} aria-labelledby="habit-management-title">
-        <h2 id="habit-management-title" className="text-xl font-bold">Gerenciar hábito</h2>
+        <h2 id="habit-management-title" className="text-xl font-bold">{reasonOnly ? 'Seu motivo (opcional)' : 'Gerenciar hábito'}</h2>
         <p>{habit.ativo === false ? 'Arquivado: histórico preservado. Reative para novos eventos.' : 'Hábito ativo'}</p>
-        <p>A nova economia vale a partir da confirmação. Os valores anteriores permanecem no histórico.</p>
+        {!reasonOnly && <p>A nova economia vale a partir da confirmação. Os valores anteriores permanecem no histórico.</p>}
         {localOnly && <p role="status">Conecte-se para editar, arquivar ou reativar. O rascunho local não é uma alteração confirmada.</p>}
         {!draft.base.revision && <p role="status">Consulte o estado remoto para habilitar a edição.</p>}
         <div aria-label="Motivo pessoal sincronizado" className="space-y-2">
@@ -117,16 +121,17 @@ export default function HabitManagement({ habit, accountKey }) {
         </div>
         <form onSubmit={save} className="space-y-4">
             <fieldset disabled={busy || reviewing} className="space-y-4">
-                <label className="block">Motivo pessoal (opcional)<textarea className={fieldBase} rows={5} value={draft.values.personalReason ?? ''} aria-describedby="personal-reason-help personal-reason-count" aria-invalid={personalReasonLength(draft.values.personalReason) > 1000} onChange={event => change('personalReason', event.target.value)} /></label>
+                <label className="block" htmlFor={reasonId}>Motivo pessoal (opcional)</label>
+                <textarea id={reasonId} className={fieldBase} rows={5} value={draft.values.personalReason ?? ''} aria-describedby="personal-reason-help personal-reason-count" aria-invalid={personalReasonLength(draft.values.personalReason) > 1000} onChange={event => change('personalReason', event.target.value)} />
                 <p id="personal-reason-help">Deixe vazio para remover. A alteração exige conexão; o rascunho fica neste navegador até a confirmação.</p>
                 <p id="personal-reason-count" role="status">{personalReasonLength(draft.values.personalReason)} / 1000 caracteres</p>
                 <Button type="button" onClick={() => change('personalReason', '')}>Limpar motivo pessoal</Button>
-                <label className="block">Nome do hábito<input className={fieldBase} value={draft.values.name} maxLength={120} onChange={event => change('name', event.target.value)} /></label>
+                {!reasonOnly && <><label className="block">Nome do hábito<input className={fieldBase} value={draft.values.name} maxLength={120} onChange={event => change('name', event.target.value)} /></label>
                 <label className="block">Economia diária (R$)<input className={fieldBase} inputMode="decimal" value={draft.values.dailySavings} onChange={event => change('dailySavings', event.target.value)} /></label>
                 <label className="block">Data de início<input className={fieldBase} type="date" max={localDateKey()} disabled={!draft.base.inicio_editavel} value={draft.values.startDate} onChange={event => change('startDate', event.target.value)} /></label>
                 {!draft.base.inicio_editavel && <p>A data de início exige ausência de registros, metas, conquistas e alterações de economia.
                     {draft.values.startDate !== draft.base.data_inicio.slice(0, 10) && <Button type="button" onClick={() => change('startDate', draft.base.data_inicio.slice(0, 10))}>Usar data remota</Button>}
-                </p>}
+                </p>}</>}
             </fieldset>
             <p role="status">{saving ? 'Salvando rascunho neste navegador…' : draft.message}</p>
             {error && <p role="alert">{error}</p>}
@@ -142,8 +147,8 @@ export default function HabitManagement({ habit, accountKey }) {
                 </>}
             </div>}
             <div className="flex flex-wrap gap-3">
-                <Button type="submit" disabled={disabled || reviewing}>Salvar alterações</Button>
-                <Button ref={archiveButton} type="button" disabled={disabled || reviewing} onClick={() => setConfirmOpen(true)}>{draft.base.ativo === false ? 'Reativar hábito' : 'Arquivar hábito'}</Button>
+                <Button type="submit" disabled={disabled || reviewing}>{reasonOnly ? 'Salvar motivo' : 'Salvar alterações'}</Button>
+                {!reasonOnly && <Button ref={archiveButton} type="button" disabled={disabled || reviewing} onClick={() => setConfirmOpen(true)}>{draft.base.ativo === false ? 'Reativar hábito' : 'Arquivar hábito'}</Button>}
                 <Button type="button" disabled={busy || saving || localOnly} onClick={() => void run(null)}>Consultar estado remoto</Button>
                 <Link to="/sincronizacao">Resolver operações pendentes</Link>
             </div>

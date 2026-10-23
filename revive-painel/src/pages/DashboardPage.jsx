@@ -1,4 +1,5 @@
 import JourneyPreferences from '../components/journey/JourneyPreferences';
+import FirstHabitIntroduction from '../components/journey/FirstHabitIntroduction';
 import { useOffline } from '../contexts/OfflineContext';
 import { resolvePrimary } from '../utils/journeyPreferences';
 import React, { useMemo, useState } from 'react';
@@ -91,6 +92,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <FirstHabitIntroduction />
       <ProgressNotice progress={progress} />
       <RecaidaModal
         isOpen={recaidaVicio !== null}
@@ -101,7 +103,7 @@ export default function DashboardPage() {
         loading={loading}
       />
 
-      <section className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-5">
+      <section id="journey-content" tabIndex={-1} className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-5">
         <article className="revive-hero min-h-[430px] p-7 sm:p-10">
           <div className="relative z-[1] min-h-[360px] flex flex-col justify-between gap-10">
             <div className="flex items-center justify-between gap-4">
@@ -150,7 +152,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-[.85fr_1.15fr] gap-5">
-        <QuickCheckIn habits={addictions} />
+        <div id="introduction-checkin" tabIndex={-1}><QuickCheckIn habits={addictions} preferredHabitId={preferences?.intro?.state === 'pending' ? preferences.intro.habit_id : undefined} /></div>
 
         <article className="surface-dark rounded-[34px] p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

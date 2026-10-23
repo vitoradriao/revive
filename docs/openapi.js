@@ -1235,6 +1235,9 @@
  *           properties:
  *             version: { type: integer, minimum: 0, maximum: 1000000, description: Versão do conteúdo; zero exige pending. Não é revisão de concorrência }
  *             state: { type: string, enum: [pending, completed, dismissed] }
+ *             step: { type: string, enum: [habit, reason, checkin], description: Opcional e exige version maior que zero. Etapa confirmada da introdução; não confirma o envio de check-in }
+ *             habit_id: { type: string, format: uuid, nullable: true, description: Obrigatório em reason/checkin; habit permite somente ausente ou null. Adoção exige hábito da própria conta, inclusive arquivado. ID preservado após remoção para impedir novo cadastro automático }
+ *           description: Campos de progresso são opcionais para compatibilidade. PATCH substitui intro inteiro sob revision; conclusão/dispensa preservam etapa e ID. Nenhum motivo, diário ou credencial pertence a este documento.
  *         revision: { type: integer, minimum: 0, description: Revisão concorrente por conta; zero antes da primeira alteração; incrementa também quando exclusão do principal limpa a referência }
  * /api/v2/preferences:
  *   get:

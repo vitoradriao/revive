@@ -1,4 +1,5 @@
 import { syncPreferences } from './journey-preferences';
+import { manageIntroduction } from './introduction';
 import { requestSnapshot } from './request-snapshot';
 import { getSessionManager } from '../services/session-manager';
 import { apiCall } from '../services/api';
@@ -145,6 +146,21 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       void connect();
     },
     refresh, sync,
+    introduction: async (action, input, accountKey) => {
+      const db = store, auth = session.getSnapshot();
+      const check = () => {
+        if (!db || db !== store || !accountKey || accountKey !== currentKey || closing
+            || session.getSnapshot().epoch !== auth.epoch || session.getSnapshot().user?.id !== db.userId
+            || (session.isCurrentEpoch && !session.isCurrentEpoch(auth.epoch))) throw changed();
+      };
+      check();
+      const result = await requireCoordinator().withAccountLock(() => manageIntroduction({ store: db, action, input, check,
+        isOnline: () => navigator.onLine !== false && !!auth.token,
+        request: (path, options) => request(path, options, auth.token),
+      }));
+      check(); await update(check); check();
+      return result;
+    },
     preferences: async (input, accountKey) => {
       const db = store, auth = session.getSnapshot();
       const check = () => {

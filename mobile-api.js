@@ -364,7 +364,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             if (error) throw error;
             if (data?.status === 200 && data.preferences) return res.json({ preferences: data.preferences });
             if (data?.status === 409) return apiError(res, 409, 'REVISAO_CONFLITO', 'As preferências mudaram. Consulte a versão atual e revise suas escolhas locais.');
-            if (data?.status === 422) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências; o principal deve ser um hábito ativo desta conta.');
+            if (data?.status === 422) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências e as referências a hábitos desta conta; o principal deve estar ativo.');
             throw new Error('Invalid preferences response');
         } catch {
             return apiError(res, 503, 'PREFERENCIAS_INDISPONIVEIS', 'Não foi possível confirmar a alteração. Consulte a versão atual antes de tentar novamente.');
