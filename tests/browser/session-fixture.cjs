@@ -7,6 +7,13 @@ const { createCredentialAuth } = require('../../credential-auth');
 const { fakeSupabase } = require('../helpers/session-database.cjs');
 const app = express();
 app.use(express.json());
+let networkUnavailable = false;
+app.post('/__test/network', (req, res) => { networkUnavailable = req.body.offline === true; res.sendStatus(204); });
+app.use((req, res, next) => {
+    // Keep server state while making the origin unreachable, including public navigation.
+    if (networkUnavailable && !req.path.startsWith('/__test/')) { res.destroy(); return; }
+    next();
+});
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const database = fakeSupabase({ usuarios: [
     { id: '00000000-0000-4000-8000-000000000001', nome: 'Conta A sintética', email: 'a@example.invalid', senha_hash: 'synthetic', credential_version: 0 },
@@ -16,15 +23,37 @@ const secret = 'synthetic-browser-session-key-not-production';
 const counts = { refresh: 0, login: 0, writes: 0, replays: 0 };
 const events = { registros: new Map(), vontades: new Map(), recaidas: new Map(), metas: new Map() };
 const receipts = new Map();
-let dropNextResponse = false, blockMutations = false;
+let dropNextResponse = false, dropRecordResponses = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
     nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
 }));
 const initialHabits = structuredClone(habits);
 database.tables.vicios = habits;
+// Diary queries exercise the Express DTO and cursor contract over synthetic rows.
+const originalFrom = database.client.from;
+database.client.from = table => {
+    if (table !== 'registros_diarios') return originalFrom(table);
+    const filters = [];
+    return {
+        select() { return this; },
+        eq(field, value) { filters.push([field, value]); return this; },
+        async maybeSingle() {
+            const record = [...events.registros.values()].find(row => filters.every(([field, value]) =>
+                (field === 'vicios.usuario_id' ? row.usuario_id : row[field]) === value));
+            return { data: record ? { ...structuredClone(record), vicios: { usuario_id: record.usuario_id } } : null, error: null };
+        }
+    };
+};
 const originalRpc = database.client.rpc;
 database.client.rpc = async (name, args) => {
+    if (name === 'list_diary_records') {
+        const rows = [...events.registros.values()].filter(row => row.usuario_id === args.p_usuario_id &&
+            (!args.p_vicio_id || row.vicio_id === args.p_vicio_id) && row.data_registro >= args.p_inicio && row.data_registro <= args.p_fim &&
+            (!args.p_cursor_date || row.data_registro < args.p_cursor_date || row.data_registro === args.p_cursor_date && row.id < args.p_cursor_id))
+            .sort((a, b) => b.data_registro.localeCompare(a.data_registro) || b.id.localeCompare(a.id)).slice(0, args.p_limit);
+        return { data: structuredClone(rows), error: null };
+    }
     if (name === 'edit_revive_habit') {
         const habit = habits.find(item => item.id === args.p_vicio_id && item.usuario_id === args.p_usuario_id);
         const result = !habit ? { status: 404, codigo: 'VICIO_NAO_ENCONTRADO' }
@@ -81,23 +110,33 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
         vicios: habits.filter(item => item.usuario_id === user.id),
         ...Object.fromEntries(Object.entries(events).map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
 });
+app.post('/__test/seed-diary', (_req, res) => {
+    for (let index = 1; index <= 23; index++) {
+        const record = { id: '20000000-0000-4000-8000-' + String(index).padStart(12, '0'), usuario_id: habits[0].usuario_id,
+            vicio_id: habits[0].id, data_registro: '2026-10-22', revision: 1, humor: 'bom',
+            gatilhos: null, conquistas: null, observacoes: index === 23 ? 'Legado sintético. '.repeat(100) : 'Registro sintético.' };
+        events.registros.set(record.id, record);
+    }
+    res.sendStatus(204);
+});
 app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
     if (blockMutations && req.method !== 'GET' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
-        if (dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') && res.statusCode < 300) {
+        if ((dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros') && res.statusCode < 300) {
             dropNextResponse = false; res.destroy(); return res;
         }
         return json(body);
     };
     next();
 });
+app.post('/__test/drop-record-responses', (req, res) => { dropRecordResponses = req.body.enabled === true; res.sendStatus(204); });
 app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true; res.sendStatus(204); });
 app.get('/__test/status', (_req, res) => res.json({
     counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
-app.post('/__test/reset', (_req, res) => { database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; res.sendStatus(204); });
+app.post('/__test/reset', (_req, res) => { networkUnavailable = false; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
     database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     res.sendStatus(204);

@@ -9,10 +9,9 @@ import HeroKpis from '../components/dashboard/HeroKpis';
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import VicioCard from '../components/dashboard/VicioCard';
 import RecentTimeline from '../components/dashboard/RecentTimeline';
-import SelectHumor from '../components/ui/SelectHumor';
-import { SelectField } from '../components/ui/Field';
+import QuickCheckIn from '../components/diary/QuickCheckIn';
 import Button from '../components/ui/Button';
-import { glassSurface, moodOptions } from '../utils/constants';
+import { glassSurface } from '../utils/constants';
 import { calculateGoalProgress } from '../utils/goalProgress';
 import { useProgress } from '../contexts/useProgress';
 import ProgressNotice from '../components/dashboard/ProgressNotice';
@@ -24,13 +23,11 @@ export default function DashboardPage() {
   const {
     motivationalMessage,
     deleteAddiction,
-    createRecordForAddiction,
     registerRelapse,
     loadAddictionDetails
   } = useData();
 
   const [recaidaVicio, setRecaidaVicio] = useState(null);
-  const [moodCheckIn, setMoodCheckIn] = useState({ humor: '', vicio_id: '' });
 
   const [habitFilter, setHabitFilter] = useState('active');
   const progress = useProgress();
@@ -75,29 +72,11 @@ export default function DashboardPage() {
     return events.sort((a, b) => b.date - a.date).slice(0, 8);
   }, [allRecords, relapses, goals]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const selectedMoodAddictionId = addictions.some(habit => String(habit.id) === moodCheckIn.vicio_id) ? moodCheckIn.vicio_id : (addictions[0]?.id ? String(addictions[0].id) : '');
-  const todayMoodRecord = useMemo(
-    () => allRecords.find(r => String(r.data_registro).slice(0, 10) === todayStr && r.humor),
-    [allRecords, todayStr]
-  );
-  const todayMoodOption = moodOptions.find(option => option.value === todayMoodRecord?.humor);
   const featuredGoals = useMemo(() => goals.slice(0, 3), [goals]);
-  const addictionOptions = useMemo(
-    () => addictions.map(vicio => ({ value: String(vicio.id), label: vicio.nome_vicio })),
-    [addictions]
-  );
-
   const getGoalProgress = (meta) => {
     if (meta.concluida) return 100;
     const vicio = addictions.find(item => item.id === meta.vicio_id);
     return calculateGoalProgress(meta, vicio);
-  };
-
-  const handleMoodCheckIn = async (event) => {
-    event.preventDefault();
-    const success = await createRecordForAddiction({ humor: moodCheckIn.humor }, selectedMoodAddictionId);
-    if (success) setMoodCheckIn(prev => ({ ...prev, humor: '' }));
   };
 
   const handleRefletir = async (vicio) => {
@@ -170,62 +149,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-[.85fr_1.15fr] gap-5">
-        <article className={`${glassSurface} rounded-[34px] p-6`}>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <p className="eyebrow">Registro de humor</p>
-                <h3 className="mt-2 text-3xl font-black leading-none tracking-[-0.055em] text-app">Como você está hoje?</h3>
-                <p className="mt-2 text-sm text-muted">Esse registro entra na atividade dos últimos 28 dias.</p>
-              </div>
-              {todayMoodRecord && (
-                <span className="self-start rounded-full bg-[#121212] px-3 py-1 text-xs font-black text-[#fbfaf5]">
-                  Hoje: {todayMoodOption?.label || todayMoodRecord.humor}
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleMoodCheckIn} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <span className="text-sm font-black text-app">Humor</span>
-                  <SelectHumor
-                    value={moodCheckIn.humor}
-                    onChange={(valor) => setMoodCheckIn(prev => ({ ...prev, humor: valor }))}
-                    label="Selecione como você está..."
-                  />
-                </div>
-
-                {addictions.length > 1 ? (
-                  <SelectField
-                    label="Hábito"
-                    value={selectedMoodAddictionId}
-                    onChange={(nextValue) => setMoodCheckIn(prev => ({ ...prev, vicio_id: nextValue }))}
-                    options={addictionOptions}
-                    placeholder="Selecione um hábito"
-                  />
-                ) : (
-                  <div className="rounded-[22px] surface-muted p-4">
-                    <span className="text-sm font-black text-app">Hábito</span>
-                    <p className="text-sm text-muted mt-1">
-                      {addictions[0]?.nome_vicio || 'Cadastre um hábito para salvar registros de humor.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading || !moodCheckIn.humor || !selectedMoodAddictionId}
-                variant="accent"
-                size="lg"
-                className="w-full"
-              >
-                Salvar humor de hoje
-              </Button>
-            </form>
-          </div>
-        </article>
+        <QuickCheckIn habits={addictions} />
 
         <article className="surface-dark rounded-[34px] p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

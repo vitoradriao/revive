@@ -17,18 +17,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
-import { Calendar, DollarSign, TrendingUp, Trash2, Target, BookOpen } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, Trash2, Target } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import HabitManagement from '../components/habits/HabitManagement';
 import RecaidaModal from '../components/modals/RecaidaModal';
-import SelectHumor from '../components/ui/SelectHumor';
+import QuickCheckIn from '../components/diary/QuickCheckIn';
+import Diary from '../components/diary/Diary';
 import { InputField } from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
-import { glassSurface, fieldBase, screenTransition } from '../utils/constants';
+import { glassSurface, screenTransition } from '../utils/constants';
 import { getLocalDateString } from '../utils/goalProgress';
 
 /**
@@ -47,16 +48,14 @@ export default function DetalhesPage() {
   const accountKey = user ? `${user.id}:${sessionEpoch || ''}` : '';
   const { loading } = useUI();
   const {
-    selectedAddiction, selectedAddictionRecords, goals,
+    selectedAddiction, goals,
     loadAddictionDetails, deleteAddiction,
     registerRelapse,
-    createRecord, createGoal
+    createGoal
   } = useData();
 
   /** @type {Object|null} Vicio selecionado para abrir o modal de recaida */
   const [recaidaVicio, setRecaidaVicio] = useState(null);
-  /** @type {Object} Estado controlado do formulario de registro diario */
-  const [formRegistro, setFormRegistro] = useState({ humor: '', gatilhos: '', conquistas: '', observacoes: '' });
   /** @type {Object} Estado controlado do formulario de nova meta */
   const [formMeta, setFormMeta] = useState({
     descricao_meta: '',
@@ -77,17 +76,6 @@ export default function DetalhesPage() {
       </div>
     );
   }
-
-  /**
-   * Envia o formulario de registro diario.
-   * Limpa o formulario apos sucesso.
-   * @param {Event} e - Evento de submit do formulario
-   */
-  const handleSubmitRegistro = async (e) => {
-    e.preventDefault();
-    const success = await createRecord(formRegistro);
-    if (success) setFormRegistro({ humor: '', gatilhos: '', conquistas: '', observacoes: '' });
-  };
 
   /**
    * Envia o formulario de nova meta vinculada ao vicio atual.
@@ -235,43 +223,9 @@ export default function DetalhesPage() {
           )}
         </div>
 
-        {/* Daily Registry Form */}
-        <div id="form-registro" className={`${glassSurface} rounded-3xl p-6 border border-white/10`}>
-          <h3 className="text-xl font-bold text-app mb-4 flex items-center gap-2"><BookOpen className="w-6 h-6 text-teal-300" />Novo registro diário</h3>
-          <form onSubmit={handleSubmitRegistro} className="space-y-4"><fieldset disabled={selectedAddiction.ativo === false} className="space-y-4">
-            <SelectHumor
-              value={formRegistro.humor}
-              onChange={(valor) => setFormRegistro({ ...formRegistro, humor: valor })}
-              label="Selecione seu humor..."
-            />
-            <input type="text" value={formRegistro.gatilhos} onChange={(e) => setFormRegistro({ ...formRegistro, gatilhos: e.target.value })} className={fieldBase} placeholder="Gatilhos (separados por vírgula)" />
-            <textarea value={formRegistro.conquistas} onChange={(e) => setFormRegistro({ ...formRegistro, conquistas: e.target.value })} className={fieldBase} placeholder="Conquistas do dia..." rows="2" />
-            <textarea value={formRegistro.observacoes} onChange={(e) => setFormRegistro({ ...formRegistro, observacoes: e.target.value })} className={fieldBase} placeholder="Observações..." rows="2" />
-            <Button type="submit" disabled={loading} variant="primary" size="lg" className="w-full">Salvar registro</Button>
-          </fieldset></form>
-        </div>
+        <div id="form-registro"><QuickCheckIn habits={[selectedAddiction]} full /></div>
       </div>
-
-      {/* Record History */}
-      {selectedAddictionRecords.length > 0 && (
-        <div className={`${glassSurface} rounded-3xl p-6 border border-white/10`}>
-          <h3 className="text-xl font-bold text-app mb-4">Histórico de registros</h3>
-          <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-            {selectedAddictionRecords.map((registro) => (
-              <div key={registro.id} className="p-4 bg-white/5 backdrop-blur rounded-lg border-l-4 border-[#7CF6C4]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-white/70">{new Date(registro.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                  <span className="px-3 py-1 bg-[#7CF6C4]/20 text-[#7CF6C4] rounded-full text-sm font-medium capitalize border border-[#7CF6C4]/30">{registro.humor}</span>
-                </div>
-                {registro.pending && <p role="status">Salvo neste navegador · confirmação pendente</p>}
-                {registro.gatilhos && <p className="text-sm text-white/70 mb-1"><strong className="text-white">Gatilhos:</strong> {registro.gatilhos}</p>}
-                {registro.conquistas && <p className="text-sm text-white/70 mb-1"><strong className="text-white">Conquistas:</strong> {registro.conquistas}</p>}
-                {registro.observacoes && <p className="text-sm text-white/70"><strong className="text-white">Observações:</strong> {registro.observacoes}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <Diary key={accountKey + ':' + id} habitId={id} accountKey={offline.accountKey} />
     </Motion.div>
   );
 }

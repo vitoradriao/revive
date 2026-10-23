@@ -57,14 +57,21 @@ const waitEnabled = locator => locator.evaluate(element => new Promise(resolve =
             browser = await playwright[engine].launch({ headless: true });
             const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: 'pt-BR', serviceWorkers: 'block' });
             context.setDefaultTimeout(15000);
-            const a = await context.newPage(); a.on('pageerror', error => errors.push(error.message));
+            const failedReads = new Set();
+            const trackFailedReads = page => page.on('requestfailed', request => {
+                const url = new URL(request.url());
+                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros'].includes(url.pathname)) {
+                    failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                }
+            });
+            const a = await context.newPage(); trackFailedReads(a); a.on('pageerror', error => errors.push(error.message));
             await a.goto(base);
             await a.getByLabel('Email', { exact: true }).fill('a@example.invalid');
             await a.getByLabel('Senha', { exact: true }).fill('Synthetic!1');
             await a.getByRole('button', { name: 'Entrar e continuar', exact: true }).click();
             await a.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
             await a.getByRole('heading', { name: 'Gerenciar hábito' }).waitFor();
-            const b = await context.newPage(); b.on('pageerror', error => errors.push(error.message));
+            const b = await context.newPage(); trackFailedReads(b); b.on('pageerror', error => errors.push(error.message));
             await b.goto(base + '/vicios/' + habitId);
             await b.getByRole('heading', { name: 'Gerenciar hábito' }).waitFor();
             await a.getByLabel('Nome do hábito', { exact: true }).fill('Nome da primeira aba');
@@ -120,7 +127,10 @@ const waitEnabled = locator => locator.evaluate(element => new Promise(resolve =
             assert.equal((await entries(b)).length, 0);
             const status = await (await fetch(base + '/__test/status')).json();
             assert.equal(status.events.registros, 1);
-            assert.deepEqual(errors, []);
+            // O WebKit no Linux relata como controle de acesso leituras GET interrompidas por navegação ou reload;
+            // só são aceitas mensagens que correspondem a uma requisição de fato falha nesta suíte.
+            assert.deepEqual(errors.filter(message => !(engine === 'webkit'
+                && [...failedReads].some(diagnostic => message.trim().endsWith(diagnostic)))), []);
             results.push({ engine, concurrency: true, draftAfterReload: true, archive: true, reactivation: true, recoveredEvent: true, focus: true });
             await context.close();
         } finally {

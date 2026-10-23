@@ -47,9 +47,8 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
       // Stop only this test's server; the production service worker already cached the public shell.
       await stop(fixture); fixture = null;
-      await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
-      await page.getByPlaceholder('Observações...').fill('synthetic offline persisted UI');
+      await page.getByLabel('Observações', { exact: true }).fill('synthetic offline persisted UI');
       await page.evaluate(() => {
         window.originalOutboxAdd = IDBObjectStore.prototype.add;
         IDBObjectStore.prototype.add = function (...args) {
@@ -58,8 +57,8 @@ const login = async (page, email = 'a@example.invalid') => {
         };
       });
       await page.getByRole('button', { name: 'Salvar registro', exact: true }).click();
-      await page.getByText('Nao foi possivel criar o registro diario.', { exact: true }).waitFor();
-      assert.equal(await page.getByPlaceholder('Observações...').inputValue(), 'synthetic offline persisted UI');
+      await page.getByRole('alert').filter({ hasText: 'Não foi possível confirmar a gravação neste navegador' }).waitFor();
+      assert.equal(await page.getByLabel('Observações', { exact: true }).inputValue(), 'synthetic offline persisted UI');
       assert.equal((await queue(page)).length, 0);
       await page.evaluate(() => { IDBObjectStore.prototype.add = window.originalOutboxAdd; delete window.originalOutboxAdd; });
       await page.getByRole('button', { name: 'Salvar registro', exact: true }).click();
@@ -110,9 +109,9 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByRole('button', { name: 'Jornada', exact: true }).first().click();
       await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
       await fetch(base + '/__test/block-mutations', { method: 'POST' });
-      await page.getByRole('button', { name: 'Selecione seu humor...' }).click();
+      await page.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
       await page.getByRole('button', { name: /Bom/ }).click();
-      await page.getByPlaceholder('Observações...').fill('synthetic explicit discard');
+      await page.getByLabel('Observações', { exact: true }).fill('synthetic explicit discard');
       await page.getByRole('button', { name: 'Salvar registro', exact: true }).click();
       await page.getByText('1 pendência(s).', { exact: false }).first().waitFor();
       await page.getByRole('button', { name: 'Sair', exact: true }).click();

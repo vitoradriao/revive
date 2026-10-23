@@ -217,6 +217,23 @@ function accountStore(db, userId, onVersionChange) {
       updatedAt: new Date().toISOString(), payloadVersion: 1 };
     return run(['pages'], 'readwrite', (tx, set) => { tx.objectStore('pages').put(row); set(row); });
   };
+  const replaceRecordEdit = (id, payload) => run(['outbox', 'receipts'], 'readwrite', (tx, set, abort) => {
+    const outbox = tx.objectStore('outbox');
+    outbox.getAll().onsuccess = event => {
+      try {
+        const entries = event.target.result, prior = entries.find(item => item.id === id);
+        if (prior?.type !== 'record.update' || prior.status !== 'recovery' || prior.lastError?.code !== 'REVISAO_CONFLITO' ||
+            prior.payload.recordId !== payload.recordId || entries.some(item => item.dependsOn === id)) {
+          throw fail('CONFLICT_CHANGED', 'A correção mudou. Reabra o registro antes de reaplicar.');
+        }
+        const nextId = crypto.randomUUID();
+        const next = { ...prior, id: nextId, localId: 'local:' + nextId, payload: clone(payload), status: 'pending',
+          attempts: 0, nextRetryAt: 0, lastError: null, createdAt: new Date().toISOString() };
+        tx.objectStore('receipts').put({ key: id, userId, kind: 'replaced', intent: prior, replacedBy: nextId, replacedAt: next.createdAt });
+        outbox.delete(id); outbox.add(next); set(next);
+      } catch (error) { abort(error); }
+    };
+  });
   const discard = id => run(['outbox', 'receipts'], 'readwrite', (tx, set, abort) => {
     const outbox = tx.objectStore('outbox');
     outbox.getAll().onsuccess = event => {
@@ -233,7 +250,11 @@ function accountStore(db, userId, onVersionChange) {
       tx.objectStore('meta').put({ key: 'habitDraft:' + id, value: clone(value) });
       set(value);
     }),
-    userId, close, saveSnapshot, savePage, enqueue, acknowledge, discard,
+    getRecordDraft: async id => (await read('meta', 'recordDraft:' + id))?.value || null,
+    saveRecordDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
+      tx.objectStore('meta').put({ key: 'recordDraft:' + id, value: clone(value) }); set(value);
+    }),
+    userId, close, saveSnapshot, savePage, enqueue, acknowledge, discard, replaceRecordEdit,
     getSnapshot: () => read('snapshots', 'bootstrap'), getIdentity: () => read('meta', 'identity'),
     getPage: (kind, filters) => read('pages', kind + ':' + stable(filters)),
     getPages: () => all('pages'), getReceipt: id => read('receipts', id), getReceipts: () => all('receipts'),

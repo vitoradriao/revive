@@ -17,6 +17,8 @@ vi.mock('../contexts/DataContext', () => ({ useData: () => ({
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: state.user, logout: vi.fn() }) }));
 vi.mock('../contexts/UIContext', () => ({ useUI: () => ({ loading: false, openNewAddictionWizard: vi.fn(), theme: 'dark', toggleTheme: vi.fn() }) }));
 
+vi.mock('../contexts/OfflineContext', () => ({ useOffline: () => ({ accountKey: 'user-a:test', loading: true }) }));
+
 const pages = [DashboardPage, AnalyticsPage, AchievementsPage, ProfilePage, ReportsPage];
 const mount = pageComponent => render(<MemoryRouter>{React.createElement(pageComponent)}</MemoryRouter>);
 
@@ -33,11 +35,11 @@ describe.each(pages)('histórico nas páginas: %s', Page => {
         state.source.stale = true;
         state.source.queue = [{ type: 'relapse.create', status: 'recovery', lastError: { status: 409 }, payload: { reset_counter: true } }];
         mount(Page);
-        expect(screen.getByRole('status')).toHaveTextContent('Cópia parcial');
-        expect(screen.getByRole('status')).toHaveTextContent('Offline');
-        expect(screen.getByRole('status')).toHaveTextContent('1 pendência(s)');
-        expect(screen.getByRole('status')).toHaveTextContent('Há conflitos');
-        expect(screen.getByRole('status')).toHaveTextContent('aguardam atualização do consolidado');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Cópia parcial');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Offline');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('1 pendência(s)');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Há conflitos');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('aguardam atualização do consolidado');
         expect(screen.queryByText('Aumento de Risco Detectado')).not.toBeInTheDocument();
         if (Page !== AchievementsPage) {
             expect(screen.getAllByText('2 dias').length).toBeGreaterThan(0);
@@ -49,14 +51,14 @@ describe.each(pages)('histórico nas páginas: %s', Page => {
     it('distingue carregamento, erro e snapshot vazio sem fabricar histórico', () => {
         state.source = { loading: true };
         const view = mount(Page);
-        expect(screen.getByRole('status')).toHaveTextContent('Carregando');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Carregando');
         state.source = { error: new Error('falha de rede') };
         view.rerender(<MemoryRouter><Page /></MemoryRouter>);
-        expect(screen.getByRole('status')).toHaveTextContent('Não foi possível atualizar');
-        expect(screen.getByRole('status')).toHaveTextContent('indisponível nesta conta');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Não foi possível atualizar');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('indisponível nesta conta');
         state.source = { data: { ...fixtures.progressFixture(), vicios: [], registros: [], recaidas: [], metas: [], conquistas: [] } };
         view.rerender(<MemoryRouter><Page /></MemoryRouter>);
-        expect(screen.getByRole('status')).toHaveTextContent('Cópia parcial');
+        expect(screen.getByRole('status', { name: 'Cobertura do histórico' })).toHaveTextContent('Cópia parcial');
         expect(screen.queryByText('Hábito sintético')).not.toBeInTheDocument();
     });
 
@@ -159,13 +161,16 @@ it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendênci
 describe('filtro de hábitos', () => {
     it('mostra arquivados para consulta, sem oferecer recaída ou selecioná-los para novo humor', () => {
         const archived = { ...state.source.data.vicios[0], id: 'archived', nome_vicio: 'Hábito arquivado', ativo: false };
-        state.source.data.vicios.push(archived);
+        state.source.data.vicios.push(archived, { ...state.source.data.vicios[0], id: 'active-second', nome_vicio: 'Outro hábito ativo' });
         mount(DashboardPage);
         expect(screen.queryByRole('heading', { name: 'Hábito arquivado' })).not.toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('Exibir hábitos'), { target: { value: 'archived' } });
         expect(screen.getByRole('heading', { name: 'Hábito arquivado' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Registrar Recaída' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Ver detalhes' })).toBeInTheDocument();
-        expect(screen.getByText('Hábito sintético', { exact: true })).toBeInTheDocument();
+        const checkin = within(screen.getByRole('region', { name: 'Check-in rápido', exact: true }));
+        expect(checkin.getByLabelText('Hábito do check-in')).toHaveValue(state.source.data.vicios[0].id);
+        expect(checkin.getAllByRole('option').map(option => option.textContent)).toEqual(['Hábito sintético', 'Outro hábito ativo']);
+        expect(checkin.queryByText('Hábito arquivado')).not.toBeInTheDocument();
     });
 });

@@ -38,8 +38,17 @@ const login = async (page, email) => {
                 ...(process.env.REVIVE_BROWSER_EXECUTABLE ? { executablePath: process.env.REVIVE_BROWSER_EXECUTABLE } : {}),
             });
             const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: 'pt-BR', acceptDownloads: true, serviceWorkers: 'block' });
+            context.setDefaultTimeout(20000);
+            await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
             const page = await context.newPage();
             let offlineSince = null;
+            const failedReads = new Set();
+            page.on('requestfailed', request => {
+                const url = new URL(request.url());
+                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros'].includes(url.pathname)) {
+                    failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                }
+            });
             page.on('pageerror', error => errors.push({ message: error.message, offline: offlineSince !== null }));
             await page.clock.setFixedTime(new Date('2026-02-02T12:00:00Z'));
             let mode = {};
@@ -69,7 +78,8 @@ const login = async (page, email) => {
                     await page.getByText('30 dias', { exact: true }).first().waitFor();
                     await page.getByText(/320,00/).first().waitFor();
                 }
-                await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))));
+                // Finalize finite transitions before capturing; paused animations may never resolve finished.
+                await page.evaluate(() => document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime)).forEach(animation => animation.finish()));
                 if (output) await page.screenshot({ path: path.join(output, `progresso-${name}-${engine}.png`), fullPage: true, animations: 'disabled' });
             }
             const downloadPromise = page.waitForEvent('download');
@@ -101,19 +111,23 @@ const login = async (page, email) => {
             await heatmap.getByText('2026-02-01: 2 registro(s) de check-in; com recaída registrada.', { exact: true }).waitFor();
             await context.setOffline(true);
             offlineSince = Date.now();
-            await page.getByRole('button', { name: 'Selecione como você está...' }).click();
-            await page.getByRole('button', { name: /Bom/ }).click();
-            await page.getByRole('button', { name: 'Salvar humor de hoje', exact: true }).click();
+            const checkin = page.getByRole('region', { name: 'Check-in rápido', exact: true });
+            await checkin.getByText('Já existe registro para este hábito hoje.', { exact: true }).waitFor();
+            assert.equal(await checkin.getByRole('button', { name: 'Bom', exact: true }).isDisabled(), true);
+            await checkin.getByRole('button', { name: 'Adicionar outro registro hoje', exact: true }).click();
+            await checkin.getByRole('button', { name: 'Bom', exact: true }).click();
+            await page.getByRole('button', { name: 'Salvar check-in', exact: true }).click();
             const notice = page.getByRole('status').filter({ hasText: 'Cópia parcial' });
             await notice.getByText('1 pendência(s) local(is), fora dos indicadores e conquistas consolidados.', { exact: true }).waitFor();
             assert.match(await notice.textContent(), /Offline/);
             assert.equal(await heatmap.getByText('2/28 dias com check-in. Uma recaída não remove a presença.', { exact: true }).count(), 1);
             if (output) await page.screenshot({ path: path.join(output, `progresso-offline-${engine}.png`), fullPage: true, animations: 'disabled' });
-            // O WebKit no Linux relata como controle de acesso o bootstrap interrompido por navegação, troca de conta
-            // ou rede desligada; registros só são aceitos após desligar a rede.
-            const unexpected = errors.filter(error => !(engine === 'webkit'
-                && (error.offline ? ['bootstrap', 'registros'] : ['bootstrap']).some(endpoint => error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/${endpoint} due to access control checks.`))))
-                .map(error => error.message);
+            // O WebKit no Linux relata como controle de acesso leituras interrompidas por navegação, troca de conta
+            // ou rede desligada; só são aceitas mensagens de leituras GET que de fato falharam nesta página.
+            const unexpected = errors.filter(error => !(engine === 'webkit' && (
+                [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
+                || error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/bootstrap due to access control checks.`)
+            ))).map(error => error.message);
             assert.deepEqual(unexpected, []);
             results.push({ engine, passed: true, scenarios: ['five-pages', 'reset-record', 'permanent-awards', 'archive', 'legacy', 'partial-export', 'account-switch', 'offline-pending', 'accessible-heatmap'] });
         } finally {
