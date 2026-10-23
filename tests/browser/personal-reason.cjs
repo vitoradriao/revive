@@ -48,7 +48,7 @@ const cachedReason = page => page.evaluate(userId => new Promise((resolve, rejec
             const failedReads = new Set();
             const trackFailedReads = page => page.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) {
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) {
                     failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
                 }
             });

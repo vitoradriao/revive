@@ -77,7 +77,7 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             page.on('pageerror', error => errors.push({ message: error.message, expectedNetworkFailure }));
             context.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
             });
             await page.clock.setFixedTime(new Date('2026-10-23T02:59:00Z'));
             await page.goto(base); await login(page);
