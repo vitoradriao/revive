@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { canRecoverUrge } from '../utils/urges';
 import { useOffline } from '../contexts/OfflineContext';
 const types = { 'record.create': 'Novo registro', 'record.update': 'Correção de registro', 'urge.create': 'Vontade', 'relapse.create': 'Recaída', 'goal.create': 'Nova meta', 'goal.complete': 'Conclusão de meta' };
 const fields = { data_registro: 'Data', humor: 'Humor', gatilhos: 'Gatilhos', conquistas: 'Conquistas', observacoes: 'Observações', intensidade: 'Intensidade', nota: 'Nota', acao_realizada: 'Ação realizada', resultado: 'Resultado', motivo: 'Motivo', resetarContador: 'Reiniciar contador', occurred_at: 'Momento registrado', timezone: 'Fuso', descricao_meta: 'Descrição da meta', dias_objetivo: 'Objetivo em dias', valor_objetivo: 'Objetivo em reais', data_inicio_meta: 'Início da meta' };
 const statuses = { pending: 'Aguardando envio', sending: 'Enviando', retry: 'Aguardando nova tentativa', recovery: 'Precisa de revisão' };
 export default function SyncPage() {
-  const { client, queue, receipts, snapshot, error } = useOffline();
+  const navigate = useNavigate();
+  const { client, queue, receipts, snapshot, error, accountKey } = useOffline();
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [discardId, setDiscardId] = useState(null);
   const action = async task => {
     if (busy) return;
@@ -27,9 +30,14 @@ export default function SyncPage() {
       {item.lastError && <p>Motivo: {item.lastError.code}. {item.lastError.outcomeUnknown && 'O resultado remoto ainda precisa ser confirmado.'}</p>}
       {item.dependsOn && <p>Aguarda a confirmação de uma operação anterior.</p>}
       {item.status === 'recovery' && <p>O conteúdo foi preservado. Revise o hábito ou registro original antes de tentar novamente. A nova tentativa mantém a operação original para evitar duplicação.</p>}
+      {canRecoverUrge(item) && <p>A recusa definitiva permanece igual nos retries. Após reativar o hábito, recuperar como rascunho preserva este conteúdo e a recusa anterior; revise e salve explicitamente um novo envio. Respostas incertas nunca usam essa recuperação.</p>}
       <details><summary>Consultar conteúdo local privado</summary><dl className="space-y-2 break-words">{Object.entries(fields).filter(([key]) => item.payload[key] !== undefined && item.payload[key] !== null && item.payload[key] !== '').map(([key, label]) => <div key={key}><dt className="font-bold">{label}</dt><dd className="whitespace-pre-wrap">{typeof item.payload[key] === 'boolean' ? item.payload[key] ? 'Sim' : 'Não' : String(item.payload[key])}</dd></div>)}</dl></details>
       <div className="flex flex-wrap gap-3">
         <button className="btn-primary px-3 py-2" disabled={busy || item.status === 'sending'} onClick={() => action(() => client.retry(item.id))}>Tentar novamente</button>
+        {canRecoverUrge(item) && <button className="px-3 py-2 border rounded" disabled={busy} onClick={() => action(async () => {
+          const habitId = await client.urges('recover', [item.id], accountKey);
+          navigate('/vicios/' + habitId);
+        })}>Recuperar vontade como rascunho</button>}
         <button className="px-3 py-2 border rounded" disabled={busy || item.status === 'sending'} onClick={() => setDiscardId(item.id)}>Descartar pendência</button>
       </div>
       {discardId === item.id && <div role="group" aria-label="Confirmar descarte" className="space-x-3">

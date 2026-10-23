@@ -23,7 +23,7 @@ const secret = 'synthetic-browser-session-key-not-production';
 const counts = { refresh: 0, login: 0, writes: 0, replays: 0 };
 const events = { registros: new Map(), vontades: new Map(), recaidas: new Map(), metas: new Map() };
 const receipts = new Map();
-let dropNextResponse = false, dropRecordResponses = false, blockMutations = false;
+let dropNextResponse = false, dropRecordResponses = false, dropUrgeResponses = false, holdUrgeResponses = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
     nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
@@ -47,6 +47,15 @@ database.client.from = table => {
 };
 const originalRpc = database.client.rpc;
 database.client.rpc = async (name, args) => {
+    if (name === 'list_urge_events') {
+        const habit = habits.find(row => row.id === args.p_vicio_id && row.usuario_id === args.p_usuario_id);
+        if (!habit) return { data: [{ habit_found: false }], error: null };
+        const day = instant => new Intl.DateTimeFormat('en-CA', { timeZone: args.p_timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(instant));
+        const all = [...events.vontades.values()].filter(row => row.usuario_id === args.p_usuario_id && row.vicio_id === args.p_vicio_id && day(row.occurred_at) >= args.p_inicio && day(row.occurred_at) <= args.p_fim);
+        const rows = all.filter(row => !args.p_cursor_time || row.occurred_at < args.p_cursor_time || row.occurred_at === args.p_cursor_time && row.id < args.p_cursor_id)
+            .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at) || b.id.localeCompare(a.id)).slice(0, args.p_limit);
+        return { data: rows.length ? rows.map(row => ({ ...structuredClone(row), habit_found: true, total_count: all.length })) : [{ habit_found: true, total_count: all.length }], error: null };
+    }
     if (name === 'list_diary_records') {
         const rows = [...events.registros.values()].filter(row => row.usuario_id === args.p_usuario_id &&
             (!args.p_vicio_id || row.vicio_id === args.p_vicio_id) && row.data_registro >= args.p_inicio && row.data_registro <= args.p_fim &&
@@ -75,7 +84,11 @@ database.client.rpc = async (name, args) => {
     const problem = (status_code, codigo) => ({ status_code, response_body: { codigo, mensagem: 'Erro sintético de teste.' } });
     let result;
     const habit = habits.find(item => item.id === (p.vicio_id || p.addictionId) && item.usuario_id === userId);
-    if (habit?.ativo === false) return { data: problem(409, 'HABITO_ARQUIVADO'), error: null };
+    if (habit?.ativo === false) {
+        const rejection = type === 'urge.create' ? problem(404, 'VICIO_NAO_ENCONTRADO') : problem(409, 'HABITO_ARQUIVADO');
+        if (type === 'urge.create') receipts.set(key, { hash: args.p_request_hash, result: structuredClone(rejection) });
+        return { data: rejection, error: null };
+    }
     const base = { id: randomUUID(), usuario_id: userId, vicio_id: habit?.id };
     if (type === 'record.update') {
         const record = events.registros.get(p.recordId);
@@ -108,8 +121,19 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
     const user = database.tables.usuarios.find(row => row.id === req.usuarioId);
     res.json({ usuario: { id: user.id, nome: user.nome, email: user.email }, server_time: new Date().toISOString(),
         vicios: habits.filter(item => item.usuario_id === user.id),
-        ...Object.fromEntries(Object.entries(events).map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
+        ...Object.fromEntries(Object.entries(events).filter(([key]) => key !== 'vontades').map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
 });
+app.post('/__test/seed-urges', (_req, res) => {
+    for (let index = 1; index <= 24; index++) {
+        const id = '70000000-0000-4000-8000-' + String(index).padStart(12, '0');
+        events.vontades.set(id, { id, usuario_id: habits[0].usuario_id, vicio_id: habits[0].id,
+            occurred_at: '2026-10-22T15:00:00.000Z', timezone: 'America/Sao_Paulo', intensidade: index % 11,
+            gatilhos: ['trigger_future_1'], nota: null, acao_realizada: null, resultado: null });
+    }
+    res.sendStatus(204);
+});
+app.post('/__test/hold-urge-responses', (req, res) => { holdUrgeResponses = req.body.enabled === true; res.sendStatus(204); });
+app.post('/__test/drop-urge-responses', (req, res) => { dropUrgeResponses = req.body.enabled === true; res.sendStatus(204); });
 app.post('/__test/seed-diary', (_req, res) => {
     for (let index = 1; index <= 23; index++) {
         const record = { id: '20000000-0000-4000-8000-' + String(index).padStart(12, '0'), usuario_id: habits[0].usuario_id,
@@ -124,7 +148,8 @@ app.use('/api/v2', (req, res, next) => {
     if (blockMutations && req.method !== 'GET' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
-        if ((dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros') && res.statusCode < 300) {
+        if (holdUrgeResponses && req.method === 'POST' && req.path === '/vontades' && res.statusCode < 300) return res;
+        if ((dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros' || dropUrgeResponses && req.method === 'POST' && req.path === '/vontades') && res.statusCode < 300) {
             dropNextResponse = false; res.destroy(); return res;
         }
         return json(body);
@@ -136,7 +161,7 @@ app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true;
 app.get('/__test/status', (_req, res) => res.json({
     counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
-app.post('/__test/reset', (_req, res) => { networkUnavailable = false; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; res.sendStatus(204); });
+app.post('/__test/reset', (_req, res) => { networkUnavailable = false; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
     database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     res.sendStatus(204);

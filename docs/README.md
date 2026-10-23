@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Vontades e calendário web](web-urges-calendar.md): criação durável, fusos, histórico paginado, arquivamento e recuperação da #62.
+
 - [Check-in e diário web](web-diary.md): criação/correção duráveis, comparação de conflito, paginação e evidências da #61.
 
 - [Edição e arquivamento web](web-habit-management.md): revisão concorrente, rascunhos duráveis, pendências e recuperação da #60.
