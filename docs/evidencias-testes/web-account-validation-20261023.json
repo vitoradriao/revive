@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-23",
+  "base": "0212925",
+  "node": "22.23.4",
+  "validate": {
+    "command": "npm run validate",
+    "status": "passed",
+    "apiTests": 81,
+    "webUnitTests": 189,
+    "webIntegrationTests": 95,
+    "build": "passed",
+    "warning": "Chunk principal acima de 500 kB; aviso já existente."
+  },
+  "lint": {
+    "command": "npm run lint:web",
+    "status": "passed"
+  },
+  "database": {
+    "command": "npm run test:db",
+    "status": "not_run",
+    "reason": "Docker não instalado.",
+    "equivalentCommand": "bash /tmp/revive-run-local-db.sh",
+    "equivalentStatus": "passed",
+    "postgresVersion": "17.11",
+    "services": [
+      "PostgreSQL local descartável",
+      "PostgREST local",
+      "SMTP Mailpit local"
+    ],
+    "verified": [
+      "instalação nova",
+      "upgrade legado preservado",
+      "negativas de SQL",
+      "ownership",
+      "exclusão da conta web com cookie expirado",
+      "access/refresh revogados",
+      "outra conta preservada",
+      "recovery SMTP sintético",
+      "expiração",
+      "limites e reenvio",
+      "consumo único e concorrente",
+      "rollback",
+      "revogação web/mobile"
+    ]
+  },
+  "browser": {
+    "command": "npm run test:browser:account",
+    "status": "passed",
+    "engines": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "transport": "HTTP local sintético",
+    "indexedDB": "real",
+    "webLocks": "real",
+    "timeoutSeconds": 12
+  },
+  "mobile": "Não alterado; validação não aplicável.",
+  "limitations": [
+    "Sem confirmação de rollout/SMTP externo atual.",
+    "Nenhuma alteração em ambiente remoto ou produção.",
+    "Sem nova homologação humana de leitor de tela ou aparelho físico.",
+    "Resposta de DELETE perdida após commit remoto não é tratada como confirmação; pendências locais são preservadas."
+  ]
+}

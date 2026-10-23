@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Recuperação, exclusão e saída web](web-account-lifecycle.md): contratos, confirmação remota, coordenação de abas, limpeza retomável e evidências da #64.
+
 - [Metas e recaídas duráveis no painel](web-goals-relapses.md): contratos, baseline, fila, reset, testes e recuperação da #63.
 
 - [Vontades e calendário web](web-urges-calendar.md): criação durável, fusos, histórico paginado, arquivamento e recuperação da #62.

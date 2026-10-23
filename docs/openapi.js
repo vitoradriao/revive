@@ -286,7 +286,11 @@
  *       - bearerAuth: []
  *     responses:
  *       204:
- *         description: Conta excluida
+ *         description: Conta excluida; cookie HttpOnly web expirado pelo servidor
+ *         headers:
+ *           Set-Cookie:
+ *             description: Expira revive_refresh com o mesmo Path, HttpOnly, SameSite e Secure do adaptador web
+ *             schema: { type: string }
  */
 
 /**
@@ -977,7 +981,11 @@
  *                 description: Uma maiúscula e um caractere especial. Limite adicional de 72 bytes UTF-8 do bcrypt.
  *     responses:
  *       200:
- *         description: Senha redefinida; entre novamente
+ *         description: Senha redefinida; entre novamente. Cookie HttpOnly web expirado pelo servidor.
+ *         headers:
+ *           Set-Cookie:
+ *             description: Expira revive_refresh pelo adaptador web, sem retornar sessão
+ *             schema: { type: string }
  *         content:
  *           application/json:
  *             schema:

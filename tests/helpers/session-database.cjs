@@ -46,6 +46,13 @@ function fakeSupabase(initial) {
     const client = {
         from: table => new Query(table),
         rpc: async (name, args) => {
+            if (name === 'delete_revive_account') {
+                if (state.failAccountDelete) return { data: null, error: { code: 'SYNTHETIC_DELETE_FAILURE' } };
+                const id = args.p_usuario_id;
+                tables.usuarios = tables.usuarios.filter(row => row.id !== id);
+                for (const name of ['app_sessions', 'vicios']) if (tables[name]) tables[name] = tables[name].filter(row => row.usuario_id !== id);
+                return { data: null, error: null };
+            }
             if (name === 'create_mobile_session') {
                 if (state.changeHashOnCreate) tables.usuarios[0].senha_hash = 'changed-hash';
                 if (state.createError) return { data: null, error: { code: state.createError } };

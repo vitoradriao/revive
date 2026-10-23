@@ -17,7 +17,7 @@ vi.mock('../contexts/DataContext', () => ({ useData: () => ({
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: state.user, logout: vi.fn() }) }));
 vi.mock('../contexts/UIContext', () => ({ useUI: () => ({ loading: false, openNewAddictionWizard: vi.fn(), theme: 'dark', toggleTheme: vi.fn() }) }));
 
-vi.mock('../contexts/OfflineContext', () => ({ useOffline: () => ({ accountKey: 'user-a:test', loading: true }) }));
+vi.mock('../contexts/OfflineContext', () => ({ useOffline: () => ({ accountKey: 'user-a:test', loading: true, queue: [], client: { deleteAccount: vi.fn() } }) }));
 
 const pages = [DashboardPage, AnalyticsPage, AchievementsPage, ProfilePage, ReportsPage];
 const mount = pageComponent => render(<MemoryRouter>{React.createElement(pageComponent)}</MemoryRouter>);

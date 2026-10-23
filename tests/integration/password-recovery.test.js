@@ -57,6 +57,8 @@ describe('password recovery HTTP contract', () => {
         expect((await request(test.app).post('/reset/confirm').send({ ...body, senha: 'É'.repeat(40) + 'A!' })).status).toBe(422);
         const response = await request(test.app).post('/reset/confirm').send(body);
         expect(response.status).toBe(200);
+        expect(response.headers['set-cookie'][0]).toContain('Expires=Thu, 01 Jan 1970');
+        expect(response.headers['set-cookie'][0]).toContain('Path=/api/v2/web-auth');
         expect(Object.keys(response.body)).toEqual(['mensagem']);
         expect(test.calls.at(-1).args.p_code_hash).toBe(digest('synthetic-secret', 'code', body.request_id, body.email, body.codigo));
     });

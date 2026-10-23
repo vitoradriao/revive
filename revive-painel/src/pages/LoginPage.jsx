@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, Clock, Star, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, cadastro } = useAuth();
   const { alert, setAlert, showToast } = useUI();
   const [view, setView] = useState('login');
@@ -114,6 +115,8 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {location.state?.accountDeleted && <p role="status">Conta excluída. Os dados e as pendências deste navegador foram removidos.</p>}
+          {location.state?.passwordReset && <p role="status">Senha redefinida. Entre com a nova senha. As sessões anteriores foram encerradas.</p>}
           {alert && <Alert type={alert.type} onClose={() => setAlert(null)}>{alert.message}</Alert>}
 
           {view === 'login' ? (
@@ -137,6 +140,7 @@ export default function LoginPage() {
               <Button type="submit" disabled={loading} variant="primary" size="lg" className="w-full">
                 {loading ? 'Entrando...' : 'Entrar e continuar'}
               </Button>
+              <Link className="block text-center font-bold underline" to="/recuperar-senha">Esqueci minha senha</Link>
             </form>
           ) : (
             <form onSubmit={handleCadastro} className="space-y-4">

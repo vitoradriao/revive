@@ -136,6 +136,7 @@ export function UIProvider({ children }) {
 
   const resetSessionUI = useCallback(() => {
     setAlert(null);
+    setTheme(localStorage.getItem('revive_theme') || 'light');
     setLoading(false);
     setConfirmModal({ isOpen: false });
     setToasts([]);

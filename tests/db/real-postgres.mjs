@@ -375,8 +375,21 @@ async function verifyApi(app, sql, second) {
   assert.equal(urgeAfter.recaidas.length, urgeBaseline.recaidas.length, 'urge creation does not create relapses');
   console.log('Urges: tied pages, ownership, archive history/block/stable rejection, intensity 0/10 and unchanged streak passed.');
 
-  bodyAt(await request(app).delete('/api/v2/account')
-    .set('Authorization', `Bearer ${a.mobileToken}`), 204, 'account deletion');
+  const webBeforeDelete = await request(app).post('/api/v2/web-auth/login')
+    .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+    .send({ email: a.email, senha: password });
+  bodyAt(webBeforeDelete, 200, 'web login before account deletion');
+  const deletedAccount = await request(app).delete('/api/v2/account')
+    .set('Authorization', `Bearer ${webBeforeDelete.body.access_token}`);
+  bodyAt(deletedAccount, 204, 'web account deletion');
+  assert.equal(deletedAccount.text, '');
+  assert.ok(deletedAccount.headers['set-cookie'][0].includes('Expires=Thu, 01 Jan 1970'));
+  assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${a.mobileToken}`)).status, 401);
+  assert.equal((await request(app).post('/api/v2/web-auth/refresh')
+    .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+    .set('Cookie', webBeforeDelete.headers['set-cookie'][0].split(';')[0]).send({})).status, 401);
+  assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${b.mobileToken}`)).status, 200);
+
   const gone = await sql.query(`select
     (select count(*) from public.usuarios where id=$1) as users,
     (select count(*) from public.vicios where usuario_id=$1) as habits,

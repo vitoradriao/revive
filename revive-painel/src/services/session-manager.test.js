@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionManager } from './session-manager';
 
 const managers = [];
@@ -74,6 +74,14 @@ describe('web session generations and tab coordination', () => {
     expect(h.refreshes()).toBe(2);
     expect(a.getSnapshot().token).toBe(b.getSnapshot().token);
     expect(a.getSnapshot().user).not.toBeNull();
+  });
+  it('reads durable generation before a delayed tab notification', async () => {
+    const h = harness(), a = h.tab(); await a.start();
+    const epoch = a.getSnapshot().epoch;
+    expect(a.isCurrentEpoch(epoch)).toBe(true);
+    h.data.set('revive_auth_metadata', JSON.stringify({ epoch: 'new-generation', revision: 0 }));
+    expect(a.getSnapshot().epoch).toBe(epoch);
+    expect(a.isCurrentEpoch(epoch)).toBe(false);
   });
   it('broadcasts logout and rejects an old tab token', async () => {
     const h = harness(), a = h.tab(), b = h.tab();
@@ -158,5 +166,60 @@ describe('web session generations and tab coordination', () => {
     await a.start();
     expect(a.getSnapshot()).toMatchObject({ token: '', authLoading: false, authError: { code: 'COORDENACAO_INDISPONIVEL' } });
     expect(h.refreshes()).toBe(0);
+  });
+});
+
+describe('account lifecycle under the auth lock', () => {
+  it('preserves session and cleanup on failed or timed-out deletion', async () => {
+    const h = harness(); const cleanup = vi.fn();
+    const a = h.tab({ request: async (path, options, token) => {
+      if (path === '/v2/account') throw Object.assign(new Error('unconfirmed'), { outcomeUnknown: true });
+      return h.request(path, options, token);
+    } });
+    await a.start(); const before = a.getSnapshot();
+    await expect(a.deleteAccount(cleanup)).rejects.toMatchObject({ outcomeUnknown: true });
+    expect(cleanup).not.toHaveBeenCalled(); expect(a.getSnapshot().token).toBe(before.token);
+  });
+  it('cleans only after remote confirmation, broadcasts deletion and cancels old requests', async () => {
+    const h = harness(); let signal, release, entered;
+    const arrived = new Promise(done => { entered = done; });
+    const a = h.tab({ request: async (path, options, token) => {
+      if (path === '/v2/account') return {};
+      if (path === '/slow') { signal = options.signal; entered(); return new Promise(done => { release = done; }); }
+      return h.request(path, options, token);
+    } }), b = h.tab();
+    await Promise.all([a.start(), b.start()]);
+    const pending = a.authenticatedRequest('/slow', {}, a.getSnapshot().token).catch(error => error);
+    await arrived;
+    let cleaned = false;
+    await a.deleteAccount(async () => { expect(a.getSnapshot().user).not.toBeNull(); cleaned = true; });
+    expect(cleaned).toBe(true); expect(signal.aborted).toBe(true);
+    release({ private: 'account-a' });
+    expect(await pending).toMatchObject({ code: 'SESSAO_ALTERADA' });
+    await expect.poll(() => b.getSnapshot().user).toBeNull();
+    expect(a.getSnapshot().user).toBeNull();
+  });
+  it('invalidates tabs after confirmed recovery without autologin', async () => {
+    const h = harness();
+    const a = h.tab({ request: async (path, options, token) => path.endsWith('/confirm') ? { mensagem: 'Senha redefinida.' } : h.request(path, options, token) }), b = h.tab();
+    await Promise.all([a.start(), b.start()]);
+    await a.confirmRecovery({});
+    expect(a.getSnapshot().token).toBe('');
+    await expect.poll(() => b.getSnapshot().user).toBeNull();
+  });
+  it('rejects deletion queued after an account change before sending DELETE', async () => {
+    const h = harness(); let release, enter, block = false, deletes = 0;
+    const gate = new Promise(done => { release = done; }), arrived = new Promise(done => { enter = done; });
+    const a = h.tab(), b = h.tab({ request: async (path, options, token) => {
+      if (block && path.endsWith('/logout')) { enter(); await gate; block = false; }
+      if (path === '/v2/account') deletes++;
+      return h.request(path, options, token);
+    } });
+    await Promise.all([a.start(), b.start()]); block = true;
+    const login = b.login('account-b', 'Synthetic!1'); await arrived;
+    const deletion = a.deleteAccount().catch(error => error);
+    release(); await login;
+    expect(await deletion).toMatchObject({ code: 'SESSAO_ALTERADA' }); expect(deletes).toBe(0);
+    expect(b.getSnapshot().user.id).toBe('account-b');
   });
 });

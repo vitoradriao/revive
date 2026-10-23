@@ -15,8 +15,9 @@
  * @see {@link useData} Hook de dados (vicios, metas, registros, recaidas)
  */
 import React from 'react';
+import AccountSecurity from '../components/account/AccountSecurity';
 import { motion as Motion } from 'framer-motion';
-import { User, Sun, Moon, Download, Shield, LogOut } from 'lucide-react';
+import { User, Sun, Moon, Download, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
 import { useProgress } from '../contexts/useProgress';
@@ -137,15 +138,7 @@ export default function ProfilePage() {
           </div>
         </button>
 
-        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-cyan-400" />
-            <div>
-              <p className="font-medium text-app">Segurança</p>
-              <p className="text-xs text-muted">Para alterar senha ou excluir conta, entre em contato com o suporte.</p>
-            </div>
-          </div>
-        </div>
+        <AccountSecurity />
       </div>
 
       {/* Logout */}

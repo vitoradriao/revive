@@ -4,6 +4,8 @@ Implementação da [issue #20](https://github.com/vitoradriao/revive/issues/20) 
 
 **Entrega externa validada com Westmail:** a solicitação no Moto G52 chegou a uma caixa Gmail externa, o código foi usado no aplicativo e a nova senha abriu a Jornada. O teste usou API/banco descartáveis. A implantação de produção ainda exige o rollout abaixo; nenhum SQL remoto foi aplicado e a recuperação permanece desabilitada por padrão.
 
+O painel oferece também [recuperação pública, exclusão e saída coordenada](web-account-lifecycle.md). Após confirmação de reset, a API expira o cookie web pelo adaptador HttpOnly; o corpo continua sem sessão e o login deve ser explícito.
+
 ## Provedor e configuração
 
 A implementação usa SMTP com [Nodemailer](https://nodemailer.com/smtp), sem dependência de um fornecedor específico. O provedor de homologação é o [Westmail](https://github.com/vitoradriao/westmail): Stalwart com relay Gmail autorizado e SMTP TLS público via Tailscale Funnel. Mailpit 1.31.4 continua sendo somente a caixa SMTP dos testes locais/CI.
