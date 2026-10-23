@@ -305,6 +305,10 @@ function accountStore(db, userId, onVersionChange) {
       };
     }),
     userId, close, saveSnapshot, savePage, enqueue, acknowledge, discard, replaceRecordEdit,
+    getPreferences: async () => (await read('meta', 'journeyPreferences'))?.value || null,
+    savePreferences: value => run(['meta'], 'readwrite', tx => {
+      tx.objectStore('meta').put({ key: 'journeyPreferences', value: clone(value) });
+    }),
     getSnapshot: () => read('snapshots', 'bootstrap'), getIdentity: () => read('meta', 'identity'),
     getPage: (kind, filters) => read('pages', kind + ':' + stable(filters)),
     getPages: () => all('pages'), getReceipt: id => read('receipts', id), getReceipts: () => all('receipts'),

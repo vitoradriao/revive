@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { defaultPreferences, validatePreferences } = require('./journey-preferences');
 const { createWebAuthTransport } = require('./web-auth-transport');
 const { validateRecordFields, parseRecordCursor } = require('./diary-records');
 const express = require('express');
@@ -337,6 +338,35 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             throw new Error('Invalid habit edit response');
         } catch {
             return apiError(res, 503, 'EDICAO_INDISPONIVEL', 'Não foi possível confirmar a edição. Recarregue o hábito antes de tentar novamente.');
+        }
+    });
+
+    router.get('/preferences', authenticate, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        try {
+            const { data, error } = await supabase.from('journey_preferences')
+                .select('primary_habit_id, indicator_order, intro, revision').eq('usuario_id', req.usuarioId).maybeSingle();
+            if (error) throw error;
+            return res.json({ preferences: data || defaultPreferences() });
+        } catch {
+            return apiError(res, 503, 'PREFERENCIAS_INDISPONIVEIS', 'Não foi possível consultar as preferências.');
+        }
+    });
+    router.patch('/preferences', authenticate, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        if (!validatePreferences(req.body)) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências informadas.');
+        const { revision, ...patch } = req.body;
+        try {
+            const { data, error } = await supabase.rpc('edit_journey_preferences', {
+                p_usuario_id: req.usuarioId, p_revision: revision, p_patch: patch,
+            });
+            if (error) throw error;
+            if (data?.status === 200 && data.preferences) return res.json({ preferences: data.preferences });
+            if (data?.status === 409) return apiError(res, 409, 'REVISAO_CONFLITO', 'As preferências mudaram. Consulte a versão atual e revise suas escolhas locais.');
+            if (data?.status === 422) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências; o principal deve ser um hábito ativo desta conta.');
+            throw new Error('Invalid preferences response');
+        } catch {
+            return apiError(res, 503, 'PREFERENCIAS_INDISPONIVEIS', 'Não foi possível confirmar a alteração. Consulte a versão atual antes de tentar novamente.');
         }
     });
 

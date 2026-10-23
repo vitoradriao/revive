@@ -7,6 +7,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
 import { verifyDiaryRecords } from './diary-records.mjs';
+import { verifyJourneyPreferences } from './journey-preferences.mjs';
 import { verifyPersonalReasons } from './personal-reason.mjs';
 import { verifyHabitEdits } from './habit-edit.mjs';
 import { verifyGoalsRelapses } from './goals-relapses.mjs';
@@ -75,6 +76,7 @@ async function verifyApi(app, sql, second) {
   await verifyWebSessions(app, sql, process.env.JWT_SECRET, second);
   await verifyHabitEdits(app, sql, process.env.JWT_SECRET);
   await verifyPersonalReasons(app, sql, process.env.JWT_SECRET);
+  await verifyJourneyPreferences(app, sql, process.env.JWT_SECRET);
   await verifyDiaryRecords(app, sql, process.env.JWT_SECRET);
   const suffix = randomUUID();
   const password = 'Senha!12345';

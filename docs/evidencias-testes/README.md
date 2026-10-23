@@ -11,3 +11,5 @@ As imagens desta pasta são registros estáticos de execuções anteriores. Não
 | Validação completa | [05-validacao-completa.png](prints/05-validacao-completa.png) |
 
 Para conferir a versão atual, consulte o commit e os logs no [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml). Para reproduzir localmente, siga o [guia de testes](../testes.md).
+
+[Preferências da Jornada — 23/10/2026](web-journey-preferences-20261023.json): registro sintético com verificações aprovadas e limites de execução HTTP/navegador.

@@ -8,16 +8,20 @@ import { fieldBase, glassSurface, moodOptions } from '../../utils/constants';
 import Button from '../ui/Button';
 import RecordFields from './RecordFields';
 import Diary from './Diary';
+import { resolvePrimary } from '../../utils/journeyPreferences';
 
 export default function QuickCheckIn({ habits, full = false }) {
-    const { accountKey } = useOffline();
-    const [selected, setSelected] = useState('');
-    const habit = habits.find(item => item.id === selected) || habits[0];
+    const { accountKey, preferences } = useOffline();
+    const [selection, setSelection] = useState(null);
+    const { habit: primary, needsReview } = resolvePrimary(full ? null : preferences, habits);
+    const habit = habits.find(item => selection?.accountKey === accountKey && item.id === selection.id) || primary || (full ? habits[0] : undefined);
     return <section aria-label={full ? 'Novo registro diário' : 'Check-in rápido'} className={`${glassSurface} rounded-3xl p-6 space-y-4`}>
         <h2 className="text-2xl font-bold">{full ? 'Novo registro diário' : 'Check-in rápido'}</h2>
-        {habits.length > 1 && <label>Hábito do check-in<select className={fieldBase} value={habit?.id || ''} onChange={event => setSelected(event.target.value)}>
+        {habits.length > 1 && <label htmlFor="journey-checkin-habit" className="block space-y-2">Hábito do check-in
+            <select id="journey-checkin-habit" className={fieldBase} value={habit?.id || ''} onChange={event => setSelection({ accountKey, id: event.target.value })}>
             {habits.map(item => <option key={item.id} value={item.id}>{item.nome_vicio}</option>)}
         </select></label>}
+        {needsReview && <p role="status">O hábito principal está indisponível ou arquivado. Revise as preferências da Jornada. Sua seleção manual foi preservada.</p>}
         {!habit ? <p>Cadastre um hábito ativo para registrar como você está.</p> : <CheckInForm key={accountKey + ':' + habit.id} habit={habit} accountKey={accountKey} full={full} />}
     </section>;
 }
