@@ -61,11 +61,11 @@ export async function buscarVicio(id, token) {
  * const novoVicio = await criarVicio({ nome: 'Cigarro', gasto_diario: 15 }, token);
  * // POST /api/vicios
  */
-export async function criarVicio(payload, token) {
+export async function criarVicio(payload, token, request = apiCall) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const result = await apiCall('/vicios', {
+    const result = await request('/vicios', {
       method: 'POST',
       body: JSON.stringify(payload),
       signal: controller.signal

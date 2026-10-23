@@ -28,4 +28,12 @@ it('authenticates reads, scopes defaults/rows to the account and maps atomic con
     expect((await patch({ revision: 0, primary_habit_id: null })).body.preferences.revision).toBe(1);
     rpc.mockResolvedValueOnce({ error: { code: 'synthetic' } });
     expect((await patch({ revision: 1, primary_habit_id: null })).status).toBe(503);
+    const intro = { version: 1, state: 'pending', step: 'reason', habit_id: '10000000-0000-4000-8000-000000000001' };
+    rpc.mockResolvedValueOnce({ data: { status: 200, preferences: { ...defaultPreferences(), intro, revision: 2 } }, error: null });
+    const progress = await patch({ revision: 1, intro });
+    expect(progress.status).toBe(200); expect(progress.body.preferences.intro).toEqual(intro);
+    expect(rpc).toHaveBeenLastCalledWith('edit_journey_preferences', { p_usuario_id: 'a', p_revision: 1, p_patch: { intro } });
+    expect((await patch({ revision: 2, intro: { ...intro, habit_id: null } })).status).toBe(422);
+    rpc.mockResolvedValueOnce({ data: { status: 422 }, error: null });
+    expect((await patch({ revision: 2, intro })).status).toBe(422);
 });

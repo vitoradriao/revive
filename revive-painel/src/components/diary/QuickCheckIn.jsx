@@ -10,11 +10,11 @@ import RecordFields from './RecordFields';
 import Diary from './Diary';
 import { resolvePrimary } from '../../utils/journeyPreferences';
 
-export default function QuickCheckIn({ habits, full = false }) {
+export default function QuickCheckIn({ habits, full = false, preferredHabitId }) {
     const { accountKey, preferences } = useOffline();
     const [selection, setSelection] = useState(null);
     const { habit: primary, needsReview } = resolvePrimary(full ? null : preferences, habits);
-    const habit = habits.find(item => selection?.accountKey === accountKey && item.id === selection.id) || primary || (full ? habits[0] : undefined);
+    const habit = habits.find(item => selection?.accountKey === accountKey && item.id === selection.id) || habits.find(item => item.id === preferredHabitId) || primary || (full ? habits[0] : undefined);
     return <section aria-label={full ? 'Novo registro diário' : 'Check-in rápido'} className={`${glassSurface} rounded-3xl p-6 space-y-4`}>
         <h2 className="text-2xl font-bold">{full ? 'Novo registro diário' : 'Check-in rápido'}</h2>
         {habits.length > 1 && <label htmlFor="journey-checkin-habit" className="block space-y-2">Hábito do check-in

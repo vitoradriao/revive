@@ -6,7 +6,7 @@ const initialForm = () => ({ name: '', startDate: localDateKey(), dailySavings: 
 const suggestions = ['Cigarro', 'Álcool', 'Jogos', 'Redes sociais', 'Doces', 'Café', 'Shopping'];
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export default function NovoVicioWizard({ isOpen, onClose, onSubmit, onCheckHabits }) {
+export default function NovoVicioWizard({ isOpen, onClose, onSubmit, onCheckHabits, allowUncertainRetry = true }) {
   const [values, setValues] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,7 @@ export default function NovoVicioWizard({ isOpen, onClose, onSubmit, onCheckHabi
 
   const submit = async (event) => {
     event.preventDefault();
-    if (busyRef.current || (uncertain && !allowRetry)) return;
+    if (busyRef.current || (uncertain && (!allowUncertainRetry || !allowRetry))) return;
     const result = validateHabitForm(values);
     setErrors(result.errors);
     const invalid = Object.keys(result.errors)[0];
@@ -164,19 +164,20 @@ export default function NovoVicioWizard({ isOpen, onClose, onSubmit, onCheckHabi
                       {checkedHabits.map(habit => <li key={habit.id}>{habit.nome_vicio} · {String(habit.data_inicio).slice(0, 10)} · {money.format(Number(habit.valor_economizado_por_dia) || 0)}/dia</li>)}
                     </ul>
                   ) : <p>Nenhum hábito encontrado nesta consulta.</p>}
-                  <label className="flex items-start gap-2">
+                  {allowUncertainRetry && <label className="flex items-start gap-2">
                     <input type="checkbox" disabled={busy} checked={allowRetry} onChange={event => setAllowRetry(event.target.checked)} />
                     Conferi a lista e quero tentar salvar novamente, mesmo com a possibilidade de duplicar.
-                  </label>
+                  </label>}
                 </>
               )}
             </div>
           )}
+          {uncertain && !allowUncertainRetry && <p>Feche este formulário e continue com um hábito confirmado na introdução. Se ainda não houver cadastro, aguarde e consulte novamente.</p>}
           <div className="flex flex-wrap justify-end gap-3 border-t hairline pt-5">
             <button type="button" onClick={close} disabled={busy} className="btn-secondary px-4 py-3">Cancelar</button>
-            <button type="submit" disabled={busy || (uncertain && !allowRetry)} className="btn-primary px-4 py-3">
+            {(!uncertain || allowUncertainRetry) && <button type="submit" disabled={busy || (uncertain && !allowRetry)} className="btn-primary px-4 py-3">
               {busy ? 'Aguarde...' : uncertain ? 'Tentar salvar novamente' : 'Salvar hábito'}
-            </button>
+            </button>}
           </div>
         </form>
       </section>

@@ -279,6 +279,10 @@ function accountStore(db, userId, onVersionChange) {
         };
       }
     }),
+    getIntroduction: async () => (await read('meta', 'introduction'))?.value || null,
+    saveIntroduction: value => run(['meta'], 'readwrite', (tx, set) => {
+      tx.objectStore('meta').put({ key: 'introduction', value: clone(value) }); set(value);
+    }),
     getHabitDraft: async id => (await read('meta', 'habitDraft:' + id))?.value || null,
     saveHabitDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
       tx.objectStore('meta').put({ key: 'habitDraft:' + id, value: clone(value) });

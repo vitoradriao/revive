@@ -10,7 +10,7 @@ const fs = require('node:fs'), path = require('node:path');
 const work = process.argv[2], root = 'supabase/verification/';
 const read = file => fs.readFileSync(file, 'utf8');
 const migrations = fs.readdirSync('supabase/migrations').filter(file => file.endsWith('.sql')).sort();
-const assertions = ['assert_base_schema.sql', 'assert_full_schema.sql', 'assert_personal_reason.sql', 'assert_journey_preferences.sql', 'assert_journey_preferences_behavior.sql'];
+const assertions = ['assert_base_schema.sql', 'assert_full_schema.sql', 'assert_personal_reason.sql', 'assert_journey_preferences.sql', 'assert_journey_preferences_behavior.sql', 'assert_introduction.sql'];
 for (const mode of ['fresh', 'legacy']) {
   const parts = [read(root + (mode === 'fresh' ? 'ci_roles.sql' : 'ci_schema_grants.sql'))];
   migrations.forEach((file, index) => {

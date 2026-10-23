@@ -23,6 +23,8 @@ const database = fakeSupabase({ usuarios: [
 ], app_sessions: [] });
 const secret = 'synthetic-browser-session-key-not-production';
 const counts = { refresh: 0, login: 0, writes: 0, replays: 0 };
+const introductionStats = { habitCreates: 0, reasonWrites: 0 };
+let introductionTransport = 'normal';
 const events = { registros: new Map(), vontades: new Map(), recaidas: new Map(), metas: new Map() };
 const receipts = new Map();
 let holdSearchResponses = false;
@@ -61,6 +63,7 @@ database.client.rpc = async (name, args) => {
         if (!row) { row = { usuario_id: args.p_usuario_id, ...defaultPreferences() }; rows.push(row); }
         if (row.revision !== args.p_revision) return { data: { status: 409 }, error: null };
         if (args.p_patch.primary_habit_id && !habits.some(item => item.id === args.p_patch.primary_habit_id && item.usuario_id === args.p_usuario_id && item.ativo !== false)) return { data: { status: 422 }, error: null };
+        if (args.p_patch.intro?.habit_id && args.p_patch.intro.habit_id !== row.intro.habit_id && !habits.some(item => item.id === args.p_patch.intro.habit_id && item.usuario_id === args.p_usuario_id)) return { data: { status: 422 }, error: null };
         Object.assign(row, structuredClone(args.p_patch), { revision: row.revision + 1 }); counts.writes++;
         const { usuario_id, ...preferences } = row;
         return { data: { status: 200, preferences }, error: null };
@@ -89,6 +92,7 @@ database.client.rpc = async (name, args) => {
             : args.p_patch.data_inicio && !habit.inicio_editavel ? { status: 409, codigo: 'INICIO_COM_HISTORICO' } : null;
         if (result) return { data: result, error: null };
         Object.assign(habit, args.p_patch, { revision: habit.revision + 1 });
+        if ('motivo_pessoal' in args.p_patch) introductionStats.reasonWrites++;
         counts.writes++;
         return { data: { status: 200, vicio: structuredClone(habit) }, error: null };
     }
@@ -215,7 +219,19 @@ app.post('/__test/seed-diary-search', (_req, res) => {
 });
 app.post('/__test/reset-block-mutations', (_req, res) => { blockMutations = false; res.sendStatus(204); });
 app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
+app.post('/__test/seed-introduction', (_req, res) => {
+    habits.splice(0, habits.length, ...structuredClone(initialHabits).filter(habit => habit.usuario_id !== database.tables.usuarios[0].id));
+    habits.forEach(habit => { habit.ativo = false; });
+    database.tables.journey_preferences.length = 0;
+    for (const values of Object.values(events)) values.clear();
+    introductionStats.habitCreates = 0; introductionStats.reasonWrites = 0;
+    res.sendStatus(204);
+});
+app.post('/__test/introduction-transport', (req, res) => { introductionTransport = req.body.mode; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
+    if (introductionTransport === 'failReason' && req.method === 'PATCH' && req.path.startsWith('/vicios/')) {
+        return res.status(503).json({ codigo: 'EDICAO_INDISPONIVEL', mensagem: 'Não foi possível confirmar a edição. Consulte o estado remoto.' });
+    }
     if (revokeOnGoalWrite && req.method === 'PATCH' && req.path.startsWith('/metas/')) {
         revokeOnGoalWrite = false; database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     }
@@ -239,7 +255,7 @@ app.use('/api/v2', (req, res, next) => {
 app.post('/__test/drop-record-responses', (req, res) => { dropRecordResponses = req.body.enabled === true; res.sendStatus(204); });
 app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true; res.sendStatus(204); });
 app.get('/__test/status', (_req, res) => res.json({
-    heldSearch: heldSearchResponses.length, goalHabitActive: habits[0].ativo, counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
+    heldSearch: heldSearchResponses.length, goalHabitActive: habits[0]?.ativo, counts, introductionStats, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
 app.post('/__test/reset', (_req, res) => { holdSearchResponses = false; for (const send of heldSearchResponses.splice(0)) send(); networkUnavailable = false; goalTransport = 'normal'; failGoalDelete = false; revokeOnGoalWrite = false; heldGoalResponses.length = 0; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
@@ -258,6 +274,16 @@ app.get('/api/me', (req, res) => {
     res.json({ usuario: { id: user.id, nome: user.nome, email: user.email } });
 });
 app.get('/api/vicios', (req, res) => res.json({ vicios: habits.filter(item => item.usuario_id === req.usuarioId) }));
+app.post('/api/vicios', (req, res) => {
+    const habit = { ...req.body, id: randomUUID(), usuario_id: req.usuarioId, ativo: true, revision: 1, inicio_editavel: true, motivo_pessoal: null, valor_economizado: 0 };
+    habits.push(habit); introductionStats.habitCreates++;
+    if (introductionTransport === 'dropHabit') {
+        // Interrompe o corpo após os headers; evita retries implícitos de sockets vazios.
+        res.status(201).type('application/json').write('{"vicio":');
+        setImmediate(() => res.destroy()); return;
+    }
+    res.status(201).json({ vicio: habit });
+});
 app.get('/api/vicios/:id/registros', (req, res) => res.json({ registros: [...events.registros.values()].filter(item => item.usuario_id === req.usuarioId && item.vicio_id === req.params.id) }));
 app.delete('/api/metas/:id', (req, res) => {
     if (failGoalDelete) return res.status(500).json({ codigo: 'DELETE_FAILED', mensagem: 'Falha sintética na exclusão. A meta foi preservada.' });
