@@ -50,7 +50,7 @@ const login = async (page, email = 'a@example.invalid') => {
             await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
             context.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
             });
             page = await context.newPage(); observe(page);
         };
@@ -222,7 +222,7 @@ const login = async (page, email = 'a@example.invalid') => {
             assert.ok((await readStore(page, 'outbox')).some(row => row.id === late.id));
             assert.equal((await readStore(page, 'receipts')).some(row => row.key === late.id), false);
             await shot('account-b');
-            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|(?:registros|vontades)\?[^\s#]+) due to access control checks\.$`);
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|registros/search|vontades(?:\?[^\s#]+)?|web-auth/refresh|preferences) due to access control checks\.$`);
             const unexpected = errors.filter(error => !(engine === 'webkit' && ([...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic)) || interruptedRead.test(error.message.trim()) || error.expectedNetworkFailure && error.message.trim().endsWith(`/127.0.0.1:${port}/api/v2/web-auth/refresh due to access control checks.`))));
             assert.deepEqual(unexpected, []);
             results.push({ engine, browserVersion: context.browser().version(), offlineRestart: true, dependentCompletion: true, doubleAction: true, lostCommitResponse: true, timeoutAfterCommit: true,

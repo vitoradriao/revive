@@ -48,7 +48,7 @@ const cachedReason = page => page.evaluate(userId => new Promise((resolve, rejec
             const failedReads = new Set();
             const trackFailedReads = page => page.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) {
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) {
                     failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
                 }
             });
@@ -138,7 +138,7 @@ const cachedReason = page => page.evaluate(userId => new Promise((resolve, rejec
             await b.getByLabel(reasonLabel).waitFor();
             assert.equal(await b.getByLabel(reasonLabel).inputValue(), '');
             assert.equal((await b.locator('body').textContent()).includes(marker), false);
-            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|vontades(?:\?[^\s#]+)?|web-auth/refresh) due to access control checks\.$`);
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|registros/search|vontades(?:\?[^\s#]+)?|web-auth/refresh|preferences) due to access control checks\.$`);
             assert.deepEqual(errors.filter(message => !(engine === 'webkit'
                 && ([...failedReads].some(diagnostic => message.trim().endsWith(diagnostic))
                     || interruptedRead.test(message.trim())))), []);
