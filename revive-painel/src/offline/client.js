@@ -196,7 +196,7 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
     diary: (method, args, accountKey) => {
       if (!accountKey || accountKey !== currentKey) return Promise.reject(changed());
       const mutation = method === 'create' || method === 'edit';
-      const key = accountKey + ':diary:' + method + ':' + JSON.stringify(args);
+      const key = mutation ? accountKey + ':diary:' + method + ':' + JSON.stringify(args) : null;
       if (mutation && enqueuing.has(key)) return enqueuing.get(key);
       const task = (async () => {
         const result = await requireCoordinator().diary(method, args);

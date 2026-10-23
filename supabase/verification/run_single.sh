@@ -18,6 +18,7 @@ for (const mode of ['fresh', 'legacy']) {
     if (index === 0 && mode === 'legacy') parts.push(read(root + 'legacy_fixture.sql'));
   });
   parts.push(...assertions.map(file => read(root + file)));
+  parts.push(require('./tests/helpers/diary-search-sql.cjs').diarySearchSql());
   if (mode === 'legacy') parts.push(read(root + 'assert_synthetic_upgrade.sql'));
   // -j termina a entrada em linha vazia; conserva comandos e corpos SQL no mesmo lote.
   fs.writeFileSync(path.join(work, mode + '.sql'), parts.join('\n').split('\n').filter(line => line.trim()).join('\n') + '\n\n');

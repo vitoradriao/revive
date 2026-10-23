@@ -55,6 +55,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 - [Preferências da Jornada](web-journey-preferences.md): contrato versionado, principal, ordem acessível, implantação e limites de verificação da #66.
 
+- [Busca no diário e perguntas opcionais](web-diary-search.md): contrato, offline, privacidade, banco e verificações da entrega web/API #68.
+
 ## Evidências e entregas anteriores
 
 - [Entregas acadêmicas da Fase 02](academico/fase-02/README.md): documentos, versões de revisão e diagramas preservados.

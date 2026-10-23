@@ -1,3 +1,4 @@
+import { validateSearchTerm, matchesDiarySearch } from '../utils/diarySearch.js';
 import { inRecordPeriod, recordFields, mergeRecords, projectRecords, recordCreation, recordPatch, validateRecordFilters } from '../utils/diary.js';
 
 const failure = (code, message) => Object.assign(new Error(message), { code });
@@ -8,22 +9,39 @@ export function createDiaryOperations({ store, check, request, isOnline }) {
         return mergeRecords(snapshot?.data.registros || [], ...pages.filter(page => page.kind === 'records').map(page => page.data.registros));
     };
     const list = async filters => {
-        validateRecordFilters(filters);
+        const searching = 'termo' in filters;
+        validateRecordFilters(filters, { optionalPeriod: searching });
+        if (searching) validateSearchTerm(filters.termo);
         let page, error, local = false;
         if (isOnline()) {
             try {
-                const data = await request('/v2/registros?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null)));
+                const data = searching
+                    ? await request('/v2/registros/search', { method: 'POST', body: JSON.stringify(filters) })
+                    : await request('/v2/registros?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null)));
                 check();
-                await store.savePage('records', filters, data); check();
+                if (searching) {
+                    // Cache records for offline coverage without storing a term, cursor or query hash.
+                    const cached = await store.getPage('records', { searchCache: true }); check();
+                    await store.savePage('records', { searchCache: true }, { registros: mergeRecords(cached?.data.registros || [], data.registros), next_cursor: null }); check();
+                } else { await store.savePage('records', filters, data); check(); }
                 page = { data };
             } catch (caught) { check(); error = caught; }
         }
-        if (!page) { local = true; page = await store.getPage('records', filters); check(); }
+        if (!page) {
+            // Validation/auth errors cannot be presented as successful local searches.
+            if (searching && error?.status && error.status < 500) throw error;
+            local = true;
+            if (!searching) { page = await store.getPage('records', filters); check(); }
+        }
         const queue = await store.getQueue(); check();
-        const records = local && !filters.cursor ? mergeRecords(page?.data.registros || [], await cachedRecords()) : page?.data.registros || [];
+        let records = local && (!filters.cursor || searching) ? mergeRecords(page?.data.registros || [], await cachedRecords()) : page?.data.registros || [];
+        if (searching && !filters.cursor && !local) {
+            const edits = new Set(queue.filter(item => item.type === 'record.update').map(item => item.payload.recordId));
+            records = mergeRecords(records, (await cachedRecords()).filter(row => edits.has(row.id)));
+        }
         check();
-        return { records: projectRecords(records, filters.cursor ? queue.filter(item => item.type === 'record.update') : queue).filter(record => inRecordPeriod(record, filters)),
-            nextCursor: page?.data.next_cursor || null, partial: local, offline: !isOnline(), error: error?.message || null };
+        return { records: projectRecords(records, filters.cursor && !local ? queue.filter(item => item.type === 'record.update') : queue).filter(record => inRecordPeriod(record, filters) && (!searching || matchesDiarySearch(record, filters.termo))),
+            nextCursor: local && searching ? null : page?.data.next_cursor || null, partial: local, restarted: searching && local && !!filters.cursor, offline: !isOnline(), error: error?.message || null };
     };
     const resolveId = async id => {
         if (!id.startsWith('local:')) return id;

@@ -6,6 +6,7 @@ import pg from 'pg';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
+import { verifyDiarySearch } from './diary-search.mjs';
 import { verifyDiaryRecords } from './diary-records.mjs';
 import { verifyJourneyPreferences } from './journey-preferences.mjs';
 import { verifyPersonalReasons } from './personal-reason.mjs';
@@ -78,6 +79,7 @@ async function verifyApi(app, sql, second) {
   await verifyPersonalReasons(app, sql, process.env.JWT_SECRET);
   await verifyJourneyPreferences(app, sql, process.env.JWT_SECRET);
   await verifyDiaryRecords(app, sql, process.env.JWT_SECRET);
+  await verifyDiarySearch(app, sql, process.env.JWT_SECRET);
   const suffix = randomUUID();
   const password = 'Senha!12345';
   const users = [];

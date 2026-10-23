@@ -1,0 +1,26 @@
+{
+  "rows": [
+    { "humor": "ÓTIMO", "gatilhos": "Café e atenção", "conquistas": "100%", "observacoes": "<b>Texto</b> com 'aspas' e barra \\" },
+    { "humor": "neutro", "gatilhos": "x_y", "conquistas": "ação", "observacoes": "HTML é texto" },
+    { "humor": "Bom", "gatilhos": null, "conquistas": "a", "observacoes": "b" },
+    { "humor": "ΟΣ", "gatilhos": "İSTANBUL", "conquistas": "ЖИЗНЬ", "observacoes": "😀" }
+  ],
+  "cases": [
+    { "term": "", "matches": [0,1,2,3] },
+    { "term": "otimo", "matches": [0] },
+    { "term": "CAFÉ", "matches": [0] },
+    { "term": "ATENCAO", "matches": [0] },
+    { "term": "AÇÃO", "matches": [1] },
+    { "term": "%", "matches": [0] },
+    { "term": "_", "matches": [1] },
+    { "term": "'aspas'", "matches": [0] },
+    { "term": "<B>", "matches": [0] },
+    { "term": "\\", "matches": [0] },
+    { "term": "a b", "matches": [] },
+    { "term": "ΟΣ", "matches": [3] },
+    { "term": "istanbul", "matches": [3] },
+    { "term": "жизнь", "matches": [3] },
+    { "term": "😀", "matches": [3] },
+    { "term": "ausente", "matches": [] }
+  ]
+}

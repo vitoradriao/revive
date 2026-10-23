@@ -143,10 +143,10 @@ export function createSyncCoordinator({
       };
       return localAction(() => createDiaryOperations({ store, check,
         isOnline: () => isOnline() && !!session.getSnapshot().token,
-        request: async path => {
+        request: async (path, options = {}) => {
           check();
           const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
-          try { return await request(path, { signal: controller.signal }, session.getSnapshot().token); }
+          try { return await request(path, { ...options, signal: controller.signal }, session.getSnapshot().token); }
           finally { clearTimeout(timeout); }
         }
       })[method](...args));
