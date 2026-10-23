@@ -42,7 +42,7 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             env: { ...process.env, REVIVE_BROWSER_API_PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe']
         });
         let browser, mobile;
-        const errors = [];
+        const errors = [], failedReads = new Set();
         let expectedNetworkFailure = false;
         try {
             await new Promise((resolve, reject) => {
@@ -56,8 +56,29 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             context.setDefaultTimeout(20000);
             // Functional captures use system fonts and do not depend on the external font CDN.
             await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
+            await context.exposeBinding('__testFailedRead', (_source, value) => {
+                const url = new URL(value);
+                if (url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+            });
+            await context.addInitScript(() => {
+                const nativeFetch = window.fetch;
+                window.fetch = async (...args) => {
+                    const [input, options] = args, url = new URL(typeof input === 'string' ? input : input.url, location.href).href;
+                    try { return await nativeFetch(...args); }
+                    catch (error) {
+                        if ((options?.method || input?.method || 'GET') === 'GET') {
+                            try { await window.__testFailedRead(url); } catch { /* The document may already be closing. */ }
+                        }
+                        throw error;
+                    }
+                };
+            });
             const page = await context.newPage();
             page.on('pageerror', error => errors.push({ message: error.message, expectedNetworkFailure }));
+            context.on('requestfailed', request => {
+                const url = new URL(request.url());
+                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+            });
             await page.clock.setFixedTime(new Date('2026-10-23T02:59:00Z'));
             await page.goto(base); await login(page);
             await page.waitForFunction(() => !!navigator.serviceWorker.controller && !!localStorage.getItem('revive_offline_account'));
@@ -183,7 +204,7 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             await login(page, 'b@example.invalid');
             assert.equal(await page.getByText('Correção sintética final', { exact: true }).count(), 0);
             // Linux WebKit may report failed offline fetches through pageerror; unrelated script failures still fail.
-            const unexpected = errors.filter(error => !(engine === 'webkit' && error.expectedNetworkFailure && /\/api\/v2\/(bootstrap|registros|web-auth\/refresh).*due to access control checks\.$/.test(error.message)));
+            const unexpected = errors.filter(error => !(engine === 'webkit' && (failedReads.has(error.message.trim()) || error.expectedNetworkFailure && /\/api\/v2\/(bootstrap|registros|web-auth\/refresh).*due to access control checks\.$/.test(error.message))));
             assert.deepEqual(unexpected, []);
             results.push({ engine, browserVersion: browser.version(), midnight: true, offlineCreateUpdateReload: true, lostResponseReplay: true, canonicalId: true,
                 nativeSessionConflict: true, localAfterReload: true, explicitReapply: true, pagination: true, legacy: true, archived: true, keyboard: true, accountIsolation: true });

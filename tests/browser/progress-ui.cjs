@@ -45,7 +45,7 @@ const login = async (page, email) => {
             const failedReads = new Set();
             page.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros'].includes(url.pathname)) {
+                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) {
                     failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
                 }
             });

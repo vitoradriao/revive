@@ -22,6 +22,8 @@ import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
+import UrgeForm from '../components/urges/UrgeForm';
+import UrgeHistory from '../components/urges/UrgeHistory';
 import HabitManagement from '../components/habits/HabitManagement';
 import RecaidaModal from '../components/modals/RecaidaModal';
 import QuickCheckIn from '../components/diary/QuickCheckIn';
@@ -225,6 +227,8 @@ export default function DetalhesPage() {
 
         <div id="form-registro"><QuickCheckIn habits={[selectedAddiction]} full /></div>
       </div>
+      <UrgeForm key={'urge:' + accountKey + ':' + id} habit={selectedAddiction} accountKey={offline.accountKey} />
+      <UrgeHistory key={'urges:' + accountKey + ':' + id} habitId={id} accountKey={offline.accountKey} />
       <Diary key={accountKey + ':' + id} habitId={id} accountKey={offline.accountKey} />
     </Motion.div>
   );

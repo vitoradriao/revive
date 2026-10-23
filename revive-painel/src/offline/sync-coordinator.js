@@ -1,4 +1,5 @@
 import { requestSnapshot } from './request-snapshot.js';
+import { createUrgeOperations } from './urge-operations.js';
 import { createDiaryOperations } from './diary-operations.js';
 import { manageHabit } from './habit-management.js';
 import { apiCall } from '../services/api.js';
@@ -104,6 +105,21 @@ export function createSyncCoordinator({
   });
   return {
     run,
+    urges: (method, args) => {
+      const initial = session.getSnapshot();
+      const check = () => {
+        if (!active() || session.getSnapshot().epoch !== initial.epoch) throw changed();
+      };
+      return localAction(() => createUrgeOperations({ store, check,
+        isOnline: () => isOnline() && !!session.getSnapshot().token,
+        request: async path => {
+          check();
+          const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
+          try { return await request(path, { signal: controller.signal }, session.getSnapshot().token); }
+          finally { clearTimeout(timeout); }
+        }
+      })[method](...args));
+    },
     diary: (method, args) => {
       const initial = session.getSnapshot();
       const check = () => {

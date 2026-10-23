@@ -1,0 +1,129 @@
+{
+  "date": "2026-10-23",
+  "base": "9be959d",
+  "synthetic": true,
+  "node": "22.23.4",
+  "browsers": [
+    {
+      "atomicAbortAndReopen": true,
+      "atomicDraftRecovery": true,
+      "lateWriteIsolation": true,
+      "latePageIsolation": true,
+      "engine": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "offlineReload": true,
+      "lostCommitResponse": true,
+      "timeoutAfterCommit": true,
+      "sameKeyReplay": true,
+      "transactionalReceipt": true,
+      "counterUnchanged": true,
+      "tiedPages": true,
+      "unknownTriggers": true,
+      "archiveDraft": true,
+      "definitiveRejectionRecovery": true,
+      "partialCalendar": true,
+      "keyboardAndAccessibleNames": true,
+      "accountIsolation": true
+    },
+    {
+      "atomicAbortAndReopen": true,
+      "atomicDraftRecovery": true,
+      "lateWriteIsolation": true,
+      "latePageIsolation": true,
+      "engine": "firefox",
+      "browserVersion": "153.0",
+      "offlineReload": true,
+      "lostCommitResponse": true,
+      "timeoutAfterCommit": true,
+      "sameKeyReplay": true,
+      "transactionalReceipt": true,
+      "counterUnchanged": true,
+      "tiedPages": true,
+      "unknownTriggers": true,
+      "archiveDraft": true,
+      "definitiveRejectionRecovery": true,
+      "partialCalendar": true,
+      "keyboardAndAccessibleNames": true,
+      "accountIsolation": true
+    },
+    {
+      "atomicAbortAndReopen": true,
+      "atomicDraftRecovery": true,
+      "lateWriteIsolation": true,
+      "latePageIsolation": true,
+      "engine": "webkit",
+      "browserVersion": "26.5",
+      "offlineReload": true,
+      "lostCommitResponse": true,
+      "timeoutAfterCommit": true,
+      "sameKeyReplay": true,
+      "transactionalReceipt": true,
+      "counterUnchanged": true,
+      "tiedPages": true,
+      "unknownTriggers": true,
+      "archiveDraft": true,
+      "definitiveRejectionRecovery": true,
+      "partialCalendar": true,
+      "keyboardAndAccessibleNames": true,
+      "accountIsolation": true
+    }
+  ],
+  "timezoneFixtures": [
+    "America/Sao_Paulo",
+    "UTC",
+    "Pacific/Kiritimati",
+    "America/New_York"
+  ],
+  "database": {
+    "runner": "native equivalent of supabase/verification/run_ci.sh",
+    "postgres": "17.11",
+    "postgrest": "12.2.12",
+    "mailpit": "1.31.4",
+    "fresh": true,
+    "legacyUpgrade": true,
+    "negativeSql": true,
+    "preRecoveryApi": true,
+    "realPostgresApi": true,
+    "urgeTiedPagination": true,
+    "urgeOwnership": true,
+    "urgeArchiveHistoryAndRejection": true,
+    "urgeDefinitiveRejectionReplay": true,
+    "urgeIntensity0And10": true,
+    "urgeStreakUnchanged": true,
+    "dockerRunner": "unavailable: executable missing"
+  },
+  "limitations": [
+    "No production deployment",
+    "No manual spoken screen reader session",
+    "CI container images not executed locally"
+  ],
+  "commands": {
+    "validate": {
+      "passed": true,
+      "apiTests": 80,
+      "webTests": 223,
+      "build": true,
+      "docs": true
+    },
+    "lint:web": {
+      "passed": true
+    },
+    "test:browser": {
+      "passed": true,
+      "suites": 10,
+      "engines": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ]
+    },
+    "test:browser:vontades": {
+      "passed": true,
+      "includedInFullSuite": true
+    },
+    "test:db": {
+      "passed": false,
+      "reason": "Docker executable unavailable; native equivalent completed"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { canRecoverUrge } from '../utils/urges.js';
 export const SCHEMA_VERSION = 2;
 export const DATABASE_PREFIX = 'revive-account-';
 const STORES = ['meta', 'snapshots', 'outbox', 'pages', 'receipts', 'mappings'];
@@ -176,7 +177,7 @@ function accountStore(db, userId, onVersionChange) {
             entry.payload.vicio_id && receipt.entity.vicio_id !== entry.payload.vicio_id ||
             entry.type === 'relapse.create' && receipt.entity.vicio_id !== entry.payload.addictionId) throw fail('RECEIPT_INVALID', 'O recibo não corresponde à intenção.');
           const mapping = { key: id, entityId: receipt.entity.id, revision: receipt.entity.revision || 1 };
-          tx.objectStore('receipts').put({ key: id, userId, type: entry.type, kind: 'confirmed', response: { [receipt.key]: clone(receipt.entity) }, confirmedAt: new Date().toISOString() });
+          tx.objectStore('receipts').put({ key: id, userId, type: entry.type, payloadVersion: 1, kind: 'confirmed', response: { [receipt.key]: clone(receipt.entity) }, confirmedAt: new Date().toISOString() });
           tx.objectStore('mappings').put(mapping);
           outbox.getAll().onsuccess = queued => {
             try {
@@ -250,9 +251,25 @@ function accountStore(db, userId, onVersionChange) {
       tx.objectStore('meta').put({ key: 'habitDraft:' + id, value: clone(value) });
       set(value);
     }),
+    getUrgeDraft: async id => (await read('meta', 'urgeDraft:' + id))?.value || null,
+    saveUrgeDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
+      tx.objectStore('meta').put({ key: 'urgeDraft:' + id, value: clone(value) }); set(value);
+    }),
     getRecordDraft: async id => (await read('meta', 'recordDraft:' + id))?.value || null,
     saveRecordDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
       tx.objectStore('meta').put({ key: 'recordDraft:' + id, value: clone(value) }); set(value);
+    }),
+    recoverUrgeDraft: (id, draft) => run(['outbox', 'receipts', 'meta'], 'readwrite', (tx, set, abort) => {
+      const outbox = tx.objectStore('outbox');
+      outbox.get(id).onsuccess = event => {
+        try {
+          const prior = event.target.result;
+          if (!canRecoverUrge(prior)) throw fail('RECOVERY_CHANGED', 'A recusa mudou. Atualize a Sincronização.');
+          tx.objectStore('meta').put({ key: 'urgeDraft:' + prior.payload.vicio_id, value: clone(draft) });
+          tx.objectStore('receipts').put({ key: id, userId, type: prior.type, payloadVersion: 1, kind: 'replaced', intent: prior, replacedByDraft: draft.eventId, replacedAt: new Date().toISOString() });
+          outbox.delete(id); set(prior.payload.vicio_id);
+        } catch (error) { abort(error); }
+      };
     }),
     userId, close, saveSnapshot, savePage, enqueue, acknowledge, discard, replaceRecordEdit,
     getSnapshot: () => read('snapshots', 'bootstrap'), getIdentity: () => read('meta', 'identity'),
