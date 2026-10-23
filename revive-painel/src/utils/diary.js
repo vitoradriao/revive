@@ -16,8 +16,9 @@ export function recordCreation(values, habitId, date = new Date()) {
     if (!habitId || !values.humor?.trim()) throw new Error('Selecione um hábito e informe seu humor.');
     return { ...recordPatch({}, values), vicio_id: habitId, data_registro: getLocalDateString(date), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
 }
-export function validateRecordFilters(filters) {
+export function validateRecordFilters(filters, { optionalPeriod = false } = {}) {
     if (filters.limit !== undefined && (!Number.isInteger(filters.limit) || filters.limit < 1 || filters.limit > 100)) throw new Error('Use entre 1 e 100 registros por página.');
+    if (optionalPeriod && filters.inicio === undefined && filters.fim === undefined) return;
     const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
     if (!validDate(filters.inicio) || !validDate(filters.fim) || filters.fim < filters.inicio || (Date.parse(filters.fim) - Date.parse(filters.inicio)) / 86400000 > 3660) {
         throw new Error('Informe um período válido de até 3.660 dias entre início e fim.');
@@ -41,4 +42,4 @@ export function projectRecords(records, queue) {
     }
     return mergeRecords([...rows.values()]);
 }
-export const inRecordPeriod = (record, filters) => (!filters.vicio_id || record.vicio_id === filters.vicio_id) && record.data_registro.slice(0, 10) >= filters.inicio && record.data_registro.slice(0, 10) <= filters.fim;
+export const inRecordPeriod = (record, filters) => (!filters.vicio_id || record.vicio_id === filters.vicio_id) && (!filters.inicio || record.data_registro.slice(0, 10) >= filters.inicio) && (!filters.fim || record.data_registro.slice(0, 10) <= filters.fim);

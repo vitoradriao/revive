@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { validSearchTerm, searchScope, encodeSearchCursor, decodeSearchCursor } = require('./diary-search');
 const { defaultPreferences, validatePreferences } = require('./journey-preferences');
 const { createWebAuthTransport } = require('./web-auth-transport');
 const { validateRecordFields, parseRecordCursor } = require('./diary-records');
@@ -500,6 +501,37 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             console.error('mobile push token removal failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel remover o dispositivo.');
         }
+    });
+
+    router.post('/registros/search', authenticate, async (req, res) => {
+        const input = req.body;
+        const allowed = ['termo', 'inicio', 'fim', 'vicio_id', 'limit', 'cursor'];
+        if (!input || typeof input !== 'object' || Array.isArray(input)
+            || Object.keys(input).some(key => !allowed.includes(key))) {
+            return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise os filtros da busca.');
+        }
+        const { inicio, fim, vicio_id, cursor, termo = '', limit = 50 } = input;
+        const hasPeriod = inicio !== undefined || fim !== undefined;
+        if (!validSearchTerm(termo) || !Number.isInteger(limit) || limit < 1 || limit > 100
+            || (hasPeriod && (!isValidLocalDate(inicio) || !isValidLocalDate(fim) || fim < inicio
+                || (new Date(fim) - new Date(inicio)) / MS_PER_DAY > 3660))
+            || (vicio_id !== undefined && (typeof vicio_id !== 'string' || !UUID_PATTERN.test(vicio_id)))) {
+            return apiError(res, 422, 'DADOS_INVALIDOS', 'Use até 100 caracteres e filtros válidos.');
+        }
+        const scope = searchScope(req.usuarioId, input, jwtSecret);
+        const after = cursor === undefined ? null : decodeSearchCursor(cursor, scope, jwtSecret);
+        if (cursor !== undefined && !after) return apiError(res, 422, 'CURSOR_INCOMPATIVEL', 'A consulta mudou. Reinicie a busca sem cursor.');
+        try {
+            const { data, error } = await supabase.rpc('search_diary_records', {
+                p_usuario_id: req.usuarioId, p_termo: termo, p_vicio_id: vicio_id || null,
+                p_inicio: inicio || null, p_fim: fim || null, p_limit: limit + 1,
+                p_cursor_date: after?.date || null, p_cursor_id: after?.id || null,
+            });
+            if (error) throw error;
+            const rows = data || [], records = rows.slice(0, limit);
+            return res.json({ registros: records, next_cursor: rows.length > limit
+                ? encodeSearchCursor(records.at(-1), scope, jwtSecret) : null });
+        } catch { return apiError(res, 503, 'CONSULTA_INDISPONIVEL', 'Não foi possível buscar no diário.'); }
     });
 
     router.get('/registros', authenticate, async (req, res) => {

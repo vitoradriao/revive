@@ -123,3 +123,48 @@ it('aguarda abertura do banco e refaz consulta depois do bootstrap', async () =>
     rerender(<QuickCheckIn habits={[diaryHabit]} />);
     await screen.findByText('Já existe registro para este hábito hoje.');
 });
+
+
+it('ignora termo e página antigos, reinicia o cursor e trata HTML como texto', async () => {
+    const oldTerm = deferred(), oldPage = deferred();
+    client.diary.mockImplementation((_method, [filters]) => {
+        if (filters.cursor) return oldPage.promise;
+        if (filters.termo === 'antigo') return oldTerm.promise;
+        if (filters.termo === '<B>') return Promise.resolve({ records: [{ ...diaryRecord, observacoes: '<b>Texto</b>' }], nextCursor: 'second' });
+        return Promise.resolve({ records: [] });
+    });
+    render(<Diary habitId={diaryHabit.id} accountKey="a:epoch" />, { wrapper });
+    const search = screen.getByRole('searchbox', { name: 'Buscar no diário' });
+    fireEvent.change(search, { target: { value: 'antigo' } });
+    fireEvent.change(search, { target: { value: '<B>' } });
+    expect(await screen.findByText('<b>Texto</b>')).toBeInTheDocument();
+    await act(async () => oldTerm.resolve({ records: [{ ...diaryRecord, observacoes: 'Resposta antiga' }] }));
+    expect(screen.queryByText('Resposta antiga')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Carregar mais registros' }));
+    fireEvent.change(search, { target: { value: 'novo' } });
+    await screen.findByText('Nenhum registro neste período nos dados disponíveis.');
+    await act(async () => oldPage.resolve({ records: [{ ...diaryRecord, observacoes: 'Página antiga' }] }));
+    expect(screen.queryByText('Página antiga')).not.toBeInTheDocument();
+    expect(client.diary.mock.calls.at(-1)[1][0]).not.toHaveProperty('cursor');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Buscar em todo o histórico' }));
+    await waitFor(() => expect(client.diary.mock.calls.at(-1)[1][0]).toMatchObject({ inicio: undefined, fim: undefined, termo: 'novo' }));
+    expect(screen.getByLabelText('Início')).toBeDisabled();
+    fireEvent.change(search, { target: { value: 'x'.repeat(101) } });
+    expect(screen.getByRole('alert')).toHaveTextContent('100 caracteres');
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+});
+
+it('perguntas são opcionais, não preenchem campos, rascunhos ou intenções nem mudam validações', async () => {
+    render(<QuickCheckIn habits={[diaryHabit]} />, { wrapper });
+    await screen.findByText('Nenhum registro de hoje nos dados disponíveis.');
+    expect(screen.queryByRole('complementary', { name: 'Perguntas opcionais' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar reflexão opcional' }));
+    const questions = screen.getByRole('complementary', { name: 'Perguntas opcionais' });
+    expect(within(questions).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+        'O que marcou seu dia?', 'Que situação você quer registrar?', 'O que você considera uma conquista hoje?'
+    ]);
+    for (const label of ['Humor', 'Gatilhos', 'Conquistas', 'Observações']) expect(screen.getByLabelText(label)).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Salvar check-in' })).toBeDisabled();
+    expect(client.diary.mock.calls.every(([method]) => method === 'list')).toBe(true);
+    expect(client.saveRecordDraft).not.toHaveBeenCalled();
+});

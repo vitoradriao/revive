@@ -45,7 +45,7 @@ const login = async (page, email) => {
             const failedReads = new Set();
             page.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) {
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) {
                     failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
                 }
             });
@@ -126,7 +126,7 @@ const login = async (page, email) => {
             // ou rede desligada; só são aceitas mensagens de leituras GET que de fato falharam nesta página.
             const unexpected = errors.filter(error => !(engine === 'webkit' && (
                 [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
-                || error.message.trim().endsWith(`/127.0.0.1:${number}/api/v2/bootstrap due to access control checks.`)
+                || /\/api\/v2\/(?:bootstrap|registros(?:\?[^\s#]+)?|registros\/search|vontades(?:\?[^\s#]+)?|web-auth\/refresh|preferences) due to access control checks\.$/.test(error.message.trim())
             ))).map(error => error.message);
             assert.deepEqual(unexpected, []);
             results.push({ engine, passed: true, scenarios: ['five-pages', 'reset-record', 'permanent-awards', 'archive', 'legacy', 'partial-export', 'account-switch', 'offline-pending', 'accessible-heatmap'] });

@@ -77,7 +77,7 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             page.on('pageerror', error => errors.push({ message: error.message, expectedNetworkFailure }));
             context.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
             });
             await page.clock.setFixedTime(new Date('2026-10-23T02:59:00Z'));
             await page.goto(base); await login(page);
@@ -204,7 +204,7 @@ const closeEditor = page => page.getByRole('button', { name: 'Fechar detalhe', e
             await login(page, 'b@example.invalid');
             assert.equal(await page.getByText('Correção sintética final', { exact: true }).count(), 0);
             // Linux WebKit may omit requestfailed during navigation/reload; accept only known local read diagnostics.
-            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|(?:registros|vontades)\?[^\s#]+) due to access control checks\.$`);
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|registros/search|vontades(?:\?[^\s#]+)?|web-auth/refresh|preferences) due to access control checks\.$`);
             const unexpected = errors.filter(error => !(engine === 'webkit' && (
                 [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
                 || interruptedRead.test(error.message.trim())

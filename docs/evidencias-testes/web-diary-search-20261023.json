@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-23",
+  "scope": "API e painel web — issue #68",
+  "data": "Somente fixtures sintéticas; sem credenciais, termos ou conteúdo de diário neste artefato",
+  "node": "22.23.4",
+  "checks": {
+    "apiUnit": {
+      "command": "npm run test:api:unit",
+      "status": "passed",
+      "tests": 62
+    },
+    "web": {
+      "command": "npm run test:web",
+      "status": "passed",
+      "unitTests": 220,
+      "componentTests": 105
+    },
+    "lint": {
+      "command": "npm run lint:web",
+      "status": "passed"
+    },
+    "build": {
+      "command": "npm run build:web",
+      "status": "passed"
+    },
+    "docs": {
+      "command": "npm run check:docs",
+      "status": "passed"
+    },
+    "postgresSql": {
+      "command": "PG_BIN=/caminho/postgresql/17/bin npm run test:db:single",
+      "status": "passed",
+      "version": "17.11",
+      "fresh": true,
+      "legacy": true,
+      "sharedCorpus": true,
+      "ownership": true,
+      "invokerAndPermissions": true,
+      "archive": true,
+      "tiedPages": true,
+      "emptyMatchesGet": true,
+      "yearFixtureDays": 365,
+      "yearSearchThresholdMs": 2000,
+      "limitation": "Modo sem servidor; não substitui HTTP/PostgREST ou concorrência em duas conexões"
+    },
+    "validate": {
+      "command": "npm run validate",
+      "status": "blocked",
+      "reason": "Suítes HTTP dependem de sockets; listen EPERM"
+    },
+    "postgresHttp": {
+      "command": "npm run test:db",
+      "status": "blocked",
+      "reason": "Docker indisponível; servidor local impedido pela restrição de sockets"
+    },
+    "browserWrapper": {
+      "command": "/workspace/prompts/browser.sh test:browser:search",
+      "status": "blocked",
+      "reason": "Fixtures indisponíveis por listen EPERM"
+    },
+    "browserSearch": {
+      "command": "npm run test:browser:search",
+      "status": "blocked",
+      "enginesPlanned": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ],
+      "reason": "listen EPERM na reserva da porta local; nenhum motor homologado"
+    },
+    "browserRegressions": {
+      "commands": [
+        "npm run test:browser:diary",
+        "npm run test:browser:client",
+        "npm run test:browser:habits"
+      ],
+      "status": "blocked",
+      "reason": "Diário/hábitos: listen EPERM. Cliente offline: Chromium impedido de iniciar, Operation not permitted/SIGTRAP."
+    },
+    "mobile": {
+      "status": "not_applicable",
+      "reason": "Nenhum arquivo mobile alterado; paridade posterior"
+    }
+  },
+  "remainingAcceptance": [
+    "HTTP completo",
+    "PostgREST/duas conexões",
+    "Chromium/Firefox/WebKit",
+    "Leitor de tela"
+  ],
+  "dependency61": {
+    "status": "integrated_in_local_history",
+    "merge": "9be959d",
+    "pullRequest": 76
+  }
+}

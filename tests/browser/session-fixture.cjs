@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
+const { normalizeDiaryText } = require('../../diary-search');
 const { createMobileApi } = require('../../mobile-api');
 const { createCredentialAuth } = require('../../credential-auth');
 const { fakeSupabase } = require('../helpers/session-database.cjs');
@@ -24,6 +25,8 @@ const secret = 'synthetic-browser-session-key-not-production';
 const counts = { refresh: 0, login: 0, writes: 0, replays: 0 };
 const events = { registros: new Map(), vontades: new Map(), recaidas: new Map(), metas: new Map() };
 const receipts = new Map();
+let holdSearchResponses = false;
+const heldSearchResponses = [];
 let dropNextResponse = false, dropRecordResponses = false, dropUrgeResponses = false, holdUrgeResponses = false, blockMutations = false;
 const habits = database.tables.usuarios.map((user, index) => ({
     id: '10000000-0000-4000-8000-00000000000' + (index + 1), usuario_id: user.id,
@@ -71,9 +74,10 @@ database.client.rpc = async (name, args) => {
             .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at) || b.id.localeCompare(a.id)).slice(0, args.p_limit);
         return { data: rows.length ? rows.map(row => ({ ...structuredClone(row), habit_found: true, total_count: all.length })) : [{ habit_found: true, total_count: all.length }], error: null };
     }
-    if (name === 'list_diary_records') {
+    if (['list_diary_records', 'search_diary_records'].includes(name)) {
         const rows = [...events.registros.values()].filter(row => row.usuario_id === args.p_usuario_id &&
-            (!args.p_vicio_id || row.vicio_id === args.p_vicio_id) && row.data_registro >= args.p_inicio && row.data_registro <= args.p_fim &&
+            (!args.p_vicio_id || row.vicio_id === args.p_vicio_id) && (!args.p_inicio || row.data_registro >= args.p_inicio) && (!args.p_fim || row.data_registro <= args.p_fim) &&
+            (!args.p_termo || ['humor','gatilhos','conquistas','observacoes'].some(key => normalizeDiaryText(row[key] || '').includes(normalizeDiaryText(args.p_termo)))) &&
             (!args.p_cursor_date || row.data_registro < args.p_cursor_date || row.data_registro === args.p_cursor_date && row.id < args.p_cursor_id))
             .sort((a, b) => b.data_registro.localeCompare(a.data_registro) || b.id.localeCompare(a.id)).slice(0, args.p_limit);
         return { data: structuredClone(rows), error: null };
@@ -193,21 +197,39 @@ app.post('/__test/seed-diary', (_req, res) => {
     }
     res.sendStatus(204);
 });
+app.post('/__test/search-transport', (req, res) => {
+    holdSearchResponses = req.body.hold === true;
+    if (!holdSearchResponses) for (const held of heldSearchResponses.splice(0)) held();
+    res.sendStatus(204);
+});
+app.post('/__test/seed-diary-search', (_req, res) => {
+    const corpus = require('../fixtures/diary-search.json');
+    for (let index = 0; index < 365; index++) {
+        const record = { ...corpus.rows[index % corpus.rows.length],
+            id: '30000000-0000-4000-8000-' + String(index + 1).padStart(12, '0'), usuario_id: habits[0].usuario_id,
+            vicio_id: habits[0].id, data_registro: new Date(Date.UTC(2025, 9, 24 + index)).toISOString().slice(0, 10), revision: 1 };
+        if (index === 0) record.observacoes = 'Sentinela anual ' + record.observacoes;
+        events.registros.set(record.id, record);
+    }
+    res.sendStatus(204);
+});
 app.post('/__test/reset-block-mutations', (_req, res) => { blockMutations = false; res.sendStatus(204); });
 app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
     if (revokeOnGoalWrite && req.method === 'PATCH' && req.path.startsWith('/metas/')) {
         revokeOnGoalWrite = false; database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     }
-    if (blockMutations && req.method !== 'GET' && req.path !== '/account' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
+    const reading = req.method === 'GET' || req.path === '/registros/search';
+    if (blockMutations && !reading && req.path !== '/account' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
+        if (holdSearchResponses && req.path === '/registros/search') { heldSearchResponses.push(() => json(body)); return res; }
         if ((req.path === '/metas' || /^\/metas\/[^/]+$/.test(req.path) || req.path.endsWith('/recaida')) && req.method !== 'GET' && res.statusCode < 300) {
             if (goalTransport === 'hold') { heldGoalResponses.push({ send: json, body }); return res; }
             if (goalTransport === 'drop') { res.destroy(); return res; }
         }
         if (holdUrgeResponses && req.method === 'POST' && req.path === '/vontades' && res.statusCode < 300) return res;
-        if ((dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros' || dropUrgeResponses && req.method === 'POST' && req.path === '/vontades') && res.statusCode < 300) {
+        if ((dropNextResponse && !reading && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros' || dropUrgeResponses && req.method === 'POST' && req.path === '/vontades') && res.statusCode < 300) {
             dropNextResponse = false; res.destroy(); return res;
         }
         return json(body);
@@ -217,9 +239,9 @@ app.use('/api/v2', (req, res, next) => {
 app.post('/__test/drop-record-responses', (req, res) => { dropRecordResponses = req.body.enabled === true; res.sendStatus(204); });
 app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true; res.sendStatus(204); });
 app.get('/__test/status', (_req, res) => res.json({
-    goalHabitActive: habits[0].ativo, counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
+    heldSearch: heldSearchResponses.length, goalHabitActive: habits[0].ativo, counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
-app.post('/__test/reset', (_req, res) => { networkUnavailable = false; goalTransport = 'normal'; failGoalDelete = false; revokeOnGoalWrite = false; heldGoalResponses.length = 0; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
+app.post('/__test/reset', (_req, res) => { holdSearchResponses = false; for (const send of heldSearchResponses.splice(0)) send(); networkUnavailable = false; goalTransport = 'normal'; failGoalDelete = false; revokeOnGoalWrite = false; heldGoalResponses.length = 0; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
     database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     res.sendStatus(204);

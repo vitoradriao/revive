@@ -309,6 +309,49 @@
 
 /**
  * @openapi
+ * /api/v2/registros/search:
+ *   post:
+ *     tags: [Mobile Offline v2]
+ *     summary: Busca literal no histórico completo do diário, inclusive hábitos arquivados
+ *     description: >-
+ *       Termo apenas no body, sem ranking. NFD, remoção de marcas U+0300–U+036F,
+ *       minúsculas Unicode com locale raiz e sigma final normalizado; espaços preservados.
+ *       Aspas, barras, HTML, % e _ são literais. Vazio equivale à listagem normal.
+ *       Sem inicio/fim, consulta todo o histórico. Quando informadas, ambas as datas
+ *       são obrigatórias, inclusivas, com intervalo de até 3660 dias. Termos não são
+ *       registrados em logs de acesso. Cursor assinado vinculado a conta, termo
+ *       normalizado, período, hábito e limit; ao mudar consulta, reiniciar sem cursor.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             properties:
+ *               termo: { type: string, maxLength: 100, default: '', description: Até 100 pontos de código Unicode; sem NUL ou surrogates isolados }
+ *               inicio: { type: string, format: date }
+ *               fim: { type: string, format: date }
+ *               vicio_id: { type: string, format: uuid }
+ *               limit: { type: integer, minimum: 1, maximum: 100, default: 50 }
+ *               cursor: { type: string, description: next_cursor da mesma consulta }
+ *     responses:
+ *       200:
+ *         description: Apenas registros da conta, por data_registro desc e ID desc
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [registros, next_cursor]
+ *               properties:
+ *                 registros: { type: array, items: { $ref: '#/components/schemas/RegistroDiario' } }
+ *                 next_cursor: { type: string, nullable: true }
+ *       400: { description: JSON inválido, sem eco do body }
+ *       401: { description: Sessão ausente, expirada ou revogada }
+ *       413: { description: Corpo excede o limite do parser JSON }
+ *       422: { description: DADOS_INVALIDOS ou CURSOR_INCOMPATIVEL; reiniciar sem cursor }
+ *       503: { description: Busca indisponível; GET legado não substitui pesquisa completa }
  * /api/v2/registros:
  *   get:
  *     tags: [Mobile Offline v2]

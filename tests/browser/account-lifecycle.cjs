@@ -54,7 +54,7 @@ const waitFor = async condition => {
                 const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
                 page.on('requestfailed', request => {
                     const url = new URL(request.url());
-                    if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                    if (url.origin === base && ((request.method() === 'GET' && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) || url.pathname === '/api/v2/registros/search')) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
                 }); return page;
             };
             const control = async (endpoint, body = {}) => {
@@ -245,7 +245,7 @@ const waitFor = async condition => {
             assert.equal((await context.cookies()).filter(cookie => cookie.name === 'revive_refresh').length, 1);
             await b.reload(); await b.getByRole('heading', { name: 'Perfil', exact: true }).waitFor();
             assert.equal(await b.getByText('Conta A sintética', { exact: true }).count(), 0);
-            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros\?[^\s#]+|vontades\?[^\s#]+|web-auth/refresh) due to access control checks\.$`);
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|registros/search|vontades(?:\?[^\s#]+)?|web-auth/refresh|preferences) due to access control checks\.$`);
             assert.deepEqual(errors.filter(message => !(engine === 'webkit' && ([...failedReads].some(diagnostic => message.trim().endsWith(diagnostic)) || interruptedRead.test(message.trim())))), []);
             results.push({ engine, browserVersion: await browser.version(), keyboard: true, delayedTabNoticeRefused: true, recovery: ['offline', 'neutral SMTP/rollout', 'cooldown', 'invalid', 'expired', 'limited', 'unavailable', 'success', 'replay', 'old password rejected', 'profile reset invalidates both tabs'], logout: ['cancel', 'sync failure preserved', 'sync success', 'discard', 'confirmed cleanup resumed after interrupted IndexedDB transaction'], deletion: ['cancel', 'failure preserved', 'real timeout preserved', 'confirmed cleanup', 'cookie expired'], tabs: 2, indexedDB: 'real', locks: 'real', secretsPersisted: false });
             await context.close();

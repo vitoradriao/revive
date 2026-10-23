@@ -76,6 +76,14 @@ function CheckInForm({ habit, accountKey, full }) {
                 <div role="group" aria-label="Sugestões de humor" className="flex flex-wrap gap-2">
                     {moodOptions.map(mood => <Button key={mood.value} type="button" aria-pressed={values.humor === mood.value} onClick={() => setValues({ ...values, humor: mood.value })}>{mood.label}</Button>)}
                 </div>
+                {expanded && <aside aria-label="Perguntas opcionais" className="space-y-2">
+                    <p>Perguntas opcionais para refletir. Nada é preenchido ou salvo ao exibi-las.</p>
+                    <ul className="list-disc pl-5">
+                        <li>O que marcou seu dia?</li>
+                        <li>Que situação você quer registrar?</li>
+                        <li>O que você considera uma conquista hoje?</li>
+                    </ul>
+                </aside>}
                 <RecordFields values={values} quick={!expanded} onChange={(key, value) => setValues({ ...values, [key]: value })} />
                 {!full && <Button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Recolher reflexão opcional' : 'Adicionar reflexão opcional'}</Button>}
                 <Button type="submit" disabled={!values.humor.trim()}>{full ? 'Salvar registro' : 'Salvar check-in'}</Button>

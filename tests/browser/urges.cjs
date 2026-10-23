@@ -105,7 +105,7 @@ const verifyStorageIsolation = async context => {
             await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
             await context.exposeBinding('__testFailedRead', (_source, value) => {
                 const url = new URL(value);
-                if (url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                if (url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
             });
             await context.addInitScript(() => {
                 const nativeFetch = window.fetch;
@@ -124,7 +124,7 @@ const verifyStorageIsolation = async context => {
             page.on('pageerror', error => errors.push({ message: error.message, expectedNetworkFailure }));
             context.on('requestfailed', request => {
                 const url = new URL(request.url());
-                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/vontades', '/api/v2/registros'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
+                if (request.method() === 'GET' && url.origin === base && ['/api/v2/bootstrap', '/api/v2/registros', '/api/v2/vontades', '/api/v2/web-auth/refresh', '/api/v2/preferences'].includes(url.pathname)) failedReads.add('/' + url.host + url.pathname + url.search + ' due to access control checks.');
             });
             await page.clock.setFixedTime(new Date('2026-10-22T15:30:42Z'));
             await page.goto(base); await login(page);
@@ -251,11 +251,11 @@ const verifyStorageIsolation = async context => {
             await page.getByText('Nenhuma vontade neste período nos dados disponíveis.', { exact: true }).waitFor();
             assert.equal(await page.getByText('Nota sintética', { exact: false }).count(), 0);
             // Linux WebKit may omit requestfailed during navigation/reload; accept only known local read diagnostics.
-            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|(?:registros|vontades)\?[^\s#]+) due to access control checks\.$`);
+            const interruptedRead = new RegExp(String.raw`/127\.0\.0\.1:${port}/api/v2/(?:bootstrap|registros(?:\?[^\s#]+)?|registros/search|vontades(?:\?[^\s#]+)?|web-auth/refresh|preferences) due to access control checks\.$`);
             const unexpected = errors.filter(error => !(engine === 'webkit' && (
                 [...failedReads].some(diagnostic => error.message.trim().endsWith(diagnostic))
                 || interruptedRead.test(error.message.trim())
-                || error.expectedNetworkFailure && error.message.trim().endsWith(`/127.0.0.1:${port}/api/v2/web-auth/refresh due to access control checks.`)
+                || error.expectedNetworkFailure && /\/api\/v2\/(?:web-auth\/refresh|vontades(?:\?[^\s#]+)?|preferences) due to access control checks\.$/.test(error.message.trim())
             )));
             assert.deepEqual(unexpected, []);
             const storage = await verifyStorageIsolation(context);

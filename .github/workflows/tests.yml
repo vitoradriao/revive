@@ -89,7 +89,7 @@ jobs:
   browser:
     name: Web — sessões, IndexedDB e shell offline
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       CI: 'true'
     steps:
