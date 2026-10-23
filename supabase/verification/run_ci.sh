@@ -56,6 +56,8 @@ docker compose -f "$compose_file" exec -T "$postgres_service" \
 psql_file revive_fixture supabase/verification/assert_base_schema.sql
 psql_file revive_fixture supabase/verification/assert_full_schema.sql
 psql_file revive_fixture supabase/verification/assert_personal_reason.sql
+psql_file revive_fixture supabase/verification/assert_journey_preferences.sql
+psql_file revive_fixture supabase/verification/assert_journey_preferences_behavior.sql
 
 psql_file revive_legacy_fixture supabase/migrations/20260615000000_initial_schema.sql
 psql_file revive_legacy_fixture supabase/verification/legacy_fixture.sql
@@ -69,6 +71,8 @@ psql_file revive_legacy_fixture supabase/verification/assert_base_schema.sql
 psql_file revive_legacy_fixture supabase/verification/assert_full_schema.sql
 psql_file revive_legacy_fixture supabase/verification/assert_synthetic_upgrade.sql
 psql_file revive_legacy_fixture supabase/verification/assert_personal_reason.sql
+psql_file revive_legacy_fixture supabase/verification/assert_journey_preferences.sql
+psql_file revive_legacy_fixture supabase/verification/assert_journey_preferences_behavior.sql
 
 expect_error revive_fixture supabase/verification/expect_invalid_constraint.sql \
   'violates foreign key constraint'

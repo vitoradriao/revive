@@ -1,3 +1,4 @@
+import { syncPreferences } from './journey-preferences';
 import { requestSnapshot } from './request-snapshot';
 import { getSessionManager } from '../services/session-manager';
 import { apiCall } from '../services/api';
@@ -37,12 +38,13 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       });
     }
   };
-  const update = async () => {
+  const update = async (check) => {
     const db = store, key = currentKey;
     if (!db) return;
-    const [snapshot, queue, receipts] = await Promise.all([db.getSnapshot(), db.getQueue(), db.getReceipts()]);
+    const [snapshot, queue, receipts, preferences] = await Promise.all([db.getSnapshot(), db.getQueue(), db.getReceipts(), db.getPreferences?.()]);
     if (db !== store || key !== currentKey) return;
-    publish({ snapshot, queue, receipts, user: snapshot?.data.usuario || state.user });
+    check?.();
+    publish({ snapshot, queue, receipts, preferences: preferences || null, user: snapshot?.data.usuario || state.user });
   };
   const sync = async () => {
     const db = store, key = currentKey;
@@ -97,7 +99,7 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
     }
     currentKey = key; const ticket = ++generation;
     coordinator?.dispose(); coordinator = null; store?.close(); store = null;
-    publish({ accountKey: key, epoch: auth.epoch, loading: !!key || auth.authLoading, user: auth.user || null, snapshot: null, queue: [], receipts: [], error: null, localOnly: !!local });
+    publish({ accountKey: key, epoch: auth.epoch, loading: !!key || auth.authLoading, user: auth.user || null, snapshot: null, preferences: null, queue: [], receipts: [], error: null, localOnly: !!local });
     try {
       await recoverConfirmedCleanup();
       if (ticket !== generation) return;
@@ -143,6 +145,21 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       void connect();
     },
     refresh, sync,
+    preferences: async (input, accountKey) => {
+      const db = store, auth = session.getSnapshot();
+      const check = () => {
+        if (!db || db !== store || !accountKey || accountKey !== currentKey || closing
+            || session.getSnapshot().epoch !== auth.epoch || session.getSnapshot().user?.id !== db.userId
+            || (session.isCurrentEpoch && !session.isCurrentEpoch(auth.epoch))) throw changed();
+      };
+      check();
+      const result = await requireCoordinator().withAccountLock(() => syncPreferences({ store: db, input, check,
+        isOnline: () => navigator.onLine !== false && !!auth.token,
+        request: (path, options) => request(path, options, auth.token),
+      }));
+      check(); await update(check); check();
+      return result;
+    },
     goals: (method, args, accountKey) => {
       if (!accountKey || accountKey !== currentKey) return Promise.reject(changed());
       const key = accountKey + ':goals:' + method + ':' + JSON.stringify(args);

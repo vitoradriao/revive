@@ -1168,3 +1168,78 @@
  *       '422': { description: Corpo não é objeto JSON }
  *       '503': { description: Não confirmou saída; cookie preservado para recuperação }
  */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     JourneyPreferences:
+ *       type: object
+ *       required: [primary_habit_id, indicator_order, intro, revision]
+ *       properties:
+ *         primary_habit_id: { type: string, format: uuid, nullable: true, description: null usa primeiro hábito ativo disponível; arquivado mantém ID para aviso e fallback local }
+ *         indicator_order:
+ *           type: array
+ *           minItems: 1
+ *           maxItems: 32
+ *           uniqueItems: true
+ *           items: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+ *           description: IDs estáveis. Defaults current_streak, historical_record, sequence_savings, accumulated_savings. Cliente filtra desconhecidos apenas na apresentação e acrescenta conhecidos ausentes na ordem padrão; mantém desconhecidos ao editar. Restaurar substitui a ordem pelos defaults atuais.
+ *         intro:
+ *           type: object
+ *           additionalProperties: false
+ *           required: [version, state]
+ *           properties:
+ *             version: { type: integer, minimum: 0, maximum: 1000000, description: Versão do conteúdo; zero exige pending. Não é revisão de concorrência }
+ *             state: { type: string, enum: [pending, completed, dismissed] }
+ *         revision: { type: integer, minimum: 0, description: Revisão concorrente por conta; zero antes da primeira alteração; incrementa também quando exclusão do principal limpa a referência }
+ * /api/v2/preferences:
+ *   get:
+ *     summary: Consultar preferências sincronizadas da Jornada
+ *     description: Resposta privada no-store por conta autenticada. Sem configuração retorna defaults virtuais com revision zero, principal null e introdução version zero/pending; não migra seleção local do check-in. Catálogo e defaults são mesclados pelo cliente sem ocultar todos os indicadores. Offline usa somente última cópia confirmada por conta. Requer migration journey_preferences antes do cliente; falha de schema não é confundida com defaults.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200':
+ *         description: Preferências ou defaults da própria conta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [preferences]
+ *               properties:
+ *                 preferences: { $ref: '#/components/schemas/JourneyPreferences' }
+ *       '401': { description: Sessão ausente ou inválida }
+ *       '503': { description: PREFERENCIAS_INDISPONIVEIS; última configuração local não é substituída }
+ *   patch:
+ *     summary: Alterar preferências online com revisão concorrente
+ *     description: PATCH parcial; revision e pelo menos um campo editável obrigatórios. Omissão preserva campos; ordem e intro são substituições completas. Principal não nulo exige ownership e hábito ativo. Desconhecidos sintaticamente válidos são aceitos para compatibilidade futura. Sem fila/retry automático; resposta perdida exige GET e revisão explícita. 409 preserva escolhas locais e não altera estado remoto. A versão de intro é independente da revisão da conta.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             minProperties: 2
+ *             required: [revision]
+ *             properties:
+ *               revision: { type: integer, minimum: 0, maximum: 2147483646 }
+ *               primary_habit_id: { type: string, format: uuid, nullable: true }
+ *               indicator_order: { $ref: '#/components/schemas/JourneyPreferences/properties/indicator_order' }
+ *               intro: { $ref: '#/components/schemas/JourneyPreferences/properties/intro' }
+ *     responses:
+ *       '200':
+ *         description: Alteração confirmada com revisão incrementada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [preferences]
+ *               properties:
+ *                 preferences: { $ref: '#/components/schemas/JourneyPreferences' }
+ *       '401': { description: Sessão ausente ou inválida }
+ *       '409': { description: REVISAO_CONFLITO; consultar e revisar escolhas locais antes de reaplicar }
+ *       '422': { description: DADOS_INVALIDOS; principal de outra conta, ausente ou arquivado recebe a mesma resposta }
+ *       '503': { description: Confirmação indisponível; consultar antes de tentar novamente }
+ */

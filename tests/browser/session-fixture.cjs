@@ -49,7 +49,19 @@ database.client.from = table => {
     };
 };
 const originalRpc = database.client.rpc;
+database.tables.journey_preferences = [];
+const { defaultPreferences } = require('../../journey-preferences');
 database.client.rpc = async (name, args) => {
+    if (name === 'edit_journey_preferences') {
+        const rows = database.tables.journey_preferences;
+        let row = rows.find(item => item.usuario_id === args.p_usuario_id);
+        if (!row) { row = { usuario_id: args.p_usuario_id, ...defaultPreferences() }; rows.push(row); }
+        if (row.revision !== args.p_revision) return { data: { status: 409 }, error: null };
+        if (args.p_patch.primary_habit_id && !habits.some(item => item.id === args.p_patch.primary_habit_id && item.usuario_id === args.p_usuario_id && item.ativo !== false)) return { data: { status: 422 }, error: null };
+        Object.assign(row, structuredClone(args.p_patch), { revision: row.revision + 1 }); counts.writes++;
+        const { usuario_id, ...preferences } = row;
+        return { data: { status: 200, preferences }, error: null };
+    }
     if (name === 'list_urge_events') {
         const habit = habits.find(row => row.id === args.p_vicio_id && row.usuario_id === args.p_usuario_id);
         if (!habit) return { data: [{ habit_found: false }], error: null };
@@ -138,6 +150,10 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
     res.json({ usuario: { id: user.id, nome: user.nome, email: user.email }, server_time: new Date().toISOString(),
         vicios: habits.filter(item => item.usuario_id === user.id),
         ...Object.fromEntries(Object.entries(events).filter(([key]) => key !== 'vontades').map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
+});
+app.post('/__test/seed-preferences', (_req, res) => {
+    habits.push({ ...structuredClone(habits[0]), id: '10000000-0000-4000-8000-000000000003', nome_vicio: 'Segundo hábito sintético' });
+    res.sendStatus(204);
 });
 app.post('/__test/seed-goals', (_req, res) => {
     const progress = require('../fixtures/progress.cjs').progressFixture({ reset: false });

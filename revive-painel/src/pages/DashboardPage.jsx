@@ -1,3 +1,6 @@
+import JourneyPreferences from '../components/journey/JourneyPreferences';
+import { useOffline } from '../contexts/OfflineContext';
+import { resolvePrimary } from '../utils/journeyPreferences';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, BookOpen, CheckCircle2, Heart, Plus, Repeat, Sparkles, Target } from 'lucide-react';
@@ -20,6 +23,7 @@ import { activityDays } from '../utils/progressMetrics';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { preferences } = useOffline();
   const { loading, openNewAddictionWizard } = useUI();
   const {
     motivationalMessage,
@@ -34,6 +38,7 @@ export default function DashboardPage() {
   const progress = useProgress();
   const visibleHabits = progress.habits.filter(habit => habitFilter === 'archived' ? habit.ativo === false : habit.ativo !== false);
   const addictions = progress.habits.filter(habit => habit.ativo !== false);
+  const { habit: primary } = resolvePrimary(preferences, progress.habits);
   const { records: allRecords, relapses, goals } = progress;
   const heatmapData = useMemo(() => activityDays(allRecords, relapses), [allRecords, relapses]);
 
@@ -121,7 +126,8 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <HeroKpis progress={progress} />
+            <p className="text-white/80">Principal da Jornada: {primary?.nome_vicio || 'nenhum hábito ativo disponível'}</p>
+            <HeroKpis progress={progress} order={preferences?.indicator_order} />
           </div>
         </article>
 
@@ -186,6 +192,8 @@ export default function DashboardPage() {
           </div>
         </article>
       </section>
+
+      <JourneyPreferences habits={progress.habits} />
 
       <label className="block">Exibir hábitos
         <select className="ml-3 p-2 rounded-xl surface-card" value={habitFilter} onChange={event => setHabitFilter(event.target.value)}>
