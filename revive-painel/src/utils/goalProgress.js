@@ -16,12 +16,13 @@ export function getLocalDateString(date = new Date()) {
 }
 
 export function calculateGoalProgress(meta, vicio) {
-  if (!meta || !vicio) return 0;
-  if (meta.concluida) return 100;
+  if (!meta) return 0;
+  if (asBoolean(meta.concluida)) return 100;
+  if (!vicio) return 0;
 
   const usesBaseline = goalUsesTodayBaseline(meta);
-  const currentDays = asNumber(vicio.dias_abstinencia);
-  const currentSavings = asNumber(vicio.valor_economizado);
+  const currentDays = asNumber(vicio.progresso ? vicio.progresso.sequencia_atual_dias : vicio.dias_abstinencia);
+  const currentSavings = asNumber(vicio.progresso ? vicio.progresso.economia_sequencia?.valor_estimado : vicio.valor_economizado);
   const baselineDays = usesBaseline ? asNumber(meta.dias_abstinencia_inicio) : 0;
   const baselineSavings = usesBaseline ? asNumber(meta.valor_economizado_inicio) : 0;
 

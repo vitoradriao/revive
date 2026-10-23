@@ -177,7 +177,7 @@ function accountStore(db, userId, onVersionChange) {
             entry.payload.vicio_id && receipt.entity.vicio_id !== entry.payload.vicio_id ||
             entry.type === 'relapse.create' && receipt.entity.vicio_id !== entry.payload.addictionId) throw fail('RECEIPT_INVALID', 'O recibo não corresponde à intenção.');
           const mapping = { key: id, entityId: receipt.entity.id, revision: receipt.entity.revision || 1 };
-          tx.objectStore('receipts').put({ key: id, userId, type: entry.type, payloadVersion: 1, kind: 'confirmed', response: { [receipt.key]: clone(receipt.entity) }, confirmedAt: new Date().toISOString() });
+          tx.objectStore('receipts').put({ key: id, userId, type: entry.type, payloadVersion: 1, kind: 'confirmed', ...(['goal.create', 'goal.complete', 'relapse.create'].includes(entry.type) ? { intentPayload: clone(entry.payload) } : {}), response: { [receipt.key]: clone(receipt.entity) }, confirmedAt: new Date().toISOString() });
           tx.objectStore('mappings').put(mapping);
           outbox.getAll().onsuccess = queued => {
             try {
@@ -246,6 +246,32 @@ function accountStore(db, userId, onVersionChange) {
     };
   });
   return {
+    removeHabit: id => run(['snapshots', 'pages'], 'readwrite', tx => {
+      for (const name of ['snapshots', 'pages']) {
+        const rows = tx.objectStore(name);
+        rows.getAll().onsuccess = event => {
+          for (const row of event.target.result) {
+            for (const collection of ['vicios', 'registros', 'metas', 'recaidas', 'vontades', 'conquistas']) {
+              if (Array.isArray(row.data?.[collection])) row.data[collection] = row.data[collection].filter(item => collection === 'vicios' ? item.id !== id : item.vicio_id !== id);
+            }
+            rows.put(row);
+          }
+        };
+      }
+    }),
+    removeGoal: id => run(['snapshots', 'pages'], 'readwrite', tx => {
+      for (const name of ['snapshots', 'pages']) {
+        const rows = tx.objectStore(name);
+        rows.getAll().onsuccess = event => {
+          for (const row of event.target.result) {
+            if (Array.isArray(row.data?.metas)) {
+              row.data.metas = row.data.metas.filter(goal => goal.id !== id);
+              rows.put(row);
+            }
+          }
+        };
+      }
+    }),
     getHabitDraft: async id => (await read('meta', 'habitDraft:' + id))?.value || null,
     saveHabitDraft: (id, value) => run(['meta'], 'readwrite', (tx, set) => {
       tx.objectStore('meta').put({ key: 'habitDraft:' + id, value: clone(value) });

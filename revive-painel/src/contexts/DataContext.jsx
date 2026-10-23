@@ -168,15 +168,16 @@ export function DataProvider({ children }) {
    * }, 'Nao foi possivel buscar os dados.');
    */
   const withLoading = useCallback(async (operation, errorMessage) => {
+    const operationAccount = activeSessionRef.current.accountKey;
     setLoading(true);
     try {
       return await operation();
     } catch (error) {
-      handleDataError(error, errorMessage);
+      if (activeSessionRef.current.accountKey === operationAccount) handleDataError(error, errorMessage);
       return null;
     } finally {
       // O bloco finally garante que o loading e desativado mesmo em caso de erro
-      setLoading(false);
+      if (activeSessionRef.current.accountKey === operationAccount) setLoading(false);
     }
   }, [setLoading, handleDataError]);
 
@@ -379,54 +380,20 @@ export function DataProvider({ children }) {
       'Confirmar Exclusao',
       `Tem certeza que deseja excluir "${addiction.nome_vicio}"? Esta acao nao pode ser desfeita.`,
       () => withLoading(async () => {
-        await viciosService.excluirVicio(addiction.id, token);
-        showToast('success', 'Vicio excluido com sucesso!');
-        await loadAddictions();
-        // Limpa a selecao se o vicio excluido era o selecionado atualmente
-        if (selectedAddiction?.id === addiction.id) setSelectedAddiction(null);
-      }, 'Nao foi possivel excluir o vicio.')
+        await viciosService.deleteConfirmedHabit(offlineClient, accountKey, addiction.id);
+        if (offlineClient.getSnapshot().accountKey !== accountKey) return;
+        showToast('success', 'Exclusão do hábito confirmada.');
+      }, 'Não foi possível excluir o hábito. Verifique a conexão e resolva as pendências em Sincronização.')
     );
-  }, [token, showToast, showConfirm, loadAddictions, selectedAddiction, withLoading]);
+  }, [offlineClient, accountKey, showToast, showConfirm, withLoading]);
 
-  /**
-   * Registra uma recaida para um vicio e opcionalmente reseta o contador de abstinencia.
-   *
-   * **Pattern de Options Object (Destructuring com default):**
-   * O segundo parametro usa destructuring com valor padrao `{ resetCounter = false }`.
-   * Isso permite chamadas flexiveis:
-   * - `registerRelapse(vicio)` -> registra recaida sem resetar
-   * - `registerRelapse(vicio, { resetCounter: true })` -> registra e reseta o contador
-   *
-   * Apos o registro, recarrega vicios, recaidas e detalhes do vicio (se selecionado),
-   * garantindo que a UI reflita o estado atualizado.
-   *
-   * @param {Object} addiction - Objeto do vicio onde ocorreu a recaida
-   * @param {string|number} addiction.id - ID do vicio
-   * @param {Object} [options={}] - Opcoes adicionais
-   * @param {boolean} [options.resetCounter=false] - Se true, reseta o contador de dias de abstinencia
-   * @returns {Promise<void>}
-   */
-  const registerRelapse = useCallback(async (addiction, { resetCounter = false } = {}) => {
-    await withLoading(async () => {
-      if (offlineClient) {
-        await offlineClient.enqueue('relapse.create', { addictionId: addiction.id, resetarContador: resetCounter, motivo: '', occurred_at: new Date().toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
-        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
-        showToast('info', 'Recaída salva neste navegador. Acompanhe a confirmação em Sincronização.');
-        return;
-      }
-      await viciosService.registrarRecaida(addiction.id, '', resetCounter, token);
-      showToast('success', resetCounter
-        ? 'Contador resetado! Um novo capitulo comeca.'
-        : 'Recaida registrada! Vamos refletir sobre o ocorrido.');
-      // Recarrega dados relacionados para manter a UI sincronizada
-      await loadAddictions();
-      await loadRelapses();
-      // Se o vicio com recaida e o selecionado, recarrega seus detalhes tambem
-      if (selectedAddiction?.id === addiction.id) {
-        await loadAddictionDetails(addiction.id);
-      }
-    }, 'Nao foi possivel registrar a recaida.');
-  }, [offlineClient, accountKey, token, showToast, loadAddictions, loadRelapses, loadAddictionDetails, selectedAddiction, withLoading]);
+  // O formulário fornece escolha explícita, instante/fuso e identidade da intenção.
+  const registerRelapse = useCallback(async (addiction, input, intentId) => {
+    const result = await recaidasService.createRelapseIntent(offlineClient, accountKey, { ...input, addictionId: addiction.id }, intentId);
+    if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+    showToast('info', 'Recaída salva neste navegador. Acompanhe a confirmação em Sincronização.');
+    return result;
+  }, [offlineClient, accountKey, showToast]);
 
   /**
    * Cria um registro diario para o vicio atualmente selecionado.
@@ -478,61 +445,26 @@ export function DataProvider({ children }) {
    * @param {string} [goalForm.descricao] - Descricao da meta
    * @returns {Promise<void>}
    */
-  const createGoal = useCallback(async (goalForm) => {
-    const result = await withLoading(async () => {
-      if (offlineClient) {
-        await offlineClient.enqueue('goal.create', goalForm);
-        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
-        showToast('info', 'Meta salva neste navegador. Acompanhe a confirmação em Sincronização.');
-        return true;
-      }
-      const response = await metasService.criarMeta(goalForm, token);
-      showToast('success', 'Meta criada com sucesso!');
-      if (response?.meta) {
-        setGoals(prev => [response.meta, ...prev.filter(goal => goal.id !== response.meta.id)]);
-      } else {
-        await loadGoals();
-      }
-      return true;
-    }, 'Nao foi possivel criar a meta.');
-    return result ?? false;
-  }, [offlineClient, accountKey, token, showToast, loadGoals, withLoading]);
+  const createGoal = useCallback(async (goalForm, intentId) => {
+    await metasService.createGoalIntent(offlineClient, accountKey, goalForm, intentId);
+    if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+    showToast('info', 'Meta salva neste navegador. Acompanhe a confirmação em Sincronização.');
+    return true;
+  }, [offlineClient, accountKey, showToast]);
 
-  /**
-   * Marca uma meta como concluida.
-   * @param {string|number} goalId - ID da meta a ser concluida
-   * @returns {Promise<void>}
-   */
-  const completeGoal = useCallback(async (goalId) => {
-    await withLoading(async () => {
-      if (offlineClient) {
-        const parent = goalId.startsWith('local:') ? goalId.slice(6) : null;
-        await offlineClient.enqueue('goal.complete', { goalId }, parent ? { dependsOn: parent } : undefined);
-        if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
-        showToast('info', 'Conclusão salva neste navegador. Acompanhe a confirmação em Sincronização.');
-        return;
-      }
-      await metasService.completarMeta(goalId, token);
-      showToast('success', 'Parabens! Meta concluida!');
-      await loadGoals();
-    }, 'Nao foi possivel concluir a meta.');
-  }, [offlineClient, accountKey, token, showToast, loadGoals, withLoading]);
+  const completeGoal = useCallback(async goalId => {
+    await metasService.completeGoalIntent(offlineClient, accountKey, goalId);
+    if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+    showToast('info', 'Conclusão salva neste navegador. Acompanhe a confirmação em Sincronização.');
+    return true;
+  }, [offlineClient, accountKey, showToast]);
 
-  /**
-   * Exclui uma meta apos confirmacao do usuario via modal.
-   * @param {string|number} goalId - ID da meta a ser excluida
-   */
-  const deleteGoal = useCallback((goalId) => {
-    showConfirm(
-      'Excluir Meta',
-      'Tem certeza que deseja excluir esta meta?',
-      () => withLoading(async () => {
-        await metasService.excluirMeta(goalId, token);
-        showToast('success', 'Meta excluida');
-        await loadGoals();
-      }, 'Nao foi possivel excluir a meta.')
-    );
-  }, [token, showToast, showConfirm, loadGoals, withLoading]);
+  const deleteGoal = useCallback(async goalId => {
+    await metasService.deleteConfirmedGoal(offlineClient, accountKey, goalId);
+    if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
+    showToast('success', 'Exclusão da meta confirmada.');
+    return true;
+  }, [offlineClient, accountKey, showToast]);
 
   // ─── Efeitos Colaterais (useEffect) — Carregamento Automatico de Dados ─
 
@@ -572,7 +504,11 @@ export function DataProvider({ children }) {
   useEffect(() => {
     const data = offline.snapshot?.data;
     if (!offlineClient || !data || data.usuario.id !== user?.id || offline.accountKey !== accountKey) return;
-    const records = [...data.registros], metas = [...data.metas], recaidas = [...data.recaidas];
+    const relapseReceipts = new Map((offline.receipts || []).filter(row => row.kind === 'confirmed' && row.type === 'relapse.create')
+      .map(row => [row.response.recaida.id, row.intentPayload]));
+    const records = [...data.registros], metas = [...data.metas], recaidas = data.recaidas.map(event => ({
+      ...event, timezone: event.timezone || relapseReceipts.get(event.id)?.timezone
+    }));
     for (const intent of offline.queue) {
       const local = { ...intent.payload, id: intent.localId, pending: true, sync_status: intent.status };
       if (intent.type === 'record.create') records.push(local);
@@ -580,10 +516,10 @@ export function DataProvider({ children }) {
         const index = records.findIndex(item => item.id === intent.payload.recordId);
         if (index >= 0) records[index] = { ...records[index], ...intent.payload, pending: true };
       }
-      if (intent.type === 'goal.create') metas.push(local);
+      if (intent.type === 'goal.create') metas.push({ ...local, local: true });
       if (intent.type === 'goal.complete') {
         const index = metas.findIndex(item => item.id === intent.payload.goalId);
-        if (index >= 0) metas[index] = { ...metas[index], pending: true, sync_status: intent.status };
+        if (index >= 0) metas[index] = { ...metas[index], pending: true, completionPending: true, sync_status: intent.status };
       }
       if (intent.type === 'relapse.create') recaidas.push({ ...local, vicio_id: local.addictionId, data_recaida: local.occurred_at });
     }
@@ -595,7 +531,7 @@ export function DataProvider({ children }) {
       return habit ? { ...habit, tempo_formatado: habit.tempo_formatado || calcularTempoDecorrido(habit.data_inicio) } : null;
     });
     setSelectedAddictionRecords(records.filter(record => record.vicio_id === selectedAddiction?.id));
-  }, [offline.snapshot, offline.queue, offline.accountKey, accountKey, offlineClient, user?.id, selectedAddiction?.id]);
+  }, [offline.snapshot, offline.queue, offline.receipts, offline.accountKey, accountKey, offlineClient, user?.id, selectedAddiction?.id]);
 
   // ─── Provider Value Object ─────────────────────────────────────────────
   /**

@@ -114,6 +114,21 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       void connect();
     },
     refresh, sync,
+    goals: (method, args, accountKey) => {
+      if (!accountKey || accountKey !== currentKey) return Promise.reject(changed());
+      const key = accountKey + ':goals:' + method + ':' + JSON.stringify(args);
+      if (enqueuing.has(key)) return enqueuing.get(key);
+      const task = (async () => {
+        const result = await requireCoordinator().goals(method, args);
+        if (accountKey !== currentKey) throw changed();
+        try { await update(); } catch (error) { if (accountKey === currentKey) publish({ error }); }
+        if (accountKey !== currentKey) throw changed();
+        if (!['delete', 'deleteHabit'].includes(method)) void sync();
+        return result;
+      })().finally(() => enqueuing.delete(key));
+      enqueuing.set(key, task);
+      return task;
+    },
     urges: (method, args, accountKey) => {
       if (!accountKey || accountKey !== currentKey) return Promise.reject(changed());
       const mutation = method === 'create' || method === 'recover';

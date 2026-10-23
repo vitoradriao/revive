@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
 import { verifyDiaryRecords } from './diary-records.mjs';
 import { verifyHabitEdits } from './habit-edit.mjs';
+import { verifyGoalsRelapses } from './goals-relapses.mjs';
 import { verifyWebSessions } from './web-sessions.mjs';
 
 const require = createRequire(import.meta.url);
@@ -437,6 +438,7 @@ try {
   process.env.RECOVERY_EMAIL_FROM = 'Revive CI <noreply@example.invalid>';
   const { app } = require('../../index.js');
   await verifyApi(app, first, second);
+  await verifyGoalsRelapses(app, first, process.env.JWT_SECRET);
   await verifyPasswordRecovery(app, first, second);
   await verifyPublicRoles(proxy.url);
   console.log('Two SQL connections, API ownership, cascade and role denial passed.');

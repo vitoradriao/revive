@@ -1,3 +1,4 @@
+import { createGoalOperations } from './goal-operations.js';
 import { requestSnapshot } from './request-snapshot.js';
 import { createUrgeOperations } from './urge-operations.js';
 import { createDiaryOperations } from './diary-operations.js';
@@ -105,6 +106,21 @@ export function createSyncCoordinator({
   });
   return {
     run,
+    goals: (method, args) => {
+      const initial = session.getSnapshot();
+      const check = () => {
+        if (!active() || session.getSnapshot().epoch !== initial.epoch) throw changed();
+      };
+      return localAction(() => createGoalOperations({ store, check,
+        isOnline: () => isOnline() && !!session.getSnapshot().token,
+        request: async (path, options = {}) => {
+          check();
+          const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 20000);
+          try { return await request(path, { ...options, signal: controller.signal }, session.getSnapshot().token); }
+          finally { clearTimeout(timeout); }
+        }
+      })[method](...args));
+    },
     urges: (method, args) => {
       const initial = session.getSnapshot();
       const check = () => {
@@ -151,7 +167,7 @@ export function createSyncCoordinator({
       const snapshot = await store.getSnapshot();
       const habitId = payload.vicio_id || payload.addictionId ||
         snapshot?.data.metas?.find(goal => goal.id === payload.goalId)?.vicio_id;
-      if (snapshot?.data.vicios?.some(habit => habit.id === habitId && habit.ativo === false)) {
+      if (type !== 'goal.complete' && snapshot?.data.vicios?.some(habit => habit.id === habitId && habit.ativo === false)) {
         throw Object.assign(new Error('Reative o hábito antes de criar novos eventos.'), { code: 'HABITO_ARQUIVADO' });
       }
       if (!active()) throw changed();

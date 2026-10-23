@@ -29,6 +29,8 @@ const habits = database.tables.usuarios.map((user, index) => ({
     nome_vicio: 'Hábito sintético', data_inicio: '2026-10-01T00:00:00.000Z', ativo: true, revision: 1, inicio_editavel: true, valor_economizado_por_dia: 10, valor_economizado: 0
 }));
 const initialHabits = structuredClone(habits);
+let goalTransport = 'normal', failGoalDelete = false, revokeOnGoalWrite = false;
+const heldGoalResponses = [];
 database.tables.vicios = habits;
 // Diary queries exercise the Express DTO and cursor contract over synthetic rows.
 const originalFrom = database.client.from;
@@ -109,6 +111,19 @@ database.client.rpc = async (name, args) => {
             'relapse.create': ['recaidas', 'recaida'], 'goal.create': ['metas', 'meta'] }[type];
         if (!target) return { data: null, error: new Error('Unsupported synthetic operation') };
         const entity = { ...p, ...base, ...(type === 'record.create' ? { revision: 1 } : {}), ...(type === 'goal.create' ? { concluida: false } : {}) };
+        if (type === 'goal.create') Object.assign(entity, {
+            dias_abstinencia_inicio: p.iniciar_hoje ? habit.dias_abstinencia || 0 : 0,
+            valor_economizado_inicio: p.iniciar_hoje ? Number(habit.valor_economizado) || 0 : 0,
+            data_criacao: new Date().toISOString()
+        });
+        if (type === 'relapse.create') {
+            entity.data_recaida = p.occurred_at; entity.resetar_contador = p.resetarContador;
+            if (p.resetarContador) {
+                habit.data_ultima_recaida = p.occurred_at;
+                habit.dias_abstinencia = 0;
+                if (habit.progresso) Object.assign(habit.progresso, { sequencia_atual_dias: 0, economia_sequencia: { valor_estimado: 0, cobertura: 'confirmed' } });
+            }
+        }
         events[target[0]].set(entity.id, entity); counts.writes++;
         if (habit) habit.inicio_editavel = false;
         result = { status_code: 201, response_body: { [target[1]]: entity } };
@@ -123,6 +138,24 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
         vicios: habits.filter(item => item.usuario_id === user.id),
         ...Object.fromEntries(Object.entries(events).filter(([key]) => key !== 'vontades').map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
 });
+app.post('/__test/seed-goals', (_req, res) => {
+    const progress = require('../fixtures/progress.cjs').progressFixture({ reset: false });
+    Object.assign(habits[0], { dias_abstinencia: 32, valor_economizado: 320, progresso: progress.vicios[0].progresso });
+    const archived = { ...structuredClone(habits[0]), id: '10000000-0000-4000-8000-000000000003', nome_vicio: 'Hábito arquivado sintético', ativo: false };
+    habits.push(archived);
+    const goal = { id: '30000000-0000-4000-8000-000000000001', usuario_id: habits[0].usuario_id, vicio_id: archived.id,
+        descricao_meta: 'Meta legada arquivada', dias_objetivo: 30, iniciar_hoje: true, dias_abstinencia_inicio: 17,
+        valor_economizado_inicio: 170, data_inicio_meta: '2026-01-18', concluida: false };
+    events.metas.set(goal.id, goal); res.sendStatus(204);
+});
+app.post('/__test/goal-transport', (req, res) => {
+    goalTransport = req.body.mode || 'normal';
+    if (goalTransport === 'normal') for (const held of heldGoalResponses.splice(0)) held.send(held.body);
+    res.sendStatus(204);
+});
+app.post('/__test/revoke-on-goal-write', (_req, res) => { revokeOnGoalWrite = true; res.sendStatus(204); });
+app.post('/__test/fail-goal-delete', (req, res) => { failGoalDelete = req.body.enabled === true; res.sendStatus(204); });
+app.post('/__test/archive-goal-habit', (req, res) => { habits[0].ativo = req.body.archived !== true; res.sendStatus(204); });
 app.post('/__test/seed-urges', (_req, res) => {
     for (let index = 1; index <= 24; index++) {
         const id = '70000000-0000-4000-8000-' + String(index).padStart(12, '0');
@@ -145,9 +178,16 @@ app.post('/__test/seed-diary', (_req, res) => {
 });
 app.post('/__test/block-mutations', (_req, res) => { blockMutations = true; res.sendStatus(204); });
 app.use('/api/v2', (req, res, next) => {
+    if (revokeOnGoalWrite && req.method === 'PATCH' && req.path.startsWith('/metas/')) {
+        revokeOnGoalWrite = false; database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
+    }
     if (blockMutations && req.method !== 'GET' && !req.path.startsWith('/web-auth/')) return res.status(503).json({ codigo: 'CONSULTA_INDISPONIVEL' });
     const json = res.json.bind(res);
     res.json = body => {
+        if ((req.path === '/metas' || /^\/metas\/[^/]+$/.test(req.path) || req.path.endsWith('/recaida')) && req.method !== 'GET' && res.statusCode < 300) {
+            if (goalTransport === 'hold') { heldGoalResponses.push({ send: json, body }); return res; }
+            if (goalTransport === 'drop') { res.destroy(); return res; }
+        }
         if (holdUrgeResponses && req.method === 'POST' && req.path === '/vontades' && res.statusCode < 300) return res;
         if ((dropNextResponse && req.method !== 'GET' && !req.path.startsWith('/web-auth/') || dropRecordResponses && req.method === 'POST' && req.path === '/registros' || dropUrgeResponses && req.method === 'POST' && req.path === '/vontades') && res.statusCode < 300) {
             dropNextResponse = false; res.destroy(); return res;
@@ -159,9 +199,9 @@ app.use('/api/v2', (req, res, next) => {
 app.post('/__test/drop-record-responses', (req, res) => { dropRecordResponses = req.body.enabled === true; res.sendStatus(204); });
 app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true; res.sendStatus(204); });
 app.get('/__test/status', (_req, res) => res.json({
-    counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
+    goalHabitActive: habits[0].ativo, counts, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
 }));
-app.post('/__test/reset', (_req, res) => { networkUnavailable = false; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
+app.post('/__test/reset', (_req, res) => { networkUnavailable = false; goalTransport = 'normal'; failGoalDelete = false; revokeOnGoalWrite = false; heldGoalResponses.length = 0; database.tables.app_sessions.length = 0; habits.splice(0, habits.length, ...structuredClone(initialHabits)); blockMutations = false; for (const key of Object.keys(counts)) counts[key] = 0; for (const values of Object.values(events)) values.clear(); receipts.clear(); dropNextResponse = false; dropRecordResponses = false; dropUrgeResponses = false; holdUrgeResponses = false; res.sendStatus(204); });
 app.post('/__test/revoke', (_req, res) => {
     database.tables.app_sessions.forEach(row => { row.revoked_at = new Date().toISOString(); });
     res.sendStatus(204);
@@ -178,6 +218,12 @@ app.get('/api/me', (req, res) => {
 });
 app.get('/api/vicios', (req, res) => res.json({ vicios: habits.filter(item => item.usuario_id === req.usuarioId) }));
 app.get('/api/vicios/:id/registros', (req, res) => res.json({ registros: [...events.registros.values()].filter(item => item.usuario_id === req.usuarioId && item.vicio_id === req.params.id) }));
+app.delete('/api/metas/:id', (req, res) => {
+    if (failGoalDelete) return res.status(500).json({ codigo: 'DELETE_FAILED', mensagem: 'Falha sintética na exclusão. A meta foi preservada.' });
+    const goal = events.metas.get(req.params.id);
+    if (!goal || goal.usuario_id !== req.usuarioId) return res.status(404).json({ erro: 'Meta nao encontrada' });
+    events.metas.delete(goal.id); res.json({ mensagem: 'Meta excluida com sucesso' });
+});
 app.get('/api/metas', (_req, res) => res.json({ metas: [] }));
 app.get('/api/recaidas', (_req, res) => res.json({ recaidas: [] }));
 app.get('/api/mensagens/diaria', (_req, res) => res.json({ mensagem: { mensagem: 'Conteúdo sintético de teste' } }));
