@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle, Plus, Target, Trash2, Trophy } from 'lucide-react';
 import Button from '../ui/Button';
 import { SelectField } from '../ui/Field';
 import { fieldBase } from '../../utils/constants';
+import { goalPayload, intentStatusLabel } from '../../utils/goalIntent';
 import { calculateGoalProgress, getLocalDateString, goalUsesTodayBaseline } from '../../utils/goalProgress';
 
 const initialForm = {
@@ -13,43 +14,58 @@ const initialForm = {
   iniciar_hoje: true
 };
 
-const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loading }) => {
+const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loading, localOnly, error, onRefresh }) => {
   const [showForm, setShowForm] = useState(false);
   const [formMeta, setFormMeta] = useState(initialForm);
 
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const intentId = useRef(null), inFlight = useRef(false), alive = useRef(true), dialog = useRef(null), lastFocus = useRef(null);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => {
+    if (deleting) { dialog.current?.showModal(); dialog.current?.querySelector('button')?.focus(); }
+    else if (dialog.current?.open) { dialog.current.close(); lastFocus.current?.focus(); }
+  }, [deleting]);
+  const run = async task => {
+    if (inFlight.current) return false;
+    inFlight.current = true; setBusy(true); setMessage('');
+    try { return await task(); }
+    catch (caught) { if (alive.current && caught.code !== 'SESSAO_ALTERADA') setMessage(caught.message); return false; }
+    finally { inFlight.current = false; if (alive.current) setBusy(false); }
+  };
+
   const metasCompletadas = metas.filter(meta => meta.concluida).length;
   const metasAtivas = metas.filter(meta => !meta.concluida);
-  const vicioOptions = vicios.map(vicio => ({ value: vicio.id, label: vicio.nome_vicio }));
+  const vicioOptions = vicios.filter(habit => habit.ativo !== false).map(vicio => ({ value: vicio.id, label: vicio.nome_vicio }));
 
   const getVicioNome = (vicioId) => {
     const vicio = vicios.find(item => item.id === vicioId);
-    return vicio ? vicio.nome_vicio : 'Hábito não encontrado';
+    return vicio ? vicio.nome_vicio + (vicio.ativo === false ? ' · Arquivado' : '') : 'Hábito não disponível';
   };
 
   const calcularProgresso = (meta) => {
     const vicio = vicios.find(item => item.id === meta.vicio_id);
-    return calculateGoalProgress(meta, vicio);
+    return meta.local ? 0 : calculateGoalProgress(meta, vicio);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!formMeta.vicio_id || !formMeta.descricao_meta) return;
-
-    const selectedVicio = vicios.find(item => String(item.id) === String(formMeta.vicio_id));
-    const payload = {
-      ...formMeta,
-      data_inicio_meta: formMeta.iniciar_hoje ? getLocalDateString() : null,
-      dias_abstinencia_inicio: formMeta.iniciar_hoje ? selectedVicio?.dias_abstinencia || 0 : 0,
-      valor_economizado_inicio: formMeta.iniciar_hoje ? Number(selectedVicio?.valor_economizado) || 0 : 0
-    };
-
-    const saved = await onAddMeta(payload);
-    if (saved === false) return;
+    const saved = await run(async () => {
+      const selected = vicios.find(item => item.id === formMeta.vicio_id && item.ativo !== false);
+      if (!selected) throw new Error('Hábito arquivado ou indisponível. Reative-o antes de salvar.');
+      const payload = goalPayload({ ...formMeta, data_inicio_meta: formMeta.iniciar_hoje ? getLocalDateString() : null });
+      intentId.current ||= crypto.randomUUID();
+      return onAddMeta(payload, intentId.current);
+    });
+    if (saved === false || !alive.current) return;
+    intentId.current = null;
     setFormMeta(initialForm);
     setShowForm(false);
   };
 
   const handleCancel = () => {
+    intentId.current = null;
     setShowForm(false);
     setFormMeta(initialForm);
   };
@@ -70,6 +86,10 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
         </div>
       </div>
 
+      <p role="status">{loading ? 'Carregando metas…' : localOnly ? 'Modo offline · Metas salvas neste navegador aguardam confirmação.' : 'Metas e conclusões só são confirmadas após resposta do servidor.'}</p>
+      {error && <p role="alert">Não foi possível atualizar as metas. A cópia local foi preservada. <button type="button" onClick={onRefresh}>Consultar dados novamente</button></p>}
+      {message && !deleting && <p role="alert">{message}</p>}
+      <a href="/sincronizacao">Revisar pendências em Sincronização</a>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="surface-card rounded-[30px] p-6">
           <div className="flex items-center justify-between">
@@ -95,6 +115,8 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
         <form onSubmit={handleSubmit} className="interactive-panel rounded-[34px] p-5 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <SelectField
+              label="Hábito da meta"
+              disabled={busy}
               value={formMeta.vicio_id}
               onChange={(nextValue) => setFormMeta({ ...formMeta, vicio_id: nextValue })}
               options={vicioOptions}
@@ -102,6 +124,10 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
             />
 
             <input
+              aria-label="Descrição da meta"
+              autoFocus
+              maxLength={240}
+              required
               type="text"
               value={formMeta.descricao_meta}
               onChange={(event) => setFormMeta({ ...formMeta, descricao_meta: event.target.value })}
@@ -116,13 +142,16 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
               value={formMeta.dias_objetivo}
               onChange={(event) => setFormMeta({ ...formMeta, dias_objetivo: event.target.value })}
               min="1"
+              aria-label="Dias objetivo"
+              max="36500"
               placeholder="Dias objetivo"
               className={fieldBase}
             />
             <input
               type="number"
               step="0.01"
-              min="0"
+              min="0.01"
+              aria-label="Valor objetivo (R$)"
               value={formMeta.valor_objetivo}
               onChange={(event) => setFormMeta({ ...formMeta, valor_objetivo: event.target.value })}
               placeholder="Valor objetivo (R$)"
@@ -148,12 +177,12 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
             <Button
               type="submit"
               variant="primary"
-              disabled={loading || !formMeta.vicio_id || !formMeta.descricao_meta}
+              disabled={busy || loading || !formMeta.vicio_id || !formMeta.descricao_meta}
               className="flex-1"
             >
               Adicionar meta
             </Button>
-            <Button type="button" variant="secondary" onClick={handleCancel} className="flex-1">
+            <Button type="button" variant="secondary" onClick={handleCancel} disabled={busy} className="flex-1">
               Cancelar
             </Button>
           </div>
@@ -168,7 +197,8 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
             const isCompleted = progresso >= 100;
 
             return (
-              <div key={meta.id} className="surface-card rounded-[26px] p-4 space-y-4">
+              <div key={meta.id} role="group" aria-label={`Meta: ${meta.descricao_meta}`} className="surface-card rounded-[26px] p-4 space-y-4">
+                <p role="status">{intentStatusLabel(meta.sync_status)}{meta.local ? ' · Base será confirmada ao sincronizar' : ''}</p>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -183,7 +213,8 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
                   </div>
                   <button
                     type="button"
-                    onClick={() => onDeleteMeta(meta.id)}
+                    disabled={busy || loading || localOnly || meta.pending}
+                    onClick={event => { lastFocus.current = event.currentTarget; setDeleting(meta.id); }}
                     className="p-2 text-muted hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition"
                     title="Excluir meta"
                   >
@@ -202,8 +233,8 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
                     <span className="text-sm font-black text-teal-300 min-w-[45px] text-right">{progresso}%</span>
                   </div>
 
-                  {isCompleted && !meta.concluida && (
-                    <Button type="button" variant="secondary" disabled={loading} onClick={() => onCompleteMeta(meta.id)} className="w-full">
+                  {!meta.concluida && (
+                    <Button type="button" variant="secondary" disabled={busy || loading || meta.completionPending} onClick={() => void run(() => onCompleteMeta(meta.id))} className="w-full">
                       <CheckCircle className="w-4 h-4" />
                       Marcar como concluída
                     </Button>
@@ -232,13 +263,34 @@ const MetasCard = ({ metas, vicios, onAddMeta, onCompleteMeta, onDeleteMeta, loa
                 <div>
                   <p className="text-app line-through">{meta.descricao_meta}</p>
                   <p className="text-xs text-muted">{getVicioNome(meta.vicio_id)}</p>
+                  <p role="status">Confirmado pelo servidor</p>
                 </div>
+                <button type="button" aria-label="Excluir meta concluída" disabled={busy || loading || localOnly || meta.pending} onClick={event => { lastFocus.current = event.currentTarget; setDeleting(meta.id); }}><Trash2 className="w-4 h-4" /></button>
                 <CheckCircle className="w-5 h-5 text-sky-300" />
               </div>
             ))}
           </div>
         </details>
       )}
+      <dialog ref={dialog} aria-labelledby="goal-delete-title" onCancel={event => { if (busy) event.preventDefault(); else setDeleting(null); }} onKeyDown={event => {
+        if (event.key !== 'Tab') return;
+        const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')];
+        const first = buttons[0], last = buttons.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }} className="surface-card text-app rounded-2xl p-6 max-w-lg">
+        <h3 id="goal-delete-title">Excluir meta definitivamente?</h3>
+        <p>Esta ação exige conexão e não pode ser desfeita. Pendências devem ser resolvidas em Sincronização.</p>
+        <div className="flex gap-3 mt-4">
+          <Button type="button" disabled={busy} onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button type="button" disabled={busy || localOnly} onClick={() => void run(async () => {
+            const result = await onDeleteMeta(deleting);
+            if (result !== false && alive.current) setDeleting(null);
+            return result;
+          })}>Confirmar exclusão</Button>
+        </div>
+        {message && <p role="alert">{message}</p>}
+      </dialog>
     </div>
   );
 };

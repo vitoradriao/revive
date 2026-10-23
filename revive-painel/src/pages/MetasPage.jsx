@@ -15,6 +15,7 @@
 import React from 'react';
 import { motion as Motion } from 'framer-motion';
 import { useData } from '../contexts/DataContext';
+import { useOffline } from '../contexts/OfflineContext';
 import { useUI } from '../contexts/UIContext';
 import MetasCard from '../components/modals/MetasCard';
 import { screenTransition } from '../utils/constants';
@@ -32,15 +33,20 @@ export default function MetasPage() {
   const { goals, addictions, createGoal, completeGoal, deleteGoal } = useData();
   const { loading } = useUI();
 
+  const offline = useOffline();
   return (
     <Motion.div {...screenTransition}>
       <MetasCard
+        key={offline.accountKey}
         metas={goals}
-        vicios={addictions.filter(habit => habit.ativo !== false)}
+        vicios={addictions}
         onAddMeta={createGoal}
         onCompleteMeta={completeGoal}
         onDeleteMeta={deleteGoal}
-        loading={loading}
+        loading={loading || offline.loading}
+        localOnly={offline.localOnly}
+        error={offline.error}
+        onRefresh={() => offline.client.refresh()}
       />
     </Motion.div>
   );

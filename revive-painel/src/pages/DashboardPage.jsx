@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, BookOpen, CheckCircle2, Heart, Plus, Repeat, Sparkles, Target } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
+import RelapseHistory from '../components/modals/RelapseHistory';
 import RecaidaModal from '../components/modals/RecaidaModal';
 import EmptyState from '../components/ui/EmptyState';
 import HeroKpis from '../components/dashboard/HeroKpis';
@@ -75,19 +76,13 @@ export default function DashboardPage() {
   const featuredGoals = useMemo(() => goals.slice(0, 3), [goals]);
   const getGoalProgress = (meta) => {
     if (meta.concluida) return 100;
-    const vicio = addictions.find(item => item.id === meta.vicio_id);
+    const vicio = progress.habits.find(item => item.id === meta.vicio_id);
     return calculateGoalProgress(meta, vicio);
   };
 
-  const handleRefletir = async (vicio) => {
-    await registerRelapse(vicio);
-    setRecaidaVicio(null);
-  };
+  const handleRefletir = (habit, input, intentId) => registerRelapse(habit, input, intentId);
+  const handleResetar = (habit, input, intentId) => registerRelapse(habit, input, intentId);
 
-  const handleResetar = async (vicio) => {
-    await registerRelapse(vicio, { resetCounter: true });
-    setRecaidaVicio(null);
-  };
 
   return (
     <div className="space-y-5">
@@ -95,7 +90,7 @@ export default function DashboardPage() {
       <RecaidaModal
         isOpen={recaidaVicio !== null}
         onClose={() => setRecaidaVicio(null)}
-        vicio={recaidaVicio}
+        vicio={recaidaVicio && (progress.habits.find(habit => habit.id === recaidaVicio.id) || recaidaVicio)}
         onRefletir={handleRefletir}
         onResetar={handleResetar}
         loading={loading}
@@ -234,6 +229,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <RelapseHistory />
       <RecentTimeline recentActivity={recentActivity} />
     </div>
   );

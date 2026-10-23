@@ -14,7 +14,7 @@
  * @see {@link useData} Hook para acessar e manipular dados do vicio selecionado
  * @see {@link useUI} Hook para estado de carregamento (loading)
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
 import { Calendar, DollarSign, TrendingUp, Trash2, Target } from 'lucide-react';
@@ -25,6 +25,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import UrgeForm from '../components/urges/UrgeForm';
 import UrgeHistory from '../components/urges/UrgeHistory';
 import HabitManagement from '../components/habits/HabitManagement';
+import RelapseHistory from '../components/modals/RelapseHistory';
 import RecaidaModal from '../components/modals/RecaidaModal';
 import QuickCheckIn from '../components/diary/QuickCheckIn';
 import Diary from '../components/diary/Diary';
@@ -32,6 +33,7 @@ import { InputField } from '../components/ui/Field';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { glassSurface, screenTransition } from '../utils/constants';
+import { goalPayload, intentStatusLabel } from '../utils/goalIntent';
 import { getLocalDateString } from '../utils/goalProgress';
 
 /**
@@ -66,6 +68,10 @@ export default function DetalhesPage() {
     iniciar_hoje: true
   });
 
+  const goalId = useRef(null), goalInFlight = useRef(false), alive = useRef(true);
+  const [goalError, setGoalError] = useState(''), [goalBusy, setGoalBusy] = useState(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+
   // Carrega detalhes do vicio quando o parametro de rota (id) muda
   useEffect(() => {
     if (id) loadAddictionDetails(id);
@@ -86,48 +92,37 @@ export default function DetalhesPage() {
    */
   const handleSubmitMeta = async (e) => {
     e.preventDefault();
-    const saved = await createGoal({
-      ...formMeta,
-      vicio_id: selectedAddiction.id,
-      data_inicio_meta: formMeta.iniciar_hoje ? getLocalDateString() : null,
-      dias_abstinencia_inicio: formMeta.iniciar_hoje ? selectedAddiction.dias_abstinencia || 0 : 0,
-      valor_economizado_inicio: formMeta.iniciar_hoje ? Number(selectedAddiction.valor_economizado) || 0 : 0
-    });
-    if (saved === false) return;
-    setFormMeta({ descricao_meta: '', dias_objetivo: '', valor_objetivo: '', iniciar_hoje: true });
+    if (goalInFlight.current) return;
+    goalInFlight.current = true; setGoalBusy(true); setGoalError('');
+    try {
+      const payload = goalPayload({ ...formMeta, vicio_id: selectedAddiction.id,
+        data_inicio_meta: formMeta.iniciar_hoje ? getLocalDateString() : null });
+      goalId.current ||= crypto.randomUUID();
+      const saved = await createGoal(payload, goalId.current);
+      if (saved === false || !alive.current) return;
+      goalId.current = null;
+      setFormMeta({ descricao_meta: '', dias_objetivo: '', valor_objetivo: '', iniciar_hoje: true });
+    } catch (error) { if (alive.current && error.code !== 'SESSAO_ALTERADA') setGoalError(error.message); }
+    finally { goalInFlight.current = false; if (alive.current) setGoalBusy(false); }
   };
 
   /**
    * Registra recaida no modo "Refletir" (sem resetar contador).
-   * Apos registro, faz scroll suave ate o formulario de registro diario.
    * @param {Object} vicio - Objeto do vicio
    */
-  const handleRefletir = async (vicio) => {
-    await registerRelapse(vicio);
-    setRecaidaVicio(null);
-    setTimeout(() => {
-      document.getElementById('form-registro')?.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-  };
-
-  /**
-   * Registra recaida no modo "Resetar" (zera o contador de abstinencia).
-   * @param {Object} vicio - Objeto do vicio
-   */
-  const handleResetar = async (vicio) => {
-    await registerRelapse(vicio, { resetCounter: true });
-    setRecaidaVicio(null);
-  };
+  const handleRefletir = (habit, input, intentId) => registerRelapse(habit, input, intentId);
+  const handleResetar = (habit, input, intentId) => registerRelapse(habit, input, intentId);
 
   // Filtra metas vinculadas ao vicio atualmente selecionado - O(n) onde n = total de metas
   const addictionGoals = goals.filter(m => m.vicio_id === selectedAddiction.id);
 
   return (
     <Motion.div {...screenTransition} className="space-y-6">
+      <RelapseHistory habitId={selectedAddiction.id} />
       <RecaidaModal
         isOpen={recaidaVicio !== null}
         onClose={() => setRecaidaVicio(null)}
-        vicio={recaidaVicio}
+        vicio={recaidaVicio && ([selectedAddiction].find(habit => habit.id === recaidaVicio.id) || recaidaVicio)}
         onRefletir={handleRefletir}
         onResetar={handleResetar}
         loading={loading}
@@ -180,11 +175,11 @@ export default function DetalhesPage() {
         <div className="space-y-6">
           <div className={`${glassSurface} rounded-3xl p-6 border border-white/10`}>
             <h3 className="text-xl font-bold text-app mb-4 flex items-center gap-2"><Target className="w-6 h-6 text-teal-300" />Nova meta para "{selectedAddiction.nome_vicio}"</h3>
-            <form onSubmit={handleSubmitMeta} className="space-y-4"><fieldset disabled={selectedAddiction.ativo === false} className="space-y-4">
-              <InputField type="text" value={formMeta.descricao_meta} onChange={(e) => setFormMeta({ ...formMeta, descricao_meta: e.target.value })} required label="Descrição da meta" placeholder="Algo que motive você" />
+            <form onSubmit={handleSubmitMeta} className="space-y-4"><fieldset disabled={goalBusy || selectedAddiction.ativo === false} className="space-y-4">
+              <InputField type="text" maxLength={240} value={formMeta.descricao_meta} onChange={(e) => setFormMeta({ ...formMeta, descricao_meta: e.target.value })} required label="Descrição da meta" placeholder="Algo que motive você" />
               <div className="grid grid-cols-2 gap-3">
-                <InputField type="number" min="1" value={formMeta.dias_objetivo} onChange={(e) => setFormMeta({ ...formMeta, dias_objetivo: e.target.value })} label="Dias objetivo" placeholder="Ex: 30" />
-                <InputField type="number" step="0.01" min="0" value={formMeta.valor_objetivo} onChange={(e) => setFormMeta({ ...formMeta, valor_objetivo: e.target.value })} label="Valor objetivo (R$)" placeholder="Ex: 150.00" />
+                <InputField type="number" min="1" max="36500" value={formMeta.dias_objetivo} onChange={(e) => setFormMeta({ ...formMeta, dias_objetivo: e.target.value })} label="Dias objetivo" placeholder="Ex: 30" />
+                <InputField type="number" step="0.01" min="0.01" value={formMeta.valor_objetivo} onChange={(e) => setFormMeta({ ...formMeta, valor_objetivo: e.target.value })} label="Valor objetivo (R$)" placeholder="Ex: 150.00" />
               </div>
               <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 cursor-pointer transition hover:bg-white/10">
                 <input
@@ -198,7 +193,9 @@ export default function DetalhesPage() {
                   <span className="block text-xs text-muted">A meta começa em 0 para este hábito.</span>
                 </span>
               </label>
-              <Button type="submit" disabled={loading} variant="primary" size="lg" className="w-full">Criar meta</Button>
+              <Button type="submit" disabled={loading || goalBusy} variant="primary" size="lg" className="w-full">Criar meta</Button>
+              {goalError && <p role="alert">{goalError}</p>}
+              <p role="status">A base será confirmada ao sincronizar. Alterações de taxa não reescrevem metas anteriores.</p>
             </fieldset></form>
           </div>
 
@@ -210,6 +207,7 @@ export default function DetalhesPage() {
                   <div key={meta.id} className="p-4 bg-white/5 backdrop-blur rounded-lg border border-white/20">
                     <div className="flex items-start justify-between mb-2">
                       <p className="font-semibold text-white">{meta.descricao_meta}</p>
+                      <p role="status">{intentStatusLabel(meta.sync_status)}</p>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${meta.concluida ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-400/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/30'}`}>
                         {meta.concluida ? 'Concluída' : 'Em progresso'}
                       </span>

@@ -1,145 +1,74 @@
-import React, { useState } from 'react';
-import { Heart, RefreshCw, BookOpen, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { civilTimeToInstant, dateTimeInZone, deviceTimezone } from '../../utils/urge-time';
+import { relapsePayload } from '../../utils/goalIntent';
+import { fieldBase } from '../../utils/constants';
+import Button from '../ui/Button';
 
-const optionClass = (active, tone) => {
-  const activeTone = tone === 'emerald'
-    ? 'bg-emerald-400/12 border-emerald-300/45'
-    : 'bg-sky-400/12 border-sky-300/45';
-  return `w-full p-5 rounded-[26px] border transition text-left ${
-    active ? activeTone : 'surface-muted hover:bg-black/5'
-  }`;
-};
-
-const RecaidaModal = ({
-  isOpen,
-  onClose,
-  vicio,
-  onRefletir,
-  onResetar,
-  loading
-}) => {
-  const [selecionado, setSelecionado] = useState(null);
-
-  if (!isOpen || !vicio) return null;
-
-  const handleRefletir = async () => {
-    setSelecionado(null);
-    await onRefletir(vicio);
+function RelapseForm({ onClose, vicio, onRefletir, onResetar, loading }) {
+  const [initial] = useState(() => {
+    const instant = new Date().toISOString(), timezone = deviceTimezone();
+    return { instant, timezone, ...dateTimeInZone(instant, timezone) };
+  });
+  const [date, setDate] = useState(initial.date), [time, setTime] = useState(initial.time);
+  const [timezone, setTimezone] = useState(initial.timezone), [reset, setReset] = useState('');
+  const [reason, setReason] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const id = useRef(null), inFlight = useRef(false), dialog = useRef(null), alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    const previous = document.activeElement;
+    dialog.current?.querySelector('button')?.focus();
+    return () => { alive.current = false; previous?.focus(); };
+  }, []);
+  const submit = async event => {
+    event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy(true); setError('');
+    try {
+      if (reset === '') throw new Error('Escolha se deseja reiniciar o contador.');
+      if (vicio.ativo === false) throw new Error('Hábito arquivado. Reative-o antes de registrar; o formulário foi preservado.');
+      const instant = date === initial.date && time === initial.time && timezone === initial.timezone ? initial.instant : civilTimeToInstant(date, time, timezone);
+      const payload = relapsePayload({ addictionId: vicio.id, motivo: reason, resetarContador: reset === 'yes', occurred_at: instant, timezone });
+      const { addictionId: _habit, ...input } = payload;
+      id.current ||= crypto.randomUUID();
+      const result = await (reset === 'yes' ? onResetar : onRefletir)(vicio, input, id.current);
+      if (alive.current && result !== false) onClose();
+    } catch (caught) { if (alive.current && caught.code !== 'SESSAO_ALTERADA') setError(caught.message); }
+    finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
-
-  const handleResetar = async () => {
-    setSelecionado(null);
-    await onResetar(vicio);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="surface-strong rounded-[34px] shadow-2xl max-w-2xl w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 icon-tile bg-rose-400/12 text-rose-300 border-rose-300/25">
-              <Heart className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="eyebrow">Registro sensível</p>
-              <h2 className="text-3xl font-black tracking-[-0.055em] text-app">Recaída registrada</h2>
-              <p className="text-muted text-sm">{vicio.nome_vicio}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-muted hover:text-app hover:bg-black/5">
-            <X className="w-5 h-5" />
-          </button>
+  return <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <section ref={dialog} role="dialog" aria-modal="true" aria-labelledby="relapse-title" className="surface-strong rounded-[34px] max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto" onKeyDown={event => {
+      if (event.key === 'Escape' && !busy) onClose();
+      if (event.key !== 'Tab') return;
+      const elements = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')];
+      const first = elements[0], last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }}>
+      <h2 id="relapse-title" className="text-3xl font-black">Registrar recaída</h2>
+      <p>{vicio.nome_vicio}</p>
+      <p>Uma recaída não apaga seu progresso. O recorde e as conquistas permanecem preservados.</p>
+      <form onSubmit={submit} className="space-y-4 mt-4">
+        <fieldset disabled={busy || loading} className="space-y-3">
+          <legend>Reiniciar contador de dias?</legend>
+          <label className="block"><input type="radio" name="reset" value="no" checked={reset === 'no'} onChange={() => setReset('no')} /> Não, manter a sequência</label>
+          <label className="block"><input type="radio" name="reset" value="yes" checked={reset === 'yes'} onChange={() => setReset('yes')} /> Sim, iniciar novo ciclo neste momento</label>
+          <label className="block">Data da recaída<input className={fieldBase} type="date" required value={date} onChange={event => setDate(event.target.value)} /></label>
+          <label className="block">Horário da recaída<input className={fieldBase} type="time" required value={time} onChange={event => setTime(event.target.value)} /></label>
+          <label className="block">Fuso da recaída<input className={fieldBase} required value={timezone} onChange={event => setTimezone(event.target.value)} /></label>
+          <label className="block">Motivo (opcional)<textarea className={fieldBase} maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>
+        </fieldset>
+        <p role="status">O registro será salvo neste navegador antes do envio. A sequência só muda após confirmação do servidor.</p>
+        {vicio.ativo === false && <p role="alert">Hábito arquivado. Reative-o antes de registrar.</p>}
+        {error && <p role="alert">{error}</p>}
+        <div className="flex gap-3">
+          <Button type="button" disabled={busy} onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={busy || loading || reset === '' || vicio.ativo === false}>{busy ? 'Salvando neste navegador…' : 'Salvar recaída'}</Button>
         </div>
+      </form>
+    </section>
+  </div>;
+}
 
-        <div className="surface-muted rounded-[24px] p-4 mb-5">
-          <p className="text-muted leading-relaxed">
-            Uma recaída não apaga seu progresso. Escolha como deseja registrar este momento para manter a jornada clara.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => setSelecionado(selecionado === 'refletir' ? null : 'refletir')}
-            className={optionClass(selecionado === 'refletir', 'emerald')}
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-11 h-11 icon-tile bg-emerald-400/12 text-emerald-300 border-emerald-300/25 flex-shrink-0">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-app mb-1">Refletir e aprender</h3>
-                <p className="text-muted text-sm">
-                  Preserva o contador e abre espaço para entender gatilhos, contexto e próximos passos.
-                </p>
-              </div>
-            </div>
-
-            {selecionado === 'refletir' && (
-              <div className="mt-4 pt-4 border-t hairline">
-                <p className="text-muted text-sm mb-3">Contador de dias mantido.</p>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleRefletir();
-                  }}
-                  disabled={loading}
-                  className="btn-primary w-full px-4 py-2.5 disabled:opacity-50"
-                >
-                  {loading ? 'Processando...' : 'Prosseguir com reflexão'}
-                </button>
-              </div>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelecionado(selecionado === 'resetar' ? null : 'resetar')}
-            className={optionClass(selecionado === 'resetar', 'sky')}
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-11 h-11 icon-tile bg-sky-400/12 text-sky-300 border-sky-300/25 flex-shrink-0">
-                <RefreshCw className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-app mb-1">Resetar e começar novo ciclo</h3>
-                <p className="text-muted text-sm">
-                  Zera o contador de abstinência e inicia uma nova contagem a partir de agora.
-                </p>
-              </div>
-            </div>
-
-            {selecionado === 'resetar' && (
-              <div className="mt-4 pt-4 border-t hairline">
-                <p className="text-muted text-sm mb-3">O contador será resetado para zero.</p>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleResetar();
-                  }}
-                  disabled={loading}
-                  className="btn-secondary w-full px-4 py-2.5 disabled:opacity-50"
-                >
-                  {loading ? 'Processando...' : 'Resetar contador'}
-                </button>
-              </div>
-            )}
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={loading}
-          className="btn-secondary w-full px-4 py-2.5 mt-6 disabled:opacity-50"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default RecaidaModal;
+export default function RecaidaModal(props) {
+  return props.isOpen && props.vicio ? <RelapseForm key={props.vicio.id} {...props} /> : null;
+}

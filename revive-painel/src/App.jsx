@@ -56,7 +56,7 @@ import TipsPage from './pages/TipsPage';
  * @returns {JSX.Element} Arvore de rotas React Router ou tela de carregamento
  */
 export default function App() {
-  const { token, user, authLoading, authError, restoreSession, localAccess } = useAuth();
+  const { token, user, sessionEpoch, authLoading, authError, restoreSession, localAccess } = useAuth();
 
   if (authLoading) {
     return (
@@ -86,7 +86,7 @@ export default function App() {
       {/* Protected routes inside AppShell */}
       <Route element={
         <ProtectedRoute>
-          <AppShell />
+          <AppShell key={`${user?.id}:${sessionEpoch}`} />
         </ProtectedRoute>
       }>
         <Route index element={<DashboardPage />} />
