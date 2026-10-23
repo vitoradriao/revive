@@ -87,6 +87,28 @@ const results = [];
         try { await store.clearAccount(); } catch (error) { protectedPending = error.code === 'PENDING_INTENTS'; }
         if (!protectedPending || (await store.getQueue()).length !== 1 || !await store.getReceipt(ids.create)) throw Error('account cleanup erased pending work');
         store.close();
+        const D = '00000000-0000-4000-8000-000000000014';
+        const diary = await api.openAccountDatabase(D);
+        const draft = { base: record, values: { humor: 'neutro', observacoes: record.observacoes } };
+        await diary.saveRecordDraft('synthetic-draft', draft);
+        const conflict = await diary.enqueue('record.update', { recordId: ids.record, expected_version: 1, humor: 'neutro' });
+        await diary.markFailed(conflict.id, { code: 'REVISAO_CONFLITO', status: 409 });
+        let replacementAborted = false;
+        IDBObjectStore.prototype.put = function (...args) {
+          const result = nativePut.apply(this, args);
+          if (this.name === 'receipts') queueMicrotask(() => this.transaction.abort());
+          return result;
+        };
+        try { await diary.replaceRecordEdit(conflict.id, { recordId: ids.record, expected_version: 2, humor: 'neutro' }); }
+        catch (error) { replacementAborted = error.code === 'STORAGE_UNAVAILABLE'; }
+        finally { IDBObjectStore.prototype.put = nativePut; }
+        if (!replacementAborted || (await diary.getQueue())[0].id !== conflict.id || await diary.getReceipt(conflict.id)) throw Error('conflict replacement was not atomic');
+        const replacement = await diary.replaceRecordEdit(conflict.id, { recordId: ids.record, expected_version: 2, humor: 'neutro' });
+        if (replacement.id === conflict.id || (await diary.getReceipt(conflict.id)).kind !== 'replaced') throw Error('conflict reused intent key');
+        diary.close();
+        const reopenedDiary = await api.openAccountDatabase(D);
+        if ((await reopenedDiary.getQueue())[0].id !== replacement.id || (await reopenedDiary.getRecordDraft('synthetic-draft')).values.observacoes !== record.observacoes) throw Error('diary recovery lost text');
+        reopenedDiary.close();
         const C = '00000000-0000-4000-8000-000000000013';
         await seed(C);
         const oldConnection = await new Promise((resolve, reject) => {
@@ -109,7 +131,7 @@ const results = [];
         let oldClosed = false;
         try { await recovered.getQueue(); } catch (error) { oldClosed = error.code === 'STORAGE_VERSION_CHANGED'; }
         if (!versionChanged || !oldClosed) throw Error('old connection still accepts work after upgrade');
-        return { preservedLegacy: true, receiptAtomic: true, dependencyBound: true, pagePreserved: true, accountIsolation: true, abortedUpgradePreserved: true, unavailableStorageRejected: true, pendingCleanupRejected: true, blockedUpgradePreserved: true, oldConnectionClosed: true };
+        return { conflictReplacementAtomic: true, diaryDraftReopened: true, preservedLegacy: true, receiptAtomic: true, dependencyBound: true, pagePreserved: true, accountIsolation: true, abortedUpgradePreserved: true, unavailableStorageRejected: true, pendingCleanupRejected: true, blockedUpgradePreserved: true, oldConnectionClosed: true };
       }, { modulePath, A, B, ids });
       assert.equal(Object.values(first).every(Boolean), true);
       await context.close(); context = await playwright[engine].launchPersistentContext(profile, options);

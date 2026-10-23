@@ -51,3 +51,9 @@ export async function criarRegistro(payload, token) {
 export async function listarRegistros(vicioId, token) {
   return apiCall(`/vicios/${vicioId}/registros`, {}, token);
 }
+
+// A UI uses the account coordinator for reads, durable writes and conflict replacement.
+export const listDiaryRecords = (client, accountKey, filters) => client.diary('list', [filters], accountKey);
+export const getDiaryRecord = (client, accountKey, id, remoteOnly = false) => client.diary('detail', [id, remoteOnly], accountKey);
+export const createDiaryRecord = (client, accountKey, values, habitId, anotherDay) => client.diary('create', [values, habitId, anotherDay], accountKey);
+export const editDiaryRecord = (client, accountKey, base, values, replaceId, remote) => client.diary('edit', [base, values, replaceId, remote], accountKey);

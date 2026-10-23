@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Check-in e diário web](web-diary.md): criação/correção duráveis, comparação de conflito, paginação e evidências da #61.
+
 - [Edição e arquivamento web](web-habit-management.md): revisão concorrente, rascunhos duráveis, pendências e recuperação da #60.
 
 - [Progresso histórico web](web-progress-history.md): indicadores canônicos, conquistas permanentes, cobertura, fixtures de paridade e verificação da #59.

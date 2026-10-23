@@ -114,6 +114,39 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       void connect();
     },
     refresh, sync,
+    diary: (method, args, accountKey) => {
+      if (!accountKey || accountKey !== currentKey) return Promise.reject(changed());
+      const mutation = method === 'create' || method === 'edit';
+      const key = accountKey + ':diary:' + method + ':' + JSON.stringify(args);
+      if (mutation && enqueuing.has(key)) return enqueuing.get(key);
+      const task = (async () => {
+        const result = await requireCoordinator().diary(method, args);
+        if (accountKey !== currentKey) throw changed();
+        if (mutation) {
+          try { await update(); } catch (error) { if (accountKey === currentKey) publish({ error }); }
+          if (accountKey !== currentKey) throw changed();
+          void sync();
+        }
+        return result;
+      })().finally(() => { if (mutation) enqueuing.delete(key); });
+      if (mutation) enqueuing.set(key, task);
+      return task;
+    },
+    getRecordDraft: async (id, accountKey) => {
+      if (!accountKey || accountKey !== currentKey) throw changed();
+      const result = await store.getRecordDraft(id);
+      if (accountKey !== currentKey) throw changed();
+      return result;
+    },
+    saveRecordDraft: (id, draft, accountKey) => {
+      if (!accountKey || accountKey !== currentKey) throw changed();
+      const db = store;
+      return requireCoordinator().withAccountLock(async () => {
+        if (accountKey !== currentKey || db !== store) throw changed();
+        await db.saveRecordDraft(id, draft);
+        if (accountKey !== currentKey) throw changed();
+      });
+    },
     getHabitDraft: async (draftId, accountKey) => {
       const db = store;
       if (!accountKey || accountKey !== currentKey) throw changed();

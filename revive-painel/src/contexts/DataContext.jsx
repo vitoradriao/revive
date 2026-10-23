@@ -450,9 +450,7 @@ export function DataProvider({ children }) {
     }
     const result = await withLoading(async () => {
       if (offlineClient) {
-        const now = new Date();
-        const data_registro = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
-        await offlineClient.enqueue('record.create', { ...recordForm, vicio_id: addictionId, data_registro, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
+        await registrosService.createDiaryRecord(offlineClient, accountKey, recordForm, addictionId);
         if (offlineClient.getSnapshot().accountKey !== accountKey) return false;
         showToast('info', 'Registro salvo neste navegador. Acompanhe a confirmação em Sincronização.');
         return true;

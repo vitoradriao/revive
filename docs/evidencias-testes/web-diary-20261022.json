@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-23",
+  "base": "879c78b",
+  "issue": 61,
+  "scope": "Painel web; dados de testes exclusivamente sintéticos",
+  "commands": [
+    {
+      "command": "npm run validate",
+      "result": "passed",
+      "apiTests": 80,
+      "webUnitTests": 119,
+      "webIntegrationTests": 72,
+      "publicBuild": true,
+      "documentationIndex": "Índice temporário incluindo as novas capturas; índice da revisão preservado"
+    },
+    {
+      "command": "npm run lint:web",
+      "result": "passed",
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "npm run test:browser",
+      "runner": "npm run test:browser (fixture 3177 + Vite 4177, como no CI)",
+      "result": "passed",
+      "engines": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ],
+      "suites": [
+        "sessions",
+        "storage",
+        "sync",
+        "shell",
+        "client",
+        "offline-ui",
+        "progress",
+        "habits",
+        "diary"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "diary": [
+    {
+      "engine": "chromium",
+      "browserVersion": "151.0.7922.34",
+      "midnight": true,
+      "offlineCreateUpdateReload": true,
+      "lostResponseReplay": true,
+      "canonicalId": true,
+      "nativeSessionConflict": true,
+      "localAfterReload": true,
+      "explicitReapply": true,
+      "pagination": true,
+      "legacy": true,
+      "archived": true,
+      "keyboard": true,
+      "accountIsolation": true
+    },
+    {
+      "engine": "firefox",
+      "browserVersion": "153.0",
+      "midnight": true,
+      "offlineCreateUpdateReload": true,
+      "lostResponseReplay": true,
+      "canonicalId": true,
+      "nativeSessionConflict": true,
+      "localAfterReload": true,
+      "explicitReapply": true,
+      "pagination": true,
+      "legacy": true,
+      "archived": true,
+      "keyboard": true,
+      "accountIsolation": true
+    },
+    {
+      "engine": "webkit",
+      "browserVersion": "26.5",
+      "midnight": true,
+      "offlineCreateUpdateReload": true,
+      "lostResponseReplay": true,
+      "canonicalId": true,
+      "nativeSessionConflict": true,
+      "localAfterReload": true,
+      "explicitReapply": true,
+      "pagination": true,
+      "legacy": true,
+      "archived": true,
+      "keyboard": true,
+      "accountIsolation": true
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "web-diary-conflict-20261023.png",
+      "engine": "chromium",
+      "description": "Texto local preservado após reload e comparação com revisão remota",
+      "sha256": "e154a377c33a1fcdbb52c08341583d8a19d896f0e02a312c94b61e20f6780b20"
+    },
+    {
+      "file": "web-diary-archived-20261023.png",
+      "engine": "chromium",
+      "description": "Diário paginado preservado após arquivamento pela interface",
+      "sha256": "82cef40e277b32a87418fc3e55b550880e43765aca5ae3ea5cf015ebc24f8dd4"
+    }
+  ],
+  "buildNotice": "Aviso existente de chunk principal acima de 500 kB; build concluído e lint sem avisos",
+  "database": "Sem alteração; RPC sintética não substitui PostgreSQL real",
+  "mobile": "Sem alteração; aparelho físico e leitor de tela humano não exercitados",
+  "deployment": "Nenhum deploy realizado"
+}
