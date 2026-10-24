@@ -2,6 +2,8 @@ import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { BootstrapData } from '@/domain/types';
+import { toCsv } from './csv';
+import { createExportJson } from './json';
 import {
   accountAccumulatedSavings,
   accountCurrentStreak,
@@ -17,12 +19,6 @@ import {
   sequenceSavings,
 } from '@/domain/metrics';
 
-const csvCell = (value: unknown) => {
-  const raw = value == null ? '' : String(value);
-  const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
-
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -35,11 +31,11 @@ const shareTextFile = async (name: string, content: string, mimeType: string) =>
 
 export const shareJson = (data: BootstrapData) => shareTextFile(
   `revive-${new Date().toISOString().slice(0, 10)}.json`,
-  JSON.stringify(data, null, 2),
+  createExportJson(data),
   'application/json',
 );
 
-export const shareCsv = (data: BootstrapData) => {
+export const createCsv = (data: BootstrapData) => {
   const header = ['tipo', 'habito', 'data', 'humor', 'descricao', 'pendente'];
   const habitNames = new Map(data.vicios.map((habit) => [habit.id, habit.nome_vicio]));
   const rows = [
@@ -47,9 +43,14 @@ export const shareCsv = (data: BootstrapData) => {
     ...data.recaidas.map((relapse) => ['recaida', habitNames.get(relapse.vicio_id), relapse.data_recaida, '', relapse.motivo, relapse.pending]),
     ...data.metas.map((goal) => ['meta', goal.vicios?.nome_vicio, goal.data_inicio_meta, '', goal.descricao_meta, goal.pending]),
   ];
-  const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
-  return shareTextFile(`revive-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, 'text/csv');
+  return toCsv(header, rows);
 };
+
+export const shareCsv = (data: BootstrapData) => shareTextFile(
+  `revive-${new Date().toISOString().slice(0, 10)}.csv`,
+  createCsv(data),
+  'text/csv',
+);
 
 export const createPrintSummaryHtml = (data: BootstrapData, generatedAt = new Date()) => {
   const current = accountCurrentStreak(data.vicios);

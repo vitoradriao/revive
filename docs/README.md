@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Exportação CSV e JSON](exportacao-csv-json.md): regras de serialização, proteção contra fórmulas e remoção de identificadores da primeira fatia da #27.
+
 - [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.
 
 - [Motivo pessoal privado](web-motivo-pessoal.md): edição versionada, leitura offline, compatibilidade e privacidade da #65.
