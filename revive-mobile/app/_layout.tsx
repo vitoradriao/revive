@@ -27,7 +27,7 @@ export default function RootLayout() {
         <SessionProvider>
           <ReminderProvider>
             <NotificationIntentProvider>
-              <StatusBar style="light" />
+              <StatusBar style="dark" />
               <Stack
                 screenOptions={{
                   headerStyle: { backgroundColor: colors.surface },

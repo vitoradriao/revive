@@ -10,12 +10,11 @@ import type { BootstrapData, DailyRecord } from '@/domain/types';
 import { displayDate, localDateKey } from '@/domain/formats';
 import { AppButton, Card, Field, textStyles } from '@/ui/components';
 import { colors, radius, spacing } from '@/ui/theme';
+import { MoodPicker } from '@/ui/mood-picker';
 import { checkinSelection } from './selection-preferences';
 import { recordSchema } from './record-schema';
 import { RecordDetails } from './record-details';
 import { useLocalDay } from './use-local-day';
-
-const moods = ['Bem', 'Confiante', 'Ansioso', 'Desanimado'];
 
 export function QuickCheckin() {
   const { user, isRestoring } = useSession();
@@ -152,9 +151,7 @@ function CheckinForm({ userId, data }: { userId: string; data: BootstrapData }) 
     </View> : null}
     {canCreate ? <>
       <Text style={textStyles.body}>Como você está se sentindo?</Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Humor do check-in" style={styles.options}>
-        {moods.map(mood => <Pressable key={mood} accessibilityRole="radio" accessibilityLabel={`Humor: ${mood}`} accessibilityState={{ checked: humor === mood, disabled: saving }} disabled={saving} onPress={() => setHumor(mood)} style={[styles.option, humor === mood && styles.selected]}><Text style={textStyles.body}>{mood}</Text></Pressable>)}
-      </View>
+      <MoodPicker value={humor} onChange={setHumor} disabled={saving} />
       <AppButton title={expanded ? 'Recolher reflexão opcional' : 'Adicionar reflexão (opcional)'} variant="secondary" disabled={saving} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} />
       {expanded ? <>
         <Field label="Humor (texto livre)" maxLength={100} value={humor} editable={!saving} onChangeText={setHumor} placeholder="Ou descreva como está se sentindo" />
