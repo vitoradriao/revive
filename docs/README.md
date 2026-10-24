@@ -31,6 +31,10 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 - [Estado da implementação](../revive-mobile/docs/implementation-status.md).
 - [Melhorias de uso](../revive-mobile/docs/quality-of-life.md).
 
+## Descoberta
+
+- [Pesquisa "tempo recuperado"](pesquisa-tempo-recuperado.md): preparação da #69 (roteiro, hipóteses, critérios e pendências); não há pesquisa realizada nem decisão.
+
 ## Evidências do painel
 
 - [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.
