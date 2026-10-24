@@ -18,6 +18,7 @@ import ProgressNotice from '../components/dashboard/ProgressNotice';
 import HeroKpis from '../components/dashboard/HeroKpis';
 import HabitProgress from '../components/dashboard/HabitProgress';
 import { distinctCheckinDays, recordsInPeriod } from '../utils/progressMetrics';
+import { toCsv } from '../utils/csv';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -65,9 +66,8 @@ export default function ReportsPage() {
     const rows = recordsInPeriod(allRecords, 'data_registro', periodo)
       .map(r => [r.data_registro, r.vicio_id, r.humor || '', r.gatilhos || '', r.conquistas || '', r.observacoes || '', progress.scope, progress.updatedAt || '', periodo, progress.pendingCount]);
 
-    const escapeCell = value => `"${String(value ?? '').replace(/^[\s]*[=+@-]/, "'$&").replaceAll('"', '""')}"`;
-    const csv = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = toCsv(headers, rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
