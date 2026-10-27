@@ -41,17 +41,9 @@ database.tables.vicios = habits;
 // Diary queries exercise the Express DTO and cursor contract over synthetic rows.
 const originalFrom = database.client.from;
 database.client.from = table => {
-    if (table !== 'registros_diarios') return originalFrom(table);
-    const filters = [];
-    return {
-        select() { return this; },
-        eq(field, value) { filters.push([field, value]); return this; },
-        async maybeSingle() {
-            const record = [...events.registros.values()].find(row => filters.every(([field, value]) =>
-                (field === 'vicios.usuario_id' ? row.usuario_id : row[field]) === value));
-            return { data: record ? { ...structuredClone(record), vicios: { usuario_id: record.usuario_id } } : null, error: null };
-        }
-    };
+    const collection = { registros_diarios: 'registros', eventos_vontade: 'vontades', historico_recaidas: 'recaidas' }[table];
+    if (!collection) return originalFrom(table);
+    return require('../helpers/weekly-database.cjs').weeklyReadQuery(() => [...events[collection].values()], () => habits, { cap: 3 });
 };
 const originalRpc = database.client.rpc;
 database.tables.journey_preferences = [];
@@ -159,6 +151,17 @@ app.get('/api/v2/bootstrap', fixtureAuth, (req, res) => {
         vicios: habits.filter(item => item.usuario_id === user.id),
         ...Object.fromEntries(Object.entries(events).filter(([key]) => key !== 'vontades').map(([key, values]) => [key, [...values.values()].filter(item => item.usuario_id === user.id)])), mensagem: null });
 });
+app.post('/__test/seed-weekly', (_req, res) => {
+    const corpus = require('../fixtures/weekly-summary.json');
+    for (const [key, rows] of [['registros', corpus.records], ['vontades', corpus.urges], ['recaidas', corpus.relapses]]) {
+        for (const row of rows) events[key].set(row.id, { ...row, vicio_id: corpus.habitId, usuario_id: corpus.ownerId, timezone: corpus.timezone, revision: 1 });
+    }
+    for (let index = 0; index < 365; index++) {
+        const id = '50000000-0000-4000-8000-' + String(index).padStart(12, '0');
+        events.registros.set(id, { id, usuario_id: corpus.ownerId, vicio_id: corpus.habitId, data_registro: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10), humor: 'bom', revision: 1 });
+    }
+    res.sendStatus(204);
+});
 app.post('/__test/seed-preferences', (_req, res) => {
     habits.push({ ...structuredClone(habits[0]), id: '10000000-0000-4000-8000-000000000003', nome_vicio: 'Segundo hábito sintético' });
     res.sendStatus(204);
@@ -253,6 +256,19 @@ app.use('/api/v2', (req, res, next) => {
     next();
 });
 app.post('/__test/drop-record-responses', (req, res) => { dropRecordResponses = req.body.enabled === true; res.sendStatus(204); });
+// Weekly-summary transport is controlled here so it is identical in every engine (WebKit does not route worker fetches).
+let weeklyTransport = 'normal'; const heldWeekly = [];
+app.post('/__test/weekly-transport', (req, res) => { weeklyTransport = req.body.mode; if (weeklyTransport !== 'hold') heldWeekly.splice(0).forEach(send => send()); res.sendStatus(204); });
+app.post('/__test/weekly-release', (_req, res) => { heldWeekly.splice(0).forEach(send => send()); res.sendStatus(204); });
+app.get('/__test/weekly-status', (_req, res) => res.json({ held: heldWeekly.length }));
+app.get('/api/v2/weekly-summary', (req, res, next) => {
+    if (weeklyTransport === 'error') return res.status(503).json({ codigo: 'SYNTHETIC_UNAVAILABLE' });
+    if (weeklyTransport !== 'hold') return next();
+    weeklyTransport = 'normal';
+    const json = res.json.bind(res);
+    res.json = body => { heldWeekly.push(() => json({ ...body, frases: [{ ...body.frases[0], texto: 'Resposta antiga indevida' }] })); return res; };
+    next();
+});
 app.post('/__test/drop-next-response', (_req, res) => { dropNextResponse = true; res.sendStatus(204); });
 app.get('/__test/status', (_req, res) => res.json({
     heldSearch: heldSearchResponses.length, goalHabitActive: habits[0]?.ativo, counts, introductionStats, events: Object.fromEntries(Object.entries(events).map(([key, values]) => [key, values.size])), activeSessions: database.tables.app_sessions.filter(row => !row.revoked_at).length
@@ -266,7 +282,8 @@ app.use('/api/v2/web-auth', (req, _res, next) => { if (req.path === '/refresh') 
 const lifecycleBcrypt = require('./account-lifecycle-fixture.cjs')(app, database, secret, events);
 app.use('/api/v2', createMobileApi({
     supabase: database.client, jwtSecret: secret, webSecureCookies: false, webAuthEnabled: true,
-    bcrypt: lifecycleBcrypt
+    bcrypt: lifecycleBcrypt,
+    ...(process.env.REVIVE_WEEKLY_CLOCK ? { weeklySummaryClock: () => new Date(process.env.REVIVE_WEEKLY_CLOCK) } : {})
 }));
 app.use('/api', createCredentialAuth({ supabase: database.client, jwtSecret: secret }));
 app.get('/api/me', (req, res) => {

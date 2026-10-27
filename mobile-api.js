@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { createWeeklySummaryHandler, createWeeklySourceHandler } = require('./weekly-summary');
 const { validSearchTerm, searchScope, encodeSearchCursor, decodeSearchCursor } = require('./diary-search');
 const { defaultPreferences, validatePreferences } = require('./journey-preferences');
 const { createWebAuthTransport } = require('./web-auth-transport');
@@ -92,7 +93,7 @@ function calculateStats(addiction) {
     };
 }
 
-function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true', webSecureCookies = process.env.NODE_ENV === 'production', webAuthEnabled = process.env.WEB_AUTH_ENABLED === 'true' }) {
+function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true', webSecureCookies = process.env.NODE_ENV === 'production', webAuthEnabled = process.env.WEB_AUTH_ENABLED === 'true', weeklySummaryClock }) {
     if (!jwtSecret) throw new Error('JWT_SECRET e obrigatorio para a API mobile');
     const router = express.Router();
     router.use(privateHabitResponse);
@@ -502,6 +503,9 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel remover o dispositivo.');
         }
     });
+
+    router.get('/weekly-summary', authenticate, createWeeklySummaryHandler({ supabase, clock: weeklySummaryClock }));
+    router.get('/weekly-summary/sources/:type/:id', authenticate, createWeeklySourceHandler({ supabase }));
 
     router.post('/registros/search', authenticate, async (req, res) => {
         const input = req.body;

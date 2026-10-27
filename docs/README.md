@@ -33,6 +33,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Resumo semanal canônico](web-weekly-summary.md): API, fórmulas, fuso, cobertura, origens, cache e limites da entrega web #26.
+
 - [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.
 
 - [Motivo pessoal privado](web-motivo-pessoal.md): edição versionada, leitura offline, compatibilidade e privacidade da #65.
