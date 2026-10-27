@@ -109,7 +109,7 @@ function aggregateWeek({ ownerId, habitId, week, timezone, records = [], urges =
         ],
         origens: { filtros: { vicio_id: habitId, inicio: week, fim: observedEnd, timezone },
             registros: diary.map(row => ({ id: row.id, data: row.data_registro.slice(0, 10) })),
-            vontades: events.map(row => ({ id: row.id, data: row.occurred_at })), recaidas: lapses.map(row => ({ id: row.id, data: row.data_recaida })) },
+            vontades: events.map(row => ({ id: row.id, data: new Date(instantTime(row.occurred_at)).toISOString() })), recaidas: lapses.map(row => ({ id: row.id, data: new Date(instantTime(row.data_recaida)).toISOString() })) },
     };
 }
 function buildWeeklySummary(input) {

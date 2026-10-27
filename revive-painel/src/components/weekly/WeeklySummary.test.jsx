@@ -57,7 +57,7 @@ it.each(['habit', 'timezone', 'account', 'week'])('discards visible data and lat
     const view = render(<WeeklySummary habits={habits} />);
     expect(screen.getByText('Carregando resumo semanal…')).toBeInTheDocument();
     if (context === 'habit') fireEvent.change(screen.getByLabelText('Hábito do resumo'), { target: { value: habits[1].id } });
-    if (context === 'timezone') fireEvent.change(screen.getByLabelText('Fuso horário IANA'), { target: { value: 'UTC' } });
+    if (context === 'timezone') fireEvent.change(screen.getByLabelText('Fuso horário IANA'), { target: { value: 'Pacific/Auckland' } });
     if (context === 'week') fireEvent.change(screen.getByLabelText('Semana'), { target: { value: '-1' } });
     if (context === 'account') { state.offline.accountKey = 'b:2'; view.rerender(<WeeklySummary habits={[habits[1]]} />); }
     client.weeklySummary.mockResolvedValue({ summary: null, offline: true });
