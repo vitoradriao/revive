@@ -1,4 +1,5 @@
 import React from 'react';
+import WeeklySummary from '../components/weekly/WeeklySummary';
 import { motion as Motion } from 'framer-motion';
 import { useProgress } from '../contexts/useProgress';
 import Card from '../components/ui/Card';
@@ -20,7 +21,8 @@ export default function AnalyticsPage() {
     const awards = [...(progress.awards || [])].sort((a, b) => new Date(b.awarded_at) - new Date(a.awarded_at)).slice(0, 5);
     return (
         <Motion.div {...screenTransition} className="space-y-6">
-            <PageHeader eyebrow="Histórico" title="Painel de análises gerais" description="Contagens descritivas dos dados consolidados disponíveis, incluindo hábitos arquivados no histórico." />
+            <PageHeader eyebrow="Histórico" title="Evolução" description="Contagens descritivas dos dados consolidados disponíveis, incluindo hábitos arquivados no histórico." />
+            <WeeklySummary habits={progress.habits} />
             <ProgressNotice progress={progress} />
             <HeroKpis progress={progress} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
