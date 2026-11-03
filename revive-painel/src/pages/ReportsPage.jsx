@@ -4,24 +4,23 @@
  *
  * Permite ao usuario visualizar estatisticas filtradas por periodo
  * (7, 30 ou 90 dias): total de registros, economia, recaidas, metas concluidas
- * e distribuicao de humor. Inclui funcionalidade de exportacao em CSV
- * e impressao/PDF.
+ * e distribuicao de humor. A exportacao seletiva (#27) fica em ExportPanel.
  *
  * @component
  * @see {@link useData} Hook para acessar dados globais
  */
 import React, { useState, useMemo } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { Download, Printer, Calendar, Heart, BookOpen, Repeat } from 'lucide-react';
+import { Printer, Calendar, Heart, BookOpen, Repeat } from 'lucide-react';
 import { useProgress } from '../contexts/useProgress';
 import ProgressNotice from '../components/dashboard/ProgressNotice';
 import HeroKpis from '../components/dashboard/HeroKpis';
 import HabitProgress from '../components/dashboard/HabitProgress';
 import { distinctCheckinDays, recordsInPeriod } from '../utils/progressMetrics';
-import { toCsv } from '../utils/csv';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
+import ExportPanel from '../components/reports/ExportPanel';
 import { glassSurface, screenTransition, moodColors } from '../utils/constants';
 
 /**
@@ -29,7 +28,6 @@ import { glassSurface, screenTransition, moodColors } from '../utils/constants';
  *
  * Gerencia estado local 'periodo' (7, 30 ou 90 dias) para filtrar dados.
  * Calcula contagens dos dados disponíveis por período via useMemo.
- * Oferece exportacao CSV com geracao de Blob e download programatico.
  *
  * @returns {JSX.Element} Pagina de relatorios com filtros, estatisticas e acoes de exportacao
  */
@@ -54,27 +52,6 @@ export default function ReportsPage() {
       humorDistribuicao: Object.entries(humorCount).sort((a, b) => b[1] - a[1]),
     };
   }, [periodo, allRecords, relapses, progress.activeCount]);
-
-  /**
-   * Exporta registros do periodo como arquivo CSV.
-   * Cria um Blob com dados separados por virgula, gera URL temporaria
-   * e dispara download automatico via elemento <a> programatico.
-   * Complexidade: O(n) onde n = registros no periodo.
-   */
-  const exportCSV = () => {
-    const headers = ['Data', 'Vício ID', 'Humor', 'Gatilhos', 'Conquistas', 'Observações', 'Cobertura', 'Consolidado em', 'Período (dias)', 'Pendências locais excluídas'];
-    const rows = recordsInPeriod(allRecords, 'data_registro', periodo)
-      .map(r => [r.data_registro, r.vicio_id, r.humor || '', r.gatilhos || '', r.conquistas || '', r.observacoes || '', progress.scope, progress.updatedAt || '', periodo, progress.pendingCount]);
-
-    const csv = toCsv(headers, rows);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `revive-relatorio-${periodo}dias.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <Motion.div {...screenTransition} className="space-y-6">
@@ -167,24 +144,16 @@ export default function ReportsPage() {
         </div>
       </Card>
 
-      {/* Export Actions */}
+      <ExportPanel />
+
       <div className="flex gap-4">
-        <Button
-          onClick={exportCSV}
-          disabled={!progress.available || progress.loading}
-          variant="secondary"
-          size="lg"
-        >
-          <Download className="w-5 h-5" />
-          Exportar registros disponíveis em CSV
-        </Button>
         <Button
           onClick={() => window.print()}
           variant="secondary"
           size="lg"
         >
           <Printer className="w-5 h-5" />
-          Imprimir / PDF
+          Imprimir esta página
         </Button>
       </div>
     </Motion.div>
