@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Saídas esperadas da exportação (#27): preservar BOM e CRLF byte a byte.
+tests/fixtures/*.expected.csv -text

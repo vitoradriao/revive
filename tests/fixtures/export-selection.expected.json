@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 2,
+  "generated_at": "2026-02-03T12:00:02.000Z",
+  "escopo": "selecao",
+  "selecao": {
+    "inicio": "2026-02-01",
+    "fim": "2026-02-03",
+    "timezone": "America/Sao_Paulo",
+    "tipos": [
+      "registros",
+      "vontades",
+      "recaidas",
+      "metas"
+    ],
+    "campos": {
+      "registros": [
+        "data_registro",
+        "humor",
+        "observacoes"
+      ],
+      "vontades": [
+        "occurred_at",
+        "timezone",
+        "intensidade",
+        "gatilhos"
+      ],
+      "recaidas": [
+        "data_recaida",
+        "dias_abstinencia_perdidos"
+      ],
+      "metas": [
+        "data_inicio_meta",
+        "dias_objetivo",
+        "valor_objetivo",
+        "concluida"
+      ]
+    },
+    "nomes_dos_habitos": false,
+    "metas_sem_data": false
+  },
+  "coleta": {
+    "inicio": "2026-02-03T12:00:00.000Z",
+    "fim": "2026-02-03T12:00:01.000Z",
+    "consistencia": "sem_snapshot_transacional"
+  },
+  "cobertura": {
+    "completa": true,
+    "fontes": [
+      {
+        "tipo": "registros",
+        "habito": "Hábito 1",
+        "origem": "api_paginada",
+        "paginas": 2,
+        "itens": 4,
+        "completa": true,
+        "erro": null
+      },
+      {
+        "tipo": "vontades",
+        "habito": "Hábito 1",
+        "origem": "api_paginada",
+        "paginas": 1,
+        "itens": 1,
+        "completa": true,
+        "erro": null
+      },
+      {
+        "tipo": "registros",
+        "habito": "Hábito 2",
+        "origem": "api_paginada",
+        "paginas": 1,
+        "itens": 1,
+        "completa": true,
+        "erro": null
+      },
+      {
+        "tipo": "vontades",
+        "habito": "Hábito 2",
+        "origem": "api_paginada",
+        "paginas": 1,
+        "itens": 0,
+        "completa": true,
+        "erro": null
+      },
+      {
+        "tipo": "recaidas",
+        "habito": null,
+        "origem": "snapshot_local",
+        "paginas": 1,
+        "itens": 4,
+        "completa": true,
+        "erro": null
+      },
+      {
+        "tipo": "metas",
+        "habito": null,
+        "origem": "snapshot_local",
+        "paginas": 1,
+        "itens": 3,
+        "completa": true,
+        "erro": null
+      }
+    ],
+    "duplicados_descartados": 1,
+    "pendencias_locais_nao_incluidas": 1
+  },
+  "habitos": [
+    {
+      "referencia": "Hábito 1",
+      "arquivado": false,
+      "indicadores_na_geracao": {
+        "sequencia_atual_dias": 2,
+        "sequencia_atual_cobertura": "confirmed",
+        "recorde_dias": 30,
+        "recorde_cobertura": "confirmed",
+        "economia_acumulada_estimada": 320,
+        "economia_acumulada_cobertura": "inferred"
+      }
+    },
+    {
+      "referencia": "Hábito 2",
+      "arquivado": true,
+      "indicadores_na_geracao": null
+    }
+  ],
+  "dados": {
+    "registros": [
+      {
+        "habito": "Hábito 1",
+        "data_registro": "2026-02-01",
+        "humor": "bom",
+        "observacoes": "=HYPERLINK(\"http://x\")"
+      },
+      {
+        "habito": "Hábito 2",
+        "data_registro": "2026-02-01",
+        "humor": "ruim",
+        "observacoes": " +SOMA(1) <script>alert(1)</script>"
+      },
+      {
+        "habito": "Hábito 1",
+        "data_registro": "2026-02-02",
+        "humor": "neutro",
+        "observacoes": "linha 1\nlinha \"2\""
+      },
+      {
+        "habito": "Hábito 1",
+        "data_registro": "2026-02-03",
+        "humor": null,
+        "observacoes": null
+      }
+    ],
+    "vontades": [
+      {
+        "habito": "Hábito 1",
+        "occurred_at": "2026-02-02T13:15:00.000Z",
+        "timezone": "America/Sao_Paulo",
+        "intensidade": 7,
+        "gatilhos": [
+          "estresse",
+          "tedio"
+        ]
+      }
+    ],
+    "recaidas": [
+      {
+        "habito": "Hábito 1",
+        "data_recaida": "2026-02-02T02:30:00Z",
+        "dias_abstinencia_perdidos": 5
+      },
+      {
+        "habito": "Hábito 2",
+        "data_recaida": "2026-02-04T02:00:00Z",
+        "dias_abstinencia_perdidos": 1
+      }
+    ],
+    "metas": [
+      {
+        "habito": "Hábito 1",
+        "data_inicio_meta": "2026-02-02",
+        "dias_objetivo": 30,
+        "valor_objetivo": null,
+        "concluida": false
+      }
+    ]
+  }
+}

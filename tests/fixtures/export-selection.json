@@ -1,0 +1,79 @@
+{
+  "description": "Fixture sintética compartilhada da exportação seletiva (#27). Usada pelos testes do painel (exportData.test.js) e do mobile (selection.test.ts); as saídas esperadas precisam ser idênticas nas duas plataformas.",
+  "habits": [
+    { "id": "10000000-0000-4000-8000-000000000001", "nome_vicio": "SENTINELA_NOME_HABITO_A", "ativo": true,
+      "progresso": { "sequencia_atual_dias": 2, "sequencia_atual_cobertura": "confirmed", "recorde_dias": 30, "recorde_cobertura": "confirmed", "dias_checkin": 3,
+        "economia_sequencia": { "valor_estimado": 20, "cobertura": "inferred" }, "economia_acumulada": { "valor_estimado": 320, "cobertura": "inferred" }, "marcos": [] } },
+    { "id": "10000000-0000-4000-8000-000000000002", "nome_vicio": "SENTINELA_NOME_HABITO_B", "ativo": false },
+    { "id": "10000000-0000-4000-8000-000000000003", "nome_vicio": "SENTINELA_HABITO_NAO_SELECIONADO", "ativo": true }
+  ],
+  "snapshot": {
+    "usuario": { "id": "00000000-0000-4000-8000-0000000000aa", "nome": "SENTINELA_NOME_CONTA", "email": "sentinela@example.invalid" },
+    "recaidas": [
+      { "id": "rc1", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_recaida": "2026-02-02T02:30:00Z", "dias_abstinencia_perdidos": 5, "motivo": "SENTINELA_MOTIVO_RECAIDA" },
+      { "id": "rc2", "vicio_id": "10000000-0000-4000-8000-000000000002", "data_recaida": "2026-02-04T02:00:00Z", "dias_abstinencia_perdidos": 1, "motivo": null },
+      { "id": "rc3", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_recaida": "2026-02-04T04:00:00Z", "dias_abstinencia_perdidos": 1, "motivo": "fora do periodo" },
+      { "id": "rc4", "vicio_id": "10000000-0000-4000-8000-000000000003", "data_recaida": "2026-02-02T12:00:00Z", "dias_abstinencia_perdidos": 2, "motivo": "habito nao selecionado" }
+    ],
+    "metas": [
+      { "id": "m1", "usuario_id": "00000000-0000-4000-8000-0000000000aa", "vicio_id": "10000000-0000-4000-8000-000000000001", "descricao_meta": "SENTINELA_DESCRICAO_META", "dias_objetivo": 30, "valor_objetivo": null, "concluida": false, "data_inicio_meta": "2026-02-02" },
+      { "id": "m2", "usuario_id": "00000000-0000-4000-8000-0000000000aa", "vicio_id": "10000000-0000-4000-8000-000000000001", "descricao_meta": "meta sem data", "dias_objetivo": 7, "concluida": true, "data_inicio_meta": null },
+      { "id": "m3", "usuario_id": "00000000-0000-4000-8000-0000000000aa", "vicio_id": "10000000-0000-4000-8000-000000000002", "descricao_meta": "meta antiga", "dias_objetivo": 7, "concluida": true, "data_inicio_meta": "2026-01-15" }
+    ]
+  },
+  "pages": {
+    "/v2/registros?inicio=2026-02-01&fim=2026-02-03&vicio_id=10000000-0000-4000-8000-000000000001&limit=100": {
+      "registros": [
+        { "id": "r1", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_registro": "2026-02-01", "humor": "bom", "gatilhos": "SENTINELA_GATILHOS_TEXTO", "conquistas": "SENTINELA_CONQUISTAS", "observacoes": "=HYPERLINK(\"http://x\")", "idempotency_key": "SENTINELA_IDEMPOTENCIA" },
+        { "id": "r2", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_registro": "2026-02-02", "humor": "neutro", "observacoes": "linha 1\nlinha \"2\"" }
+      ],
+      "next_cursor": "c1"
+    },
+    "/v2/registros?inicio=2026-02-01&fim=2026-02-03&vicio_id=10000000-0000-4000-8000-000000000001&limit=100&cursor=c1": {
+      "registros": [
+        { "id": "r2", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_registro": "2026-02-02", "humor": "neutro", "observacoes": "linha 1\nlinha \"2\"" },
+        { "id": "r3", "vicio_id": "10000000-0000-4000-8000-000000000001", "data_registro": "2026-02-03", "humor": null, "observacoes": null }
+      ],
+      "next_cursor": null
+    },
+    "/v2/registros?inicio=2026-02-01&fim=2026-02-03&vicio_id=10000000-0000-4000-8000-000000000002&limit=100": {
+      "registros": [
+        { "id": "r4", "vicio_id": "10000000-0000-4000-8000-000000000002", "data_registro": "2026-02-01", "humor": "ruim", "observacoes": "\u00a0+SOMA(1) <script>alert(1)</script>" }
+      ],
+      "next_cursor": null
+    },
+    "/v2/vontades?vicio_id=10000000-0000-4000-8000-000000000001&inicio=2026-02-01&fim=2026-02-03&timezone=America%2FSao_Paulo&limit=100": {
+      "vontades": [
+        { "id": "u1", "usuario_id": "00000000-0000-4000-8000-0000000000aa", "vicio_id": "10000000-0000-4000-8000-000000000001", "occurred_at": "2026-02-02T13:15:00.000Z", "timezone": "America/Sao_Paulo", "intensidade": 7, "gatilhos": ["estresse", "tedio"], "nota": "SENTINELA_NOTA_VONTADE", "acao_realizada": "SENTINELA_ACAO", "resultado": "SENTINELA_RESULTADO" }
+      ],
+      "next_cursor": null,
+      "cobertura": { "total": 1, "retornados": 1, "tem_mais": false }
+    },
+    "/v2/vontades?vicio_id=10000000-0000-4000-8000-000000000002&inicio=2026-02-01&fim=2026-02-03&timezone=America%2FSao_Paulo&limit=100": {
+      "vontades": [], "next_cursor": null, "cobertura": { "total": 0, "retornados": 0, "tem_mais": false }
+    }
+  },
+  "clock": ["2026-02-03T12:00:00.000Z", "2026-02-03T12:00:01.000Z"],
+  "generatedAt": "2026-02-03T12:00:02.000Z",
+  "pendingCount": 1,
+  "selection": {
+    "habitIds": ["10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000001"],
+    "inicio": "2026-02-01",
+    "fim": "2026-02-03",
+    "timezone": "America/Sao_Paulo",
+    "types": ["metas", "registros", "vontades", "recaidas"],
+    "fields": {
+      "registros": ["data_registro", "humor", "observacoes"],
+      "vontades": ["occurred_at", "timezone", "intensidade", "gatilhos"],
+      "recaidas": ["data_recaida", "dias_abstinencia_perdidos"],
+      "metas": ["data_inicio_meta", "dias_objetivo", "valor_objetivo", "concluida"]
+    },
+    "includeHabitNames": false,
+    "includeUndatedGoals": false
+  },
+  "sentinels": ["SENTINELA_NOME_HABITO_A", "SENTINELA_NOME_HABITO_B", "SENTINELA_HABITO_NAO_SELECIONADO", "SENTINELA_NOME_CONTA", "sentinela@example.invalid",
+    "SENTINELA_MOTIVO_RECAIDA", "SENTINELA_DESCRICAO_META", "SENTINELA_GATILHOS_TEXTO", "SENTINELA_CONQUISTAS", "SENTINELA_IDEMPOTENCIA",
+    "SENTINELA_NOTA_VONTADE", "SENTINELA_ACAO", "SENTINELA_RESULTADO", "00000000-0000-4000-8000-0000000000aa",
+    "10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "meta sem data", "meta antiga", "fora do periodo", "habito nao selecionado"],
+  "partialFailPath": "/v2/registros?inicio=2026-02-01&fim=2026-02-03&vicio_id=10000000-0000-4000-8000-000000000001&limit=100&cursor=c1"
+}
