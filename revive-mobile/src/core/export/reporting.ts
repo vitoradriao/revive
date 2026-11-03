@@ -3,7 +3,6 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { BootstrapData } from '@/domain/types';
 import { toCsv } from './csv';
-import { createExportJson } from './json';
 import {
   accountAccumulatedSavings,
   accountCurrentStreak,
@@ -22,18 +21,25 @@ import {
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const shareTextFile = async (name: string, content: string, mimeType: string) => {
+
+/**
+ * Compartilhamento da exportação seletiva (#27): só por ação explícita no seletor do sistema.
+ * O arquivo temporário é apagado depois que o seletor fecha, inclusive em cancelamento ou falha.
+ */
+export const shareExportFile = async (name: string, content: string, mimeType: string) => {
   if (!(await Sharing.isAvailableAsync())) throw new Error('Compartilhamento não disponível neste aparelho.');
   const file = new File(Paths.cache, name);
-  file.write(content);
-  await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exportar dados do Revive' });
+  try {
+    if (file.exists) file.delete();
+    file.write(content);
+    await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exportar dados do Revive' });
+  } finally {
+    try { if (file.exists) file.delete(); } catch { /* limpeza best-effort do cache */ }
+  }
 };
 
-export const shareJson = (data: BootstrapData) => shareTextFile(
-  `revive-${new Date().toISOString().slice(0, 10)}.json`,
-  createExportJson(data),
-  'application/json',
-);
+export const printExportHtml = (html: string) => Print.printAsync({ html });
+
 
 export const createCsv = (data: BootstrapData) => {
   const header = ['tipo', 'habito', 'data', 'humor', 'descricao', 'pendente'];
@@ -46,11 +52,6 @@ export const createCsv = (data: BootstrapData) => {
   return toCsv(header, rows);
 };
 
-export const shareCsv = (data: BootstrapData) => shareTextFile(
-  `revive-${new Date().toISOString().slice(0, 10)}.csv`,
-  createCsv(data),
-  'text/csv',
-);
 
 export const createPrintSummaryHtml = (data: BootstrapData, generatedAt = new Date()) => {
   const current = accountCurrentStreak(data.vicios);

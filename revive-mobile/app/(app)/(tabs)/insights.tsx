@@ -5,7 +5,7 @@ import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { accountAccumulatedSavings, accountCurrentStreak, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency, moodDistribution } from '@/domain/metrics';
 import { AppButton, Card, LoadingState, PageTitle, Screen, textStyles } from '@/ui/components';
 import { spacing } from '@/ui/theme';
-import { shareCsv, shareJson, printSummary } from '@/core/export/reporting';
+import { printSummary } from '@/core/export/reporting';
 
 export default function InsightsScreen() {
   const router = useRouter();
@@ -51,9 +51,8 @@ export default function InsightsScreen() {
       <Card>
         <Text style={textStyles.heading}>Relatórios e dados</Text>
         <Text style={textStyles.muted}>Arquivos exportados podem conter informações pessoais. Compartilhe apenas com quem você confia.</Text>
-        <AppButton title="Compartilhar CSV" variant="secondary" onPress={() => void shareCsv(data).catch((error) => Alert.alert('Exportação', error.message))} />
-        <AppButton title="Compartilhar JSON" variant="secondary" onPress={() => void shareJson(data).catch((error) => Alert.alert('Exportação', error.message))} />
-        <AppButton title="Imprimir resumo" variant="secondary" onPress={() => void printSummary(data).catch((error) => Alert.alert('Relatório', error.message))} />
+        <AppButton title="Exportar dados selecionados" onPress={() => router.push('/(app)/export')} />
+        <AppButton title="Imprimir resumo da jornada" variant="secondary" onPress={() => void printSummary(data).catch((error) => Alert.alert('Relatório', error.message))} />
       </Card>
     </Screen>
   );
