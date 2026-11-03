@@ -26,8 +26,8 @@ export const EXPORT_FIELDS = {
   registros: [
     { key: 'data_registro', label: 'Data', freeText: false },
     { key: 'humor', label: 'Humor', freeText: false },
-    { key: 'gatilhos', label: 'Gatilhos (texto)', freeText: true },
-    { key: 'conquistas', label: 'Conquistas (texto)', freeText: true },
+    { key: 'gatilhos', label: 'Gatilhos anotados', freeText: true },
+    { key: 'conquistas', label: 'Conquistas anotadas', freeText: true },
     { key: 'observacoes', label: 'Observações', freeText: true },
   ],
   vontades: [

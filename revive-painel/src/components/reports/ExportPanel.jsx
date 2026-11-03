@@ -141,7 +141,7 @@ export default function ExportPanel() {
 
       <fieldset className="space-y-2">
         <legend className="font-semibold">Hábitos</legend>
-        {!habits.length && <p>Nenhum hábito disponível nesta cópia.</p>}
+        {!habits.length && <p>Nenhum hábito disponível para exportar.</p>}
         {habits.map((habit) => (
           <label key={habit.id} className="flex items-center gap-2">
             <input type="checkbox" checked={selection.habitIds.includes(habit.id)} onChange={() => update({ habitIds: toggle(selection.habitIds, habit.id) })} />
