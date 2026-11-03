@@ -1,3 +1,4 @@
+import { readWeeklySummary } from './weekly-summary';
 import { syncPreferences } from './journey-preferences';
 import { manageIntroduction } from './introduction';
 import { requestSnapshot } from './request-snapshot';
@@ -160,6 +161,30 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       }));
       check(); await update(check); check();
       return result;
+    },
+    weeklySummary: async (filters, accountKey, { signal } = {}) => {
+      const db = store, auth = session.getSnapshot();
+      const check = () => {
+        if (!db || db !== store || !accountKey || accountKey !== currentKey || closing || signal?.aborted
+            || session.getSnapshot().epoch !== auth.epoch
+            || (session.isCurrentEpoch && !session.isCurrentEpoch(auth.epoch))) throw changed();
+      };
+      check();
+      return requireCoordinator().withAccountLock(() => readWeeklySummary({ store: db, filters, check, signal,
+        isOnline: () => navigator.onLine !== false && !!auth.token,
+        request: (path, options) => request(path, options, auth.token),
+      }));
+    },
+    weeklySource: async (type, id, accountKey) => {
+      const db = store, auth = session.getSnapshot();
+      const check = () => {
+        if (!db || db !== store || accountKey !== currentKey || closing || session.getSnapshot().epoch !== auth.epoch
+            || (session.isCurrentEpoch && !session.isCurrentEpoch(auth.epoch))) throw changed();
+      };
+      check();
+      if (!auth.token || navigator.onLine === false) throw new Error('Conecte-se para abrir os detalhes desta origem. O resumo consolidado continua disponível.');
+      const result = await request('/v2/weekly-summary/sources/' + encodeURIComponent(type) + '/' + encodeURIComponent(id), {}, auth.token);
+      check(); return result;
     },
     preferences: async (input, accountKey) => {
       const db = store, auth = session.getSnapshot();

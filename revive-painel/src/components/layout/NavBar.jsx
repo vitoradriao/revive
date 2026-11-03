@@ -21,7 +21,7 @@ import { navButtonMotion } from '../../utils/constants';
 
 const navItems = [
   { path: '/', label: 'Jornada', icon: Heart },
-  { path: '/analytics', label: 'Insights', icon: PieChart },
+  { path: '/analytics', label: 'Evolução', icon: PieChart },
   { path: '/metas', label: 'Metas', icon: Target },
   { path: '/calendario', label: 'Calendário', icon: CalendarIcon },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },

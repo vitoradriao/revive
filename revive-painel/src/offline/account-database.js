@@ -199,6 +199,9 @@ function accountStore(db, userId, onVersionChange) {
           };
           tx.objectStore('pages').getAll().onsuccess = pages => {
             for (const page of pages.target.result) {
+              if (page.kind === 'weekly-summary') {
+                page.staleAfterMutation = true; tx.objectStore('pages').put(page); continue;
+              }
               if (!Array.isArray(page.data[collection])) continue;
               page.data[collection] = page.data[collection].map(item => item.id === receipt.entity.id ? clone(receipt.entity) : item);
               page.staleAfterMutation = true;
@@ -210,6 +213,11 @@ function accountStore(db, userId, onVersionChange) {
     });
   };
   const savePage = (kind, filters, data) => {
+    if (kind === 'weekly-summary') {
+      if (data?.versao !== 1 || data.vicio_id !== filters.vicio_id || data.timezone !== filters.timezone || data.intervalo?.inicio !== filters.semana) return Promise.reject(fail('PAGE_INVALID', 'Resumo inválido.'));
+      const row = { key: kind + ':' + stable(filters), userId, kind, filters: clone(filters), data: clone(data), updatedAt: new Date().toISOString(), staleAfterMutation: false, payloadVersion: 1 };
+      return run(['pages'], 'readwrite', (tx, set) => { tx.objectStore('pages').put(row); set(row); });
+    }
     const collection = kind === 'records' ? 'registros' : kind === 'urges' ? 'vontades' : null;
     if (!collection || !Array.isArray(data?.[collection])) return Promise.reject(fail('PAGE_INVALID', 'Página inválida.'));
     try { data[collection].forEach(own); } catch (error) { return Promise.reject(error); }
@@ -258,6 +266,7 @@ function accountStore(db, userId, onVersionChange) {
         const rows = tx.objectStore(name);
         rows.getAll().onsuccess = event => {
           for (const row of event.target.result) {
+            if (row.kind === 'weekly-summary') row.staleAfterMutation = true;
             for (const collection of ['vicios', 'registros', 'metas', 'recaidas', 'vontades', 'conquistas']) {
               if (Array.isArray(row.data?.[collection])) row.data[collection] = row.data[collection].filter(item => collection === 'vicios' ? item.id !== id : item.vicio_id !== id);
             }
@@ -271,6 +280,7 @@ function accountStore(db, userId, onVersionChange) {
         const rows = tx.objectStore(name);
         rows.getAll().onsuccess = event => {
           for (const row of event.target.result) {
+            if (row.kind === 'weekly-summary') { row.staleAfterMutation = true; rows.put(row); }
             if (Array.isArray(row.data?.metas)) {
               row.data.metas = row.data.metas.filter(goal => goal.id !== id);
               rows.put(row);

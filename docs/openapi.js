@@ -1289,3 +1289,233 @@
  *       '422': { description: DADOS_INVALIDOS; principal de outra conta, ausente ou arquivado recebe a mesma resposta }
  *       '503': { description: Confirmação indisponível; consultar antes de tentar novamente }
  */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     WeeklyInterval:
+ *       type: object
+ *       required: [inicio, fim, inicio_instant, fim_exclusivo, observado_ate]
+ *       properties:
+ *         inicio: { type: string, format: date, description: Segunda-feira civil no fuso solicitado }
+ *         fim: { type: string, format: date, description: Domingo civil inclusive }
+ *         inicio_instant: { type: string, format: date-time }
+ *         fim_exclusivo: { type: string, format: date-time, description: Primeira ocorrência da segunda-feira seguinte no fuso; semanas com DST podem ter 167 ou 169 horas }
+ *         observado_ate: { type: string, format: date-time, description: Corte capturado no início da consulta; episódios posteriores não entram }
+ *     WeeklyCount:
+ *       type: object
+ *       required: [quantidade, ids]
+ *       properties:
+ *         quantidade: { type: integer, minimum: 0 }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyCheckins:
+ *       type: object
+ *       required: [valor, denominador, ids]
+ *       properties:
+ *         valor: { type: integer, minimum: 0, maximum: 7, description: Dias civis distintos com pelo menos um check-in }
+ *         denominador: { type: integer, minimum: 0, maximum: 7, description: Dias civis observados incluindo o dia atual em semana parcial }
+ *         ids: { type: array, description: Todos os check-ins que sustentam os dias distintos, items: { type: string, format: uuid } }
+ *     WeeklyIntensity:
+ *       type: object
+ *       required: [media, soma, denominador, total, ids]
+ *       properties:
+ *         media: { type: number, nullable: true, minimum: 0, maximum: 10, description: Soma dividida pela quantidade de intensidades inteiras 0 a 10; duas casas decimais; null quando denominador zero }
+ *         soma: { type: integer, minimum: 0 }
+ *         denominador: { type: integer, minimum: 0 }
+ *         total: { type: integer, minimum: 0, description: Todos os episódios de vontade, inclusive os sem intensidade válida }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyDistribution:
+ *       type: object
+ *       required: [codigo, rotulo, quantidade, denominador, ids]
+ *       properties:
+ *         codigo: { type: string }
+ *         rotulo: { type: string }
+ *         quantidade: { type: integer, minimum: 0 }
+ *         denominador: { type: integer, minimum: 0, description: Total de check-ins para humor; total de episódios para gatilhos. Um episódio conta uma vez por código de gatilho }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyCoverage:
+ *       type: object
+ *       required: [carregamento, registros, episodios, recaidas, dias_observados, dias_sem_checkin, intensidade_informada, gatilhos_estruturados, humor_categorizado]
+ *       properties:
+ *         carregamento: { type: string, enum: [completo, incompleto], description: O endpoint só entrega 200 após carregar todas as páginas; falha em qualquer página retorna 503 }
+ *         registros: { type: integer, minimum: 0 }
+ *         episodios: { type: integer, minimum: 0 }
+ *         recaidas: { type: integer, minimum: 0 }
+ *         dias_observados: { type: integer, minimum: 0, maximum: 7 }
+ *         dias_sem_checkin: { type: integer, minimum: 0, maximum: 7, description: Lacuna não comprova abstinência ou ausência de eventos }
+ *         intensidade_informada: { type: integer, minimum: 0 }
+ *         gatilhos_estruturados: { type: integer, minimum: 0, description: Episódios com array de códigos, inclusive array vazio; nunca extrai gatilhos do texto do diário }
+ *         humor_categorizado: { type: integer, minimum: 0 }
+ *     WeeklyOrigins:
+ *       type: object
+ *       required: [filtros, registros, vontades, recaidas]
+ *       properties:
+ *         filtros:
+ *           type: object
+ *           required: [vicio_id, inicio, fim, timezone]
+ *           properties:
+ *             vicio_id: { type: string, format: uuid }
+ *             inicio: { type: string, format: date }
+ *             fim: { type: string, format: date, description: Último dia observado }
+ *             timezone: { type: string }
+ *         registros:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, format: date }
+ *         vontades:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, format: date-time }
+ *         recaidas:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, description: Instante UTC; timestamps legados sem sufixo são interpretados como UTC }
+ *     WeeklySummary:
+ *       type: object
+ *       required: [versao, vicio_id, timezone, intervalo, parcial, dias_checkin, episodios, recaidas, intensidade, gatilhos, humores, cobertura, frases, origens, atualizado_em, comparacao]
+ *       properties:
+ *         versao: { type: integer, enum: [1] }
+ *         vicio_id: { type: string, format: uuid }
+ *         timezone: { type: string }
+ *         intervalo: { $ref: '#/components/schemas/WeeklyInterval' }
+ *         parcial: { type: boolean, description: true enquanto o domingo local ainda não terminou }
+ *         dias_checkin: { $ref: '#/components/schemas/WeeklyCheckins' }
+ *         episodios: { $ref: '#/components/schemas/WeeklyCount' }
+ *         recaidas: { $ref: '#/components/schemas/WeeklyCount' }
+ *         intensidade: { $ref: '#/components/schemas/WeeklyIntensity' }
+ *         gatilhos: { type: array, items: { $ref: '#/components/schemas/WeeklyDistribution' } }
+ *         humores:
+ *           type: array
+ *           description: Catálogo web excelente/bom/neutro/ruim/péssimo, mobile Bem/Confiante/Ansioso/Desanimado e aliases legados explícitos documentados em docs/web-weekly-summary.md. Texto livre é não categorizado; vazio é não informado. Sem IA ou equivalência clínica entre catálogos.
+ *           items: { $ref: '#/components/schemas/WeeklyDistribution' }
+ *         cobertura: { $ref: '#/components/schemas/WeeklyCoverage' }
+ *         frases:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [codigo, texto, numerador, denominador, origem]
+ *             properties:
+ *               codigo: { type: string, description: Identificador da fórmula determinística }
+ *               texto: { type: string, example: Estresse apareceu em 4 de 6 episódios registrados. }
+ *               numerador: { type: integer, minimum: 0 }
+ *               denominador: { type: integer, minimum: 0 }
+ *               origem:
+ *                 type: object
+ *                 required: [tipo, ids]
+ *                 properties:
+ *                   tipo: { type: string, enum: [registros, vontades, recaidas] }
+ *                   ids: { type: array, items: { type: string, format: uuid } }
+ *         origens: { $ref: '#/components/schemas/WeeklyOrigins' }
+ *         atualizado_em: { type: string, format: date-time }
+ *         comparacao:
+ *           type: object
+ *           required: [status, texto, anterior]
+ *           properties:
+ *             status: { type: string, enum: [disponivel, dados_insuficientes] }
+ *             texto: { type: string, description: Apenas contagens descritivas; exige ambas as semanas encerradas de sete dias, totalmente carregadas e ao menos um registro em cada uma. Semana parcial nunca é comparada com semana inteira }
+ *             anterior:
+ *               type: object
+ *               required: [intervalo, cobertura, dias_checkin, episodios, recaidas, intensidade, origens]
+ *               properties:
+ *                 intervalo: { $ref: '#/components/schemas/WeeklyInterval' }
+ *                 cobertura: { $ref: '#/components/schemas/WeeklyCoverage' }
+ *                 dias_checkin: { $ref: '#/components/schemas/WeeklyCheckins' }
+ *                 episodios: { $ref: '#/components/schemas/WeeklyCount' }
+ *                 recaidas: { $ref: '#/components/schemas/WeeklyCount' }
+ *                 intensidade: { $ref: '#/components/schemas/WeeklyIntensity' }
+ *                 origens: { $ref: '#/components/schemas/WeeklyOrigins' }
+ * /api/v2/weekly-summary:
+ *   get:
+ *     summary: Resumo semanal canônico por hábito, incluindo arquivados
+ *     description: Sessão web v2 atual (access Bearer emitido pelo transporte web); ownership verificado no hábito e em todas as páginas. Segunda a domingo civil no fuso IANA explícito. Check-ins usam a data civil registrada; vontades/recaídas usam o instante convertido no fuso. IDs deduplicados por coleção. Consulta completa por cursor interno, inclusive semana anterior; não agrega bootstrap parcial. Somente episódios de vontade entram em intensidade/gatilhos, recaídas são contadas separadamente. Nenhum texto privado é incluído no resumo. Sem previsão, tendência, causalidade ou prescrição.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: vicio_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: semana
+ *         required: true
+ *         description: Segunda-feira YYYY-MM-DD (ano a partir de 1900), não futura no fuso informado
+ *         schema: { type: string, format: date, example: '2026-10-19' }
+ *       - in: query
+ *         name: timezone
+ *         required: true
+ *         description: Fuso IANA reconhecido por Intl/ICU; UTC e aliases nomeados aceitos, offsets numéricos recusados
+ *         schema: { type: string, maxLength: 100, example: America/Sao_Paulo }
+ *     responses:
+ *       '200':
+ *         description: Todas as páginas autorizadas foram carregadas; cobertura de campos pode ser incompleta e ausência de registros não prova ausência de eventos
+ *         headers:
+ *           Cache-Control: { schema: { type: string, enum: [no-store] } }
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WeeklySummary' }
+ *       '401': { description: Sessão ausente, inválida, expirada ou revogada }
+ *       '404': { description: Mesmo resultado para hábito inexistente ou de outra conta }
+ *       '422': { description: Filtros inválidos, extras, repetidos, semana futura, data não segunda-feira ou fuso inválido }
+ *       '503': { description: Resumo indisponível; nenhuma contagem parcial é entregue como completa }
+ * /api/v2/weekly-summary/sources/{type}/{id}:
+ *   get:
+ *     summary: Abrir episódio ou recaída que sustenta um indicador semanal
+ *     description: Leitura explícita e autenticada, com ownership revalidado inclusive para arquivados. Retorna campos originais (inclusive texto privado apenas nesta consulta), sem logs de conteúdo. Check-ins são abertos pelo GET /api/v2/registros/{id} existente. O resumo contém filtros e IDs; um ID nunca substitui autenticação. O detalhe é online e não é gravado no cache do resumo.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: type
+ *         required: true
+ *         schema: { type: string, enum: [vontades, recaidas] }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       '200':
+ *         description: Origem autorizada, Cache-Control no-store
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [tipo, registro]
+ *               properties:
+ *                 tipo: { type: string, enum: [vontades, recaidas] }
+ *                 registro:
+ *                   oneOf:
+ *                     - type: object
+ *                       required: [id, vicio_id, occurred_at, timezone, intensidade, gatilhos]
+ *                       properties:
+ *                         id: { type: string, format: uuid }
+ *                         vicio_id: { type: string, format: uuid }
+ *                         occurred_at: { type: string, format: date-time }
+ *                         timezone: { type: string }
+ *                         intensidade: { type: integer, minimum: 0, maximum: 10 }
+ *                         gatilhos: { type: array, items: { type: string } }
+ *                         nota: { type: string, nullable: true }
+ *                         acao_realizada: { type: string, nullable: true }
+ *                         resultado: { type: string, nullable: true }
+ *                     - type: object
+ *                       required: [id, vicio_id, data_recaida]
+ *                       properties:
+ *                         id: { type: string, format: uuid }
+ *                         vicio_id: { type: string, format: uuid }
+ *                         data_recaida: { type: string, description: Instante legado UTC mesmo quando sem sufixo }
+ *                         motivo: { type: string, nullable: true }
+ *                         dias_abstinencia_perdidos: { type: integer, nullable: true }
+ *       '401': { description: Sessão inválida }
+ *       '404': { description: Origem inexistente ou de outra conta; mesma resposta }
+ *       '503': { description: Consulta de origem indisponível }
+ */

@@ -70,7 +70,7 @@ export default function LoginPage() {
             {[
               { icon: TrendingUp, text: 'Acompanhe economia, dias limpos e metas em um so lugar' },
               { icon: Clock, text: 'Registre humor, gatilhos e conquistas com poucos toques' },
-              { icon: Star, text: 'Veja calendario, conquistas e insights personalizados' }
+              { icon: Star, text: 'Veja calendario, conquistas e sua evolução' }
             ].map((item) => {
               const Icon = item.icon;
               return (

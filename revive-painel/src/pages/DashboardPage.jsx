@@ -112,8 +112,8 @@ export default function DashboardPage() {
                 type="button"
                 onClick={() => navigate('/analytics')}
                 className="revive-round-icon"
-                aria-label="Abrir insights"
-                title="Abrir insights"
+                aria-label="Abrir evolução"
+                title="Abrir evolução"
               >
                 <ArrowUpRight className="w-6 h-6" />
               </button>
