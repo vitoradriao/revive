@@ -60,10 +60,11 @@ Telas: painel em **Relatórios → Exportar dados selecionados** ([ExportPanel](
 
 - `exportData.test.js` (painel) e `selection.test.ts` (mobile): saídas idênticas, sentinelas ausentes, paginação/duplicados, parcial, opt-in, cancelamento e troca de conta, validação e datas por fuso.
 - `ExportPanel.test.jsx` e `selective-export.test.tsx`: padrões desmarcados, prévia e arquivo do mesmo dataset, descarte ao mudar a seleção, cancelamento sem arquivo e aviso de parcial.
+- `npm run test:browser:export` ([selective-export.cjs](../tests/browser/selective-export.cjs)): no navegador, com a API sintética, confere padrões desmarcados, consulta da segunda página, **download real** de CSV e JSON sem sentinelas, descarte da prévia ao mudar a seleção e arquivo `-parcial` quando uma página falha.
 - O CSV esperado foi aberto no LibreOffice (importação UTF-8): acentos e quebras de linha preservados e nenhuma célula de fórmula. O HTML esperado foi renderizado no Chromium sem executar scripts.
 
 ### Pendências
 
 - Compartilhamento e impressão em aparelho real (Android/iOS) e download/impressão em navegadores reais pelo usuário.
 - Abrir os arquivos no Excel e no Google Sheets (apenas LibreOffice foi testado).
-- Teste de navegador ponta a ponta do painel com API e PostgreSQL reais.
+- Teste ponta a ponta com API e PostgreSQL reais (o teste de navegador usa a API sintética) e impressão real pelo navegador.
