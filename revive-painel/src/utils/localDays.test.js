@@ -5,9 +5,11 @@ import { activityDays, localDayKey, recordsInPeriod } from './progressMetrics';
 const EVENING_IN_BRAZIL = new Date('2026-03-11T01:30:00.000Z');
 
 describe('dias civis locais no painel', () => {
-  const originalTz = process.env.TZ;
-  beforeAll(() => { process.env.TZ = 'America/Sao_Paulo'; });
-  afterAll(() => { process.env.TZ = originalTz; });
+  // O fuso do Node pode ser trocado em tempo de execução; fixa um fuso com horário à noite em UTC-3.
+  const env = globalThis.process.env;
+  const originalTz = env.TZ;
+  beforeAll(() => { env.TZ = 'America/Sao_Paulo'; });
+  afterAll(() => { env.TZ = originalTz; });
 
   it('keeps civil dates and converts instants to the device day', () => {
     expect(localDayKey('2026-03-10')).toBe('2026-03-10');
