@@ -1,5 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
-# Saídas esperadas da exportação (#27): preservar BOM e CRLF byte a byte.
-tests/fixtures/*.expected.csv -text
+# Saídas esperadas da exportação (#27): preservar os bytes exatos (BOM e CRLF no CSV,
+# LF no JSON/HTML) também em checkouts Windows com core.autocrlf=true.
+tests/fixtures/*.expected.* -text
