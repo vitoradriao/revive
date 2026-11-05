@@ -67,7 +67,7 @@ function parseUrgeCursor(value) {
 function formatDuration(totalDays) {
     const years = Math.floor(totalDays / 365);
     const months = Math.floor((totalDays % 365) / 30);
-    const days = totalDays % 30;
+    const days = (totalDays % 365) % 30;
     const parts = [];
     if (years) parts.push(`${years} ${years === 1 ? 'ano' : 'anos'}`);
     if (months) parts.push(`${months} ${months === 1 ? 'mes' : 'meses'}`);
