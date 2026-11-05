@@ -2,20 +2,22 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DailyRecord } from '@/domain/types';
 import { displayDate } from '@/domain/formats';
+import { describeMood } from '@/domain/moods';
 import { editorialStyles } from '@/ui/editorial';
 import { Illustration, type IllustrationName } from '@/ui/illustration';
 import { textStyles } from '@/ui/components';
 import { colors, radius } from '@/ui/theme';
 
-const moods: Record<string, IllustrationName> = { Bem: 'humor-bem', Confiante: 'humor-confiante', Ansioso: 'humor-ansioso', Desanimado: 'humor-desanimado' };
+const moodArt = (humor?: string | null): IllustrationName => describeMood(humor)?.art ?? 'sol';
+const moodLabel = (humor?: string | null) => describeMood(humor)?.label ?? 'Sem humor informado';
 
 export function RecordTimeline({ records, onOpen, habitLabel }: { records: DailyRecord[]; onOpen: (record: DailyRecord) => void; habitLabel?: (id: string) => string }) {
   return <View style={styles.list}>{records.map((record, index) => <View key={record.id} style={styles.entry}>
     <View style={styles.rail} accessible={false}><View style={styles.dot} />{index < records.length - 1 ? <View style={styles.line} /> : null}</View>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Abrir registro de ${displayDate(record.data_registro)}: ${record.humor || 'sem humor informado'}`} accessibilityHint="Consulte os detalhes e corrija este registro." onPress={() => onOpen(record)} style={({ pressed }) => [styles.card, { backgroundColor: index % 2 ? colors.lavender : colors.butter }, pressed && { opacity: 0.75 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Abrir registro de ${displayDate(record.data_registro)}: ${describeMood(record.humor)?.label || 'sem humor informado'}`} accessibilityHint="Consulte os detalhes e corrija este registro." onPress={() => onOpen(record)} style={({ pressed }) => [styles.card, { backgroundColor: index % 2 ? colors.lavender : colors.butter }, pressed && { opacity: 0.75 }]}>
       <View style={editorialStyles.row}><Text style={styles.eyebrow}>CHECK-IN</Text><Text style={styles.date}>{displayDate(record.data_registro)}</Text></View>
       {habitLabel ? <Text style={styles.detail}>{habitLabel(record.vicio_id)}</Text> : null}
-      <View style={editorialStyles.row}><Text accessibilityLabel={`Check-in: ${record.humor || 'Sem humor informado'}`} style={styles.mood}>{record.humor || 'Sem humor informado'}</Text><Illustration name={moods[record.humor || ''] || 'sol'} size={40} /></View>
+      <View style={editorialStyles.row}><Text accessibilityLabel={`Check-in: ${moodLabel(record.humor)}`} style={styles.mood}>{moodLabel(record.humor)}</Text><Illustration name={moodArt(record.humor)} size={40} /></View>
       {record.gatilhos ? <Text style={styles.detail}>Gatilhos: {record.gatilhos}</Text> : null}
       {record.conquistas ? <Text style={styles.detail}>Conquistas: {record.conquistas}</Text> : null}
       {record.observacoes ? <Text style={styles.detail}>Observações: {record.observacoes}</Text> : null}

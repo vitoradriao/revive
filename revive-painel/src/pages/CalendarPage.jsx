@@ -13,7 +13,7 @@
  *
  * @component
  * @see {@link useData} Hook para acessar registros, recaidas e metas
- * @see {@link moodColors} Mapa de cores para cada tipo de humor
+ * @see {@link module:utils/moods} Rotulos e cores dos humores dos dois apps
  */
 import React, { useState, useMemo } from 'react';
 import { motion as Motion } from 'framer-motion';
@@ -24,7 +24,9 @@ import UrgeContent from '../components/urges/UrgeContent';
 import { dateInZone, deviceTimezone } from '../utils/urge-time';
 import { useData } from '../contexts/DataContext';
 import PageHeader from '../components/ui/PageHeader';
-import { glassSurface, screenTransition, moodColors } from '../utils/constants';
+import { glassSurface, screenTransition } from '../utils/constants';
+import { describeMood } from '../utils/moods';
+import { localDayKey } from '../utils/progressMetrics';
 
 /**
  * Componente da pagina de Calendario.
@@ -69,8 +71,8 @@ export default function CalendarPage() {
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayRegistros = allRecords.filter(r => r.data_registro === dateStr);
-      const dayRecaidas = relapses.filter(r => r.data_recaida?.split('T')[0] === dateStr);
-      const dayMetas = goals.filter(m => m.concluida && m.data_criacao?.split('T')[0] === dateStr);
+      const dayRecaidas = relapses.filter(r => localDayKey(r.data_recaida) === dateStr);
+      const dayMetas = goals.filter(m => m.concluida && localDayKey(m.data_conclusao || m.data_criacao) === dateStr);
       const mood = dayRegistros.length > 0 ? dayRegistros[dayRegistros.length - 1].humor : null;
 
       days.push({
@@ -81,7 +83,7 @@ export default function CalendarPage() {
         metas: dayMetas,
         urges: urges.filter(event => dateInZone(event.occurred_at, deviceTimezone()) === dateStr),
         mood,
-        isToday: dateStr === new Date().toISOString().split('T')[0]
+        isToday: dateStr === localDayKey(new Date().toISOString())
       });
     }
     return days;
@@ -145,7 +147,7 @@ export default function CalendarPage() {
                   {!!dayData.recaidas.length && <span>Recaída</span>}
                   {!!dayData.metas.length && <span>Meta</span>}
                   {dayData.mood && (
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: moodColors[dayData.mood] || '#6b7280' }} />
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: describeMood(dayData.mood)?.color || '#6b7280' }} />
                   )}
                   {dayData.recaidas.length > 0 && <div className="w-2 h-2 rounded-full bg-rose-500" />}
                   {dayData.metas.length > 0 && <div className="w-2 h-2 rounded-full bg-amber-400" />}
@@ -189,7 +191,7 @@ export default function CalendarPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <BookOpen className="w-4 h-4 text-[#7CF6C4]" />
                     <span className="text-sm text-white/60">Registro</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-[#7CF6C4]/20 text-[#7CF6C4] capitalize">{reg.humor}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-[#7CF6C4]/20 text-[#7CF6C4] ">{describeMood(reg.humor)?.label || 'Sem humor'}</span>
                   </div>
                   {reg.gatilhos && <p className="text-sm text-white/60"><strong className="text-white/80">Gatilhos:</strong> {reg.gatilhos}</p>}
                   {reg.conquistas && <p className="text-sm text-white/60"><strong className="text-white/80">Conquistas:</strong> {reg.conquistas}</p>}

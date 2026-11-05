@@ -21,7 +21,8 @@ import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import ExportPanel from '../components/reports/ExportPanel';
-import { glassSurface, screenTransition, moodColors } from '../utils/constants';
+import { glassSurface, screenTransition } from '../utils/constants';
+import { countMoods } from '../utils/moods';
 
 /**
  * Componente da pagina de Relatorios.
@@ -39,17 +40,13 @@ export default function ReportsPage() {
   const stats = useMemo(() => {
     const periodRecords = recordsInPeriod(allRecords, 'data_registro', periodo);
     const periodRelapses = recordsInPeriod(relapses, 'data_recaida', periodo);
-    const humorCount = {};
-    periodRecords.forEach(r => {
-      if (r.humor) humorCount[r.humor] = (humorCount[r.humor] || 0) + 1;
-    });
 
     return {
       totalRegistros: periodRecords.length,
       totalRecaidas: periodRelapses.length,
       checkinDays: distinctCheckinDays(periodRecords),
       activeCount: progress.activeCount,
-      humorDistribuicao: Object.entries(humorCount).sort((a, b) => b[1] - a[1]),
+      humorDistribuicao: countMoods(periodRecords),
     };
   }, [periodo, allRecords, relapses, progress.activeCount]);
 
@@ -80,7 +77,7 @@ export default function ReportsPage() {
 
       <ProgressNotice progress={progress} />
       <HeroKpis progress={progress} />
-      <p className="text-sm text-muted">Registros, presença, humor e recaídas: últimos {periodo} dias, incluindo hoje (UTC). Economias e sequências: snapshot consolidado, sem recorte pelo filtro.</p>
+      <p className="text-sm text-muted">Registros, presença, humor e recaídas: últimos {periodo} dias, incluindo hoje (fuso do aparelho). Economias e sequências: snapshot consolidado, sem recorte pelo filtro.</p>
 
       {/* Resumo do período */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -110,14 +107,14 @@ export default function ReportsPage() {
       <Card title={`Distribuição de humor (${periodo} dias)`}>
         {stats.humorDistribuicao.length > 0 ? (
           <div className="space-y-3">
-            {stats.humorDistribuicao.map(([humor, count]) => {
+            {stats.humorDistribuicao.map(({ key, label, color, count }) => {
               const total = stats.totalRegistros || 1;
               const pct = (count / total) * 100;
               return (
-                <div key={humor} className="flex items-center gap-3">
-                  <span className="text-sm text-white/70 capitalize w-20">{humor}</span>
+                <div key={key} className="flex items-center gap-3">
+                  <span className="text-sm text-white/70 w-20">{label}</span>
                   <div className="flex-1 bg-slate-700/40 rounded-full h-2">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: moodColors[humor] || '#6b7280' }} />
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
                   </div>
                   <span className="text-sm text-white/50 w-12 text-right">{Math.round(pct)}%</span>
                 </div>

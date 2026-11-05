@@ -1,4 +1,24 @@
 import { badgeDefinitions } from './constants';
+import { localDateKey } from './habitForm';
+
+const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Dia civil local de um valor salvo. Datas civis (data_registro) ficam como estao;
+ * instantes (data_recaida, data_criacao) sao convertidos para o fuso do aparelho,
+ * em vez de usar o dia UTC, que adianta registros feitos a noite no Brasil.
+ */
+export function localDayKey(value) {
+    const text = String(value ?? '');
+    if (CIVIL_DATE.test(text)) return text;
+    const date = new Date(text);
+    return Number.isFinite(date.getTime()) ? localDateKey(date) : '';
+}
+
+const addCivilDays = (day, amount) => {
+    const [year, month, date] = day.split('-').map(Number);
+    return localDateKey(new Date(year, month - 1, date + amount));
+};
 
 const unavailable = () => ({ value: null, coverage: 'unknown' });
 const asNumber = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -101,23 +121,19 @@ export function buildProgressView({ data, loading = false, error = null, localOn
 }
 
 export function recordsInPeriod(records, field, days, now = new Date()) {
-    const end = now.toISOString().slice(0, 10);
-    const startDate = new Date(`${end}T00:00:00Z`);
-    startDate.setUTCDate(startDate.getUTCDate() - days + 1);
-    const start = startDate.toISOString().slice(0, 10);
+    const end = localDateKey(now);
+    const start = addCivilDays(end, -days + 1);
     return records.filter(record => {
-        const date = String(record[field] || '').slice(0, 10);
-        return date >= start && date <= end;
+        const date = localDayKey(record[field]);
+        return date && date >= start && date <= end;
     });
 }
 
 export function activityDays(records, relapses, now = new Date()) {
-    const end = now.toISOString().slice(0, 10);
+    const end = localDateKey(now);
     return Array.from({ length: 28 }, (_, index) => {
-        const date = new Date(`${end}T00:00:00Z`);
-        date.setUTCDate(date.getUTCDate() - 27 + index);
-        const key = date.toISOString().slice(0, 10);
-        return { date: key, count: records.filter(record => String(record.data_registro).slice(0, 10) === key).length,
-            hasRelapse: relapses.some(relapse => String(relapse.data_recaida).slice(0, 10) === key) };
+        const key = addCivilDays(end, -27 + index);
+        return { date: key, count: records.filter(record => localDayKey(record.data_registro) === key).length,
+            hasRelapse: relapses.some(relapse => localDayKey(relapse.data_recaida) === key) };
     });
 }

@@ -8,16 +8,15 @@ import DonutChart from '../components/ui/DonutChart';
 import PageHeader from '../components/ui/PageHeader';
 import HeroKpis from '../components/dashboard/HeroKpis';
 import ProgressNotice from '../components/dashboard/ProgressNotice';
-import { moodColors, screenTransition } from '../utils/constants';
+import { screenTransition } from '../utils/constants';
+import { countMoods } from '../utils/moods';
 import { distinctCheckinDays, recordsInPeriod, milestoneCategoryLabel, milestoneOriginLabel, coverageLabel } from '../utils/progressMetrics';
 
 export default function AnalyticsPage() {
     const progress = useProgress();
     const records = recordsInPeriod(progress.records, 'data_registro', 30);
     const relapses = recordsInPeriod(progress.relapses, 'data_recaida', 30);
-    const moods = new Map();
-    records.forEach(record => { if (record.humor) moods.set(record.humor, (moods.get(record.humor) || 0) + 1); });
-    const moodData = [...moods].map(([label, value]) => ({ label, value, cor: moodColors[label] || '#6b7280' }));
+    const moodData = countMoods(records).map(({ label, count, color }) => ({ label, value: count, cor: color }));
     const awards = [...(progress.awards || [])].sort((a, b) => new Date(b.awarded_at) - new Date(a.awarded_at)).slice(0, 5);
     return (
         <Motion.div {...screenTransition} className="space-y-6">
