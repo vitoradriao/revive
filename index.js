@@ -1132,10 +1132,14 @@ app.get('/api/mensagens/diaria', authMiddleware, async (req, res) => {
             .select('*')
             .eq('ativa', true);
 
-        // Se tipo_vicio foi informado, filtra por tipo específico OU tipo "geral"
-        // Usa o operador OR do Supabase para combinar condições
-        if (tipo_vicio) {
-            query = query.or(`tipo_vicio.eq.${tipo_vicio},tipo_vicio.eq.geral`);
+        // Se tipo_vicio foi informado, filtra por tipo específico OU tipo "geral".
+        // `.in()` escapa os valores; interpolar a entrada em `.or()` permitiria
+        // injetar filtros PostgREST adicionais (ex.: ",ativa.eq.false").
+        if (tipo_vicio !== undefined) {
+            if (typeof tipo_vicio !== 'string' || !/^[\p{L}\p{N} _-]{1,60}$/u.test(tipo_vicio)) {
+                return res.status(400).json({ erro: 'Tipo de vicio invalido' });
+            }
+            query = query.in('tipo_vicio', [...new Set([tipo_vicio, 'geral'])]);
         }
 
         const { data, error } = await query;
@@ -1193,18 +1197,24 @@ app.post('/api/metas', authMiddleware, async (req, res) => {
             valor_economizado_inicio: 0
         };
 
-        if (iniciar_hoje && vicio_id) {
-            const { data: vicio, error: vicioError } = await supabase
+        // Toda meta vinculada precisa apontar para um vício do próprio usuário;
+        // sem isso, o join em GET /api/metas exporia o nome de vícios alheios.
+        let vicio = null;
+        if (vicio_id) {
+            const { data: ownedVicio, error: vicioError } = await supabase
                 .from('vicios')
                 .select('*')
                 .eq('id', vicio_id)
                 .eq('usuario_id', req.usuarioId)
                 .single();
 
-            if (vicioError || !vicio) {
+            if (vicioError || !ownedVicio) {
                 return res.status(404).json({ erro: 'Vicio nao encontrado' });
             }
+            vicio = ownedVicio;
+        }
 
+        if (iniciar_hoje && vicio) {
             const stats = calculateAddictionStats(vicio);
             const economy = await historicalSavings([vicio]);
             baseline = {
@@ -1391,7 +1401,7 @@ app.delete('/api/metas/:id', authMiddleware, async (req, res) => {
 function formatDuration(days) {
     const years = Math.floor(days / 365);
     const months = Math.floor((days % 365) / 30);
-    const remainingDays = days % 30;
+    const remainingDays = (days % 365) % 30;
 
     // Monta array com partes não-zero e aplica pluralização em português
     const result = [];
