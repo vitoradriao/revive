@@ -22,9 +22,10 @@ export function achievementProgress(data: BootstrapData) {
     const current = values[group.category];
     return {
       id: `${group.category}-${target}`,
-      label: group.category === 'streak' ? `${target} dias consecutivos`
+      categoryKey: group.category,
+      label: group.category === 'streak' ? `${target} ${target === 1 ? 'dia consecutivo' : 'dias consecutivos'}`
         : group.category === 'savings' ? `${formatCurrency(target)} de economia estimada acumulada`
-          : group.category === 'goals' ? `${target} metas concluídas`
+          : group.category === 'goals' ? `${target} ${target === 1 ? 'meta concluída' : 'metas concluídas'}`
             : `${target} dias distintos com check-in`,
       category: group.label, target, current,
       award: data.conquistas?.find((item) => item.vicio_id == null

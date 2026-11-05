@@ -14,7 +14,7 @@ const config: ExpoConfig = {
   version: '0.1.1',
   orientation: 'portrait',
   scheme: 'revive',
-  userInterfaceStyle: 'automatic',
+  userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'com.reviveapp.revive',
     supportsTablet: true,
@@ -23,7 +23,7 @@ const config: ExpoConfig = {
   android: {
     versionCode: 2,
     package: 'com.reviveapp.revive',
-    adaptiveIcon: { backgroundColor: '#07111F' },
+    adaptiveIcon: { backgroundColor: '#F8F3E9' },
     predictiveBackGestureEnabled: true,
   },
   extra: {
@@ -50,7 +50,7 @@ const config: ExpoConfig = {
     [
       'expo-notifications',
       {
-        color: '#7CF6C4',
+        color: '#3F43A8',
         defaultChannel: 'lembretes',
       },
     ],
