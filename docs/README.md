@@ -22,6 +22,7 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 - [Vercel](deploy-vercel.md): hospedagem utilizada pelo ambiente de demonstração.
 - [Render](deploy-render.md): configuração alternativa mantida no repositório.
 - [Android local](../revive-mobile/docs/android-local.md): desenvolvimento, assinatura e compilação no Windows.
+- [Mudança de fonte, densidade e resolução no Android](../revive-mobile/docs/android-config-change-investigation.md): análise, hipóteses e matriz automatizada por adb da #50.
 - [Checklist mobile](../revive-mobile/docs/release-checklist.md): verificações antes da distribuição.
 
 ## Documentação do aplicativo
@@ -30,6 +31,10 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 - [Contratos da API mobile](../revive-mobile/docs/api-contracts.md).
 - [Estado da implementação](../revive-mobile/docs/implementation-status.md).
 - [Melhorias de uso](../revive-mobile/docs/quality-of-life.md).
+
+## Descoberta
+
+- [Pesquisa "tempo recuperado"](pesquisa-tempo-recuperado.md): preparação da #69 (roteiro, hipóteses, critérios e pendências); não há pesquisa realizada nem decisão.
 
 ## Evidências do painel
 
