@@ -18,6 +18,7 @@ import QuickCheckIn from '../components/diary/QuickCheckIn';
 import Button from '../components/ui/Button';
 import { glassSurface } from '../utils/constants';
 import { calculateGoalProgress } from '../utils/goalProgress';
+import { selectRecentActivity } from '../utils/dashboard';
 import { useProgress } from '../contexts/useProgress';
 import ProgressNotice from '../components/dashboard/ProgressNotice';
 import { activityDays } from '../utils/progressMetrics';
@@ -44,39 +45,9 @@ export default function DashboardPage() {
   const heatmapData = useMemo(() => activityDays(allRecords, relapses), [allRecords, relapses]);
 
   const recentActivity = useMemo(() => {
-    const events = [];
-
-    allRecords.slice(-5).forEach(r => {
-      events.push({
-        id: `reg-${r.id}`,
-        type: 'registro',
-        date: new Date(r.data_registro),
-        text: `Registro de humor: ${r.humor}`,
-        icon: BookOpen
-      });
-    });
-
-    relapses.slice(-3).forEach(r => {
-      events.push({
-        id: `rec-${r.id}`,
-        type: 'recaida',
-        date: new Date(r.data_recaida),
-        text: 'Recaída registrada',
-        icon: Repeat
-      });
-    });
-
-    goals.filter(m => m.concluida).slice(-3).forEach(m => {
-      events.push({
-        id: `meta-${m.id}`,
-        type: 'meta',
-        date: new Date(m.data_criacao),
-        text: `Meta concluída: ${m.descricao_meta}`,
-        icon: Target
-      });
-    });
-
-    return events.sort((a, b) => b.date - a.date).slice(0, 8);
+    const icons = { registro: BookOpen, recaida: Repeat, meta: Target };
+    return selectRecentActivity({ records: allRecords, relapses, goals })
+      .map(event => ({ ...event, icon: icons[event.type] }));
   }, [allRecords, relapses, goals]);
 
   const featuredGoals = useMemo(() => goals.slice(0, 3), [goals]);

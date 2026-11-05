@@ -16,7 +16,9 @@ describe('api helper functions', () => {
         expect(formatDuration(0)).toBe('0 dias');
         expect(formatDuration(1)).toBe('1 dia');
         expect(formatDuration(35)).toBe('1 mes, 5 dias');
-        expect(formatDuration(400)).toContain('1 ano');
+        expect(formatDuration(365)).toBe('1 ano');
+        expect(formatDuration(400)).toBe('1 ano, 1 mes, 5 dias');
+        expect(formatDuration(730)).toBe('2 anos');
     });
 
     it('calculateAddictionStats computes abstinence and savings', () => {
