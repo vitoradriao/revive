@@ -38,6 +38,8 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 
 ## Evidências do painel
 
+- [Exportação CSV e JSON](exportacao-csv-json.md): regras de serialização, proteção contra fórmulas e remoção de identificadores da primeira fatia da #27.
+
 - [Resumo semanal canônico](web-weekly-summary.md): API, fórmulas, fuso, cobertura, origens, cache e limites da entrega web #26.
 
 - [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { FileJson, FileSpreadsheet, Printer } from 'lucide-react-native';
+import { FileSpreadsheet, Printer } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { accountAccumulatedSavings, accountCurrentStreak, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency, moodDistribution } from '@/domain/metrics';
 import { AppButton, Card, DataUnavailable, LoadingState, Screen, textStyles } from '@/ui/components';
 import { ActionRow, AppHeader, EditorialTitle, editorialStyles, Flourish, SectionTabs } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors } from '@/ui/theme';
-import { shareCsv, shareJson, printSummary } from '@/core/export/reporting';
+import { printSummary } from '@/core/export/reporting';
 
 const tabs = [{ value: 'overview', label: 'Visão geral' }, { value: 'reports', label: 'Relatórios' }] as const;
 
@@ -60,8 +60,7 @@ export default function InsightsScreen() {
         </Card>
         <Text style={textStyles.heading}>Leve seu progresso com você.</Text>
         <View>
-          <ActionRow title="Compartilhar CSV" subtitle="Para abrir em planilhas" icon={<FileSpreadsheet color={colors.text} size={21} />} onPress={() => void shareCsv(data).catch(error => Alert.alert('Exportação', error.message))} />
-          <ActionRow title="Compartilhar JSON" subtitle="Uma cópia dos seus dados" tone={colors.sage} icon={<FileJson color={colors.text} size={21} />} onPress={() => void shareJson(data).catch(error => Alert.alert('Exportação', error.message))} />
+          <ActionRow title="Exportar dados selecionados" subtitle="Escolha hábitos, período e campos" icon={<FileSpreadsheet color={colors.text} size={21} />} onPress={() => router.push('/(app)/export')} />
           <ActionRow title="Imprimir resumo" subtitle="Sua jornada em um documento" tone={colors.butter} icon={<Printer color={colors.text} size={21} />} onPress={() => void printSummary(data).catch(error => Alert.alert('Relatório', error.message))} />
         </View>
         <Text style={textStyles.muted}>Arquivos exportados podem conter informações pessoais. Compartilhe apenas com quem você confia.</Text>

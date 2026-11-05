@@ -8,6 +8,8 @@ vi.mock('../contexts/DataContext', () => ({
     useData: () => ({ progressSource: { data: fixtures.progressFixture() } }),
 }));
 
+vi.mock('../components/reports/ExportPanel', () => ({ default: () => <section aria-label="Exportar dados" /> }));
+
 describe('ReportsPage', () => {
     it('exibe economia acumulada canônica e os escopos do filtro', () => {
         render(<ReportsPage />);
@@ -16,5 +18,6 @@ describe('ReportsPage', () => {
         expect(screen.getByText('Resumo por hábito (snapshot, incluindo arquivados)')).toBeInTheDocument();
         expect(screen.getByText('Hábito sintético')).toBeInTheDocument();
         expect(screen.getByText(/sem recorte pelo filtro/)).toBeInTheDocument();
+        expect(screen.getByLabelText('Exportar dados')).toBeInTheDocument();
     });
 });

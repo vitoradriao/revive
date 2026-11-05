@@ -1,0 +1,10 @@
+﻿"tipo","habito","data_registro","humor","observacoes","occurred_at","timezone","intensidade","gatilhos","data_recaida","dias_abstinencia_perdidos","data_inicio_meta","dias_objetivo","valor_objetivo","concluida","exportacao"
+"registros","Hábito 1","2026-02-01","bom","'=HYPERLINK(""http://x"")","","","","","","","","","","","completa"
+"registros","Hábito 2","2026-02-01","ruim","' +SOMA(1) <script>alert(1)</script>","","","","","","","","","","","completa"
+"registros","Hábito 1","2026-02-02","neutro","linha 1
+linha ""2""","","","","","","","","","","","completa"
+"registros","Hábito 1","2026-02-03","","","","","","","","","","","","","completa"
+"vontades","Hábito 1","","","","2026-02-02T13:15:00.000Z","America/Sao_Paulo","7","estresse; tedio","","","","","","","completa"
+"recaidas","Hábito 1","","","","","","","","2026-02-02T02:30:00Z","5","","","","","completa"
+"recaidas","Hábito 2","","","","","","","","2026-02-04T02:00:00Z","1","","","","","completa"
+"metas","Hábito 1","","","","","","","","","","2026-02-02","30","","não","completa"

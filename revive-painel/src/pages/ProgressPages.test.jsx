@@ -155,13 +155,9 @@ it('exporta JSON parcial com marcos e CSV com cobertura sem incorporar pendênci
     expect(json.conquistas.length).toBeGreaterThan(0);
     view.unmount();
     mount(ReportsPage);
-    fireEvent.click(screen.getByRole('button', { name: 'Exportar registros disponíveis em CSV' }));
-    const csv = await read(blobs[1]);
-    expect(csv.includes(marker)).toBe(false);
-    expect(csv.includes('motivo_pessoal')).toBe(false);
-    expect(csv).toContain('Cobertura');
-    expect(csv).toContain('Cópia parcial');
-    expect(csv).not.toContain('2026-02-03');
+    // O CSV fixo do snapshot foi substituído pela exportação seletiva (#27), coberta em exportData.test.js.
+    expect(screen.queryByRole('button', { name: 'Exportar registros disponíveis em CSV' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Exportar dados' })).toBeInTheDocument();
 });
 
 

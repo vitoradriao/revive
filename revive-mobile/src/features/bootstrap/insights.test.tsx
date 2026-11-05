@@ -2,15 +2,15 @@ import React from 'react';
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import InsightsScreen from '../../../app/(app)/(tabs)/insights';
-import { shareCsv, shareJson, printSummary } from '@/core/export/reporting';
+import { printSummary } from '@/core/export/reporting';
 import { useBootstrap } from './use-bootstrap';
 import type { BootstrapData } from '@/domain/types';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
-jest.mock('lucide-react-native', () => ({ Eye: () => null, EyeOff: () => null, FileJson: () => null, FileSpreadsheet: () => null, Printer: () => null }));
+jest.mock('lucide-react-native', () => ({ Eye: () => null, EyeOff: () => null, FileSpreadsheet: () => null, Printer: () => null }));
 jest.mock('./use-bootstrap', () => ({ useBootstrap: jest.fn() }));
-jest.mock('@/core/export/reporting', () => ({ shareCsv: jest.fn(async () => undefined), shareJson: jest.fn(async () => undefined), printSummary: jest.fn(async () => undefined) }));
+jest.mock('@/core/export/reporting', () => ({ printSummary: jest.fn(async () => undefined) }));
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { SafeAreaView: View };
@@ -26,22 +26,19 @@ beforeEach(() => {
   jest.mocked(useBootstrap).mockReturnValue({ data, isLoading: false } as ReturnType<typeof useBootstrap>);
 });
 
-test('separates reports from overview and exports the actual snapshot', async () => {
+test('separates reports from overview, opens selective export and prints the snapshot', async () => {
   await render(<InsightsScreen />);
   expect(screen.getByText('1 de 1 registros')).toBeTruthy();
-  expect(screen.queryByLabelText('Compartilhar CSV')).toBeNull();
+  expect(screen.queryByLabelText('Exportar dados selecionados')).toBeNull();
   await fireEvent.press(screen.getByRole('tab', { name: 'Relatórios' }));
   expect(screen.queryByText('1 de 1 registros')).toBeNull();
-  await fireEvent.press(screen.getByRole('button', { name: 'Compartilhar CSV' }));
-  await fireEvent.press(screen.getByRole('button', { name: 'Compartilhar JSON' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Exportar dados selecionados' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Imprimir resumo' }));
-  expect(shareCsv).toHaveBeenCalledWith(data);
-  expect(shareJson).toHaveBeenCalledWith(data);
   expect(printSummary).toHaveBeenCalledWith(data);
   await fireEvent.press(screen.getByRole('tab', { name: 'Visão geral' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Calendário' }));
   await fireEvent.press(screen.getByRole('button', { name: 'Conquistas' }));
-  expect(mockPush.mock.calls).toEqual([['/(app)/calendar'], ['/(app)/achievements']]);
+  expect(mockPush.mock.calls).toEqual([['/(app)/export'], ['/(app)/calendar'], ['/(app)/achievements']]);
 });
 
 test('offers retry for missing data without displaying zero progress or exports', async () => {
@@ -50,7 +47,7 @@ test('offers retry for missing data without displaying zero progress or exports'
   await render(<InsightsScreen />);
   expect(screen.getByText('Seus dados ainda não estão disponíveis.')).toBeTruthy();
   expect(screen.queryByText('0')).toBeNull();
-  expect(screen.queryByLabelText('Compartilhar CSV')).toBeNull();
+  expect(screen.queryByLabelText('Exportar dados selecionados')).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: 'Atualizar dados' }));
   expect(refetch).toHaveBeenCalledTimes(1);
 });

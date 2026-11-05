@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { createPrintSummaryHtml } from './reporting';
+import { createCsv, createPrintSummaryHtml } from './reporting';
 import type { BootstrapData } from '@/domain/types';
 
 jest.mock('expo-file-system', () => ({ File: jest.fn(), Paths: { cache: {} } }));
@@ -24,6 +24,19 @@ const makeData = (habitName = 'Hábito A'): BootstrapData => ({
   ],
   recaidas: [], metas: [], mensagem: null,
   conquistas: [{ id: 'award', vicio_id: null, categoria: 'streak', valor_alvo: 30, awarded_at: '2026-01-30T12:00:00Z', origem: 'period_threshold', cobertura: 'confirmed' }],
+});
+
+describe('CSV export', () => {
+  it('neutraliza fórmulas em texto livre, nomes de hábitos e metas, e usa BOM e CRLF', () => {
+    const data = makeData('=HYPERLINK("x")');
+    data.registros = [{ id: '1', vicio_id: 'habit', data_registro: '2026-01-30', humor: ' +Bem', observacoes: '@texto' }];
+    const csv = createCsv(data);
+    expect(csv.startsWith('﻿"tipo"')).toBe(true);
+    expect(csv).toContain('\r\n');
+    expect(csv).toContain('"\'=HYPERLINK(""x"")"');
+    expect(csv).toContain('"\' +Bem"');
+    expect(csv).toContain('"\'@texto"');
+  });
 });
 
 describe('printable progress summary', () => {

@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { BootstrapData } from '@/domain/types';
+import { toCsv } from './csv';
 import {
   accountAccumulatedSavings,
   accountCurrentStreak,
@@ -17,29 +18,30 @@ import {
   sequenceSavings,
 } from '@/domain/metrics';
 
-const csvCell = (value: unknown) => {
-  const raw = value == null ? '' : String(value);
-  const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
-
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const shareTextFile = async (name: string, content: string, mimeType: string) => {
+
+/**
+ * Compartilhamento da exportação seletiva (#27): só por ação explícita no seletor do sistema.
+ * O arquivo temporário é apagado depois que o seletor fecha, inclusive em cancelamento ou falha.
+ */
+export const shareExportFile = async (name: string, content: string, mimeType: string) => {
   if (!(await Sharing.isAvailableAsync())) throw new Error('Compartilhamento não disponível neste aparelho.');
   const file = new File(Paths.cache, name);
-  file.write(content);
-  await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exportar dados do Revive' });
+  try {
+    if (file.exists) file.delete();
+    file.write(content);
+    await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exportar dados do Revive' });
+  } finally {
+    try { if (file.exists) file.delete(); } catch { /* limpeza best-effort do cache */ }
+  }
 };
 
-export const shareJson = (data: BootstrapData) => shareTextFile(
-  `revive-${new Date().toISOString().slice(0, 10)}.json`,
-  JSON.stringify(data, null, 2),
-  'application/json',
-);
+export const printExportHtml = (html: string) => Print.printAsync({ html });
 
-export const shareCsv = (data: BootstrapData) => {
+
+export const createCsv = (data: BootstrapData) => {
   const header = ['tipo', 'habito', 'data', 'humor', 'descricao', 'pendente'];
   const habitNames = new Map(data.vicios.map((habit) => [habit.id, habit.nome_vicio]));
   const rows = [
@@ -47,9 +49,9 @@ export const shareCsv = (data: BootstrapData) => {
     ...data.recaidas.map((relapse) => ['recaida', habitNames.get(relapse.vicio_id), relapse.data_recaida, '', relapse.motivo, relapse.pending]),
     ...data.metas.map((goal) => ['meta', goal.vicios?.nome_vicio, goal.data_inicio_meta, '', goal.descricao_meta, goal.pending]),
   ];
-  const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
-  return shareTextFile(`revive-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFF${csv}`, 'text/csv');
+  return toCsv(header, rows);
 };
+
 
 export const createPrintSummaryHtml = (data: BootstrapData, generatedAt = new Date()) => {
   const current = accountCurrentStreak(data.vicios);

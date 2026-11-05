@@ -186,6 +186,21 @@ export function createOfflineClient({ session = getSessionManager(), storage = l
       const result = await request('/v2/weekly-summary/sources/' + encodeURIComponent(type) + '/' + encodeURIComponent(id), {}, auth.token);
       check(); return result;
     },
+    // Leitura paginada para a exportação seletiva (#27): somente GET de registros/vontades v2,
+    // interrompida ao cancelar, sair ou trocar de conta.
+    exportPage: async (path, accountKey, { signal } = {}) => {
+      const db = store, auth = session.getSnapshot();
+      const check = () => {
+        if (!db || db !== store || !accountKey || accountKey !== currentKey || closing || signal?.aborted
+            || session.getSnapshot().epoch !== auth.epoch || session.getSnapshot().user?.id !== db.userId
+            || (session.isCurrentEpoch && !session.isCurrentEpoch(auth.epoch))) throw changed();
+      };
+      check();
+      if (!/^\/v2\/(registros|vontades)\?/.test(path)) throw new Error('Consulta de exportação não permitida.');
+      if (!auth.token || navigator.onLine === false) throw new Error('Sem conexão para consultar todas as páginas.');
+      const result = await request(path, { signal }, auth.token);
+      check(); return result;
+    },
     preferences: async (input, accountKey) => {
       const db = store, auth = session.getSnapshot();
       const check = () => {
