@@ -1,9 +1,10 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,9 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { colors, fonts, radius, spacing } from './theme';
 
-export function Screen({ children, scroll = true }: React.PropsWithChildren<{ scroll?: boolean }>) {
+export function Screen({ children, scroll = true, refreshing = false, onRefresh }: React.PropsWithChildren<{ scroll?: boolean; refreshing?: boolean; onRefresh?: () => void }>) {
+  const refreshControl = onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined;
   const content = scroll ? (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">{children}</ScrollView>
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>{children}</ScrollView>
   ) : (
     <View style={styles.content}>{children}</View>
   );
@@ -105,6 +107,34 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
+/** Pull-to-refresh state that only spins for the gesture, not for background refetches. */
+export function usePullToRefresh(refetch: () => Promise<unknown>) {
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
+  return { refreshing, onRefresh };
+}
+
+const offlineTime = (iso: string) => {
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : null;
+};
+
+/** Tells the person they are reading the device copy because the server was unreachable. */
+export function OfflineNotice({ data }: { data?: { from_cache?: boolean; server_time?: string } | null }) {
+  if (!data?.from_cache) return null;
+  const when = data.server_time ? offlineTime(data.server_time) : null;
+  return <Card style={styles.offline}>
+    <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={textStyles.body}>
+      Sem conexão com o servidor. Você está vendo os dados salvos no aparelho{when ? ` em ${when}` : ''}. Novos registros ficam guardados e serão sincronizados.
+    </Text>
+  </Card>;
+}
+
 export function DataUnavailable({ onRetry }: { onRetry: () => void }) {
   return <Card>
     <Text accessibilityRole="header" style={textStyles.heading}>Seus dados ainda não estão disponíveis.</Text>
@@ -121,6 +151,7 @@ export const textStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  offline: { borderColor: colors.warning, borderWidth: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 40, gap: spacing.md, flexGrow: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },

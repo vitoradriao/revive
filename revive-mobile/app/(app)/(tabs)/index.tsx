@@ -5,7 +5,7 @@ import { Plus, RefreshCw } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { useSession } from '@/features/auth/session-context';
 import { accountAccumulatedSavings, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency } from '@/domain/metrics';
-import { Card, DataUnavailable, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
+import { Card, DataUnavailable, EmptyState, LoadingState, OfflineNotice, Screen, textStyles, usePullToRefresh } from '@/ui/components';
 import { AppHeader, ArrowMark, EditorialTitle, editorialStyles, Flourish } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors, radius, spacing } from '@/ui/theme';
@@ -16,6 +16,7 @@ export default function DashboardScreen() {
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 360 || fontScale > 1.2;
   const { data, isLoading, error, refetch, isFetching } = useBootstrap();
+  const pullToRefresh = usePullToRefresh(refetch);
   const activeHabits = (data?.vicios || []).filter(habit => habit.ativo !== false);
   const recordHolder = accountRecordHolder(data?.vicios || []);
   const goalCount = completedGoals(data?.metas || []);
@@ -24,8 +25,9 @@ export default function DashboardScreen() {
   if (isLoading && !data) return <Screen scroll={false}><LoadingState label="Preparando sua jornada..." /></Screen>;
   if (error && !data) return <Screen><AppHeader section="Sua jornada" /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   return (
-    <Screen>
+    <Screen {...pullToRefresh}>
       <AppHeader section="Sua jornada" />
+      <OfflineNotice data={data} />
       <View style={editorialStyles.row}>
         <EditorialTitle eyebrow={`Olá, ${user?.nome?.split(' ')[0] || 'você'}`} title="Um dia de" emphasis="cada vez." />
         <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" accessibilityState={{ busy: isFetching }} onPress={() => void refetch()} style={styles.iconButton}><RefreshCw color={colors.text} size={22} /></Pressable>

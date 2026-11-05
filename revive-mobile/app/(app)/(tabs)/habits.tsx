@@ -4,20 +4,22 @@ import { Link } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { coverageLabel, currentStreak, formatCurrency, sequenceSavings } from '@/domain/metrics';
-import { AppButton, DataUnavailable, EmptyState, LoadingState, Screen, textStyles } from '@/ui/components';
+import { AppButton, DataUnavailable, EmptyState, LoadingState, OfflineNotice, Screen, textStyles, usePullToRefresh } from '@/ui/components';
 import { AppHeader, ArrowMark, EditorialTitle, editorialStyles } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors, radius, spacing } from '@/ui/theme';
 
 export default function HabitsScreen() {
   const { data, isLoading, error, refetch } = useBootstrap();
+  const pullToRefresh = usePullToRefresh(refetch);
   const [archived, setArchived] = useState(false);
   const habits = (data?.vicios || []).filter(habit => (habit.ativo === false) === archived);
   if (isLoading && !data) return <Screen scroll={false}><LoadingState /></Screen>;
   if (error && !data) return <Screen><AppHeader section="Hábitos" /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
   return (
-    <Screen>
+    <Screen {...pullToRefresh}>
       <AppHeader section="Hábitos" />
+      <OfflineNotice data={data} />
       <View style={editorialStyles.row}><EditorialTitle title="Há espaço" emphasis="para mudar." /><Link href="/(app)/habits/new" asChild><Pressable accessibilityRole="button" accessibilityLabel="Adicionar hábito" style={styles.add}><Plus color={colors.background} /></Pressable></Link></View>
       <Text style={editorialStyles.eyebrow}>{habits.length} {archived ? habits.length === 1 ? 'HÁBITO ARQUIVADO' : 'HÁBITOS ARQUIVADOS' : habits.length === 1 ? 'HÁBITO EM ACOMPANHAMENTO' : 'HÁBITOS EM ACOMPANHAMENTO'}</Text>
       {!habits.length ? <EmptyState title={archived ? 'Nenhum hábito arquivado' : 'Nenhum hábito ativo'} body={archived ? 'Os hábitos arquivados aparecerão aqui.' : 'Cadastre ou reative um hábito para começar.'} /> : habits.map((habit, index) => (

@@ -4,7 +4,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { FileSpreadsheet, Printer } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
 import { accountAccumulatedSavings, accountCurrentStreak, accountRecordHolder, completedGoals, coverageLabel, currentStreak, distinctCheckinDays, formatCurrency, moodDistribution } from '@/domain/metrics';
-import { AppButton, Card, DataUnavailable, LoadingState, Screen, textStyles } from '@/ui/components';
+import { AppButton, Card, DataUnavailable, LoadingState, OfflineNotice, Screen, textStyles, usePullToRefresh } from '@/ui/components';
 import { ActionRow, AppHeader, EditorialTitle, editorialStyles, Flourish, SectionTabs } from '@/ui/editorial';
 import { Illustration } from '@/ui/illustration';
 import { colors } from '@/ui/theme';
@@ -15,6 +15,7 @@ const tabs = [{ value: 'overview', label: 'Visão geral' }, { value: 'reports', 
 export default function InsightsScreen() {
   const router = useRouter();
   const { data, isLoading, refetch } = useBootstrap();
+  const pullToRefresh = usePullToRefresh(refetch);
   const [tab, setTab] = useState<'overview' | 'reports'>('overview');
   if (isLoading && !data) return <Screen scroll={false}><LoadingState /></Screen>;
   if (!data) return <Screen><AppHeader section="Insights" /><EditorialTitle title="Seu caminho," emphasis="no seu tempo." /><DataUnavailable onRetry={() => void refetch()} /></Screen>;
@@ -25,8 +26,9 @@ export default function InsightsScreen() {
   const moods = moodDistribution(data);
   const dominantMood = moods[0];
   return (
-    <Screen>
+    <Screen {...pullToRefresh}>
       <AppHeader section="Insights" />
+      <OfflineNotice data={data} />
       <EditorialTitle title={tab === 'overview' ? 'Olha só o seu' : 'Essa história'} emphasis={tab === 'overview' ? 'caminho.' : 'é sua.'} />
       <SectionTabs tabs={tabs} selected={tab} onSelect={setTab} />
       {hasPendingProgress ? <Card><Text accessibilityLiveRegion="polite" style={textStyles.body}>Há uma atualização de progresso aguardando sincronização. Marcos permanentes só aparecem depois da confirmação do servidor.</Text></Card> : null}

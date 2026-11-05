@@ -143,6 +143,8 @@ export type BootstrapData = {
   metas: Goal[];
   conquistas?: PermanentMilestone[];
   mensagem: MotivationalMessage | null;
+  /** Set locally when the server could not be reached and the device copy was shown. */
+  from_cache?: boolean;
 };
 
 export type CreateAddictionInput = {
