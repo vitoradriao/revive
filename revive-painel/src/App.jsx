@@ -31,11 +31,12 @@
  */
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import AppShell from './components/layout/AppShell';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import PasswordRecoveryPage from './pages/PasswordRecoveryPage';
 import DashboardPage from './pages/DashboardPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DetalhesPage from './pages/DetalhesPage';
@@ -44,6 +45,7 @@ import CalendarPage from './pages/CalendarPage';
 import AchievementsPage from './pages/AchievementsPage';
 import ReportsPage from './pages/ReportsPage';
 import ProfilePage from './pages/ProfilePage';
+import SyncPage from './pages/SyncPage';
 import TipsPage from './pages/TipsPage';
 
 /**
@@ -55,7 +57,10 @@ import TipsPage from './pages/TipsPage';
  * @returns {JSX.Element} Arvore de rotas React Router ou tela de carregamento
  */
 export default function App() {
-  const { token, user, authLoading } = useAuth();
+  const { token, user, sessionEpoch, authLoading, authError, restoreSession, localAccess } = useAuth();
+
+  const location = useLocation();
+  if (location.pathname === '/recuperar-senha') return <PasswordRecoveryPage key={user ? `${user.id}:${sessionEpoch}` : 'public'} />;
 
   if (authLoading) {
     return (
@@ -63,6 +68,13 @@ export default function App() {
         <div className="text-white/60 text-lg animate-pulse">Carregando Revive...</div>
       </div>
     );
+  }
+
+  if (authError && !token && !localAccess) {
+    return <main className="min-h-screen flex flex-col gap-4 items-center justify-center p-6">
+      <p role="alert">Não foi possível restaurar sua sessão. {authError.message}</p>
+      <button type="button" className="btn-primary px-5 py-3" onClick={restoreSession}>Tentar novamente</button>
+    </main>;
   }
 
   return (
@@ -78,7 +90,7 @@ export default function App() {
       {/* Protected routes inside AppShell */}
       <Route element={
         <ProtectedRoute>
-          <AppShell />
+          <AppShell key={`${user?.id}:${sessionEpoch}`} />
         </ProtectedRoute>
       }>
         <Route index element={<DashboardPage />} />
@@ -89,6 +101,7 @@ export default function App() {
         <Route path="conquistas" element={<AchievementsPage />} />
         <Route path="relatorios" element={<ReportsPage />} />
         <Route path="perfil" element={<ProfilePage />} />
+        <Route path="sincronizacao" element={<SyncPage />} />
         <Route path="dicas" element={<TipsPage />} />
       </Route>
 

@@ -118,3 +118,10 @@ begin
 end;
 $$;
 rollback;
+
+-- Upgrade aditivo: motivos de hábitos anteriores começam nulos.
+do $$ begin
+  if exists(select 1 from public.vicios where motivo_pessoal is not null) then
+    raise exception 'Personal reason upgrade must preserve old habits without content';
+  end if;
+end $$;

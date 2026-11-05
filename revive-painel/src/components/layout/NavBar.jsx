@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
 import {
+  RefreshCw,
   BarChart3,
   Calendar as CalendarIcon,
   FileText,
@@ -20,12 +21,13 @@ import { navButtonMotion } from '../../utils/constants';
 
 const navItems = [
   { path: '/', label: 'Jornada', icon: Heart },
-  { path: '/analytics', label: 'Insights', icon: PieChart },
+  { path: '/analytics', label: 'Evolução', icon: PieChart },
   { path: '/metas', label: 'Metas', icon: Target },
   { path: '/calendario', label: 'Calendário', icon: CalendarIcon },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/relatorios', label: 'Relatórios', icon: FileText },
   { path: '/dicas', label: 'Dicas', icon: Lightbulb },
+  { path: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
   { path: '/perfil', label: 'Perfil', icon: User },
 ];
 

@@ -17,6 +17,7 @@ begin
       ('password_recovery_requests','attempts','smallint',true),
       ('password_recovery_requests','expires_at','timestamp with time zone',true),
       ('vicios','revision','integer',true),
+      ('vicios','motivo_pessoal','text',false),
       ('metas','iniciar_hoje','boolean',true),
       ('metas','data_inicio_meta','date',false),
       ('metas','dias_abstinencia_inicio','integer',true),
@@ -263,6 +264,20 @@ begin
       raise exception 'Security drift: unsafe progress function %', expected.signature;
     end if;
   end loop;
+
+  if to_regprocedure('public.omit_private_habit_receipt()') is null
+     or not has_function_privilege('service_role', 'public.omit_private_habit_receipt()', 'EXECUTE')
+     or has_function_privilege('anon', 'public.omit_private_habit_receipt()', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.omit_private_habit_receipt()', 'EXECUTE') then
+    raise exception 'Security drift: unsafe private receipt filter';
+  end if;
+
+  if to_regprocedure('public.normalize_personal_reason(text)') is null
+     or not has_function_privilege('service_role', 'public.normalize_personal_reason(text)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.normalize_personal_reason(text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.normalize_personal_reason(text)', 'EXECUTE') then
+    raise exception 'Security drift: unsafe personal reason normalizer';
+  end if;
 
   if to_regprocedure('public.valid_urge_trigger_codes(text[])') is null
      or not has_function_privilege('service_role', 'public.valid_urge_trigger_codes(text[])', 'EXECUTE')

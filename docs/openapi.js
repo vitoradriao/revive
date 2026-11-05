@@ -3,8 +3,14 @@
  * /api/v2/vicios/{id}:
  *   patch:
  *     summary: Editar, arquivar ou reativar hábito com revisão
+ *     description: motivo_pessoal privado é opcional e editável inclusive arquivado; omissão preserva, vazio/null remove. Normaliza CRLF/CR para LF e trim ECMAScript; conta pontos de código Unicode, máximo 1000, sem truncar. Respostas de toda a API omitem motivo_pessoal por padrão para proteger exportações de clientes antigos. Leituras e resposta do PATCH de hábito exigem X-Revive-Include-Personal-Reason=true e autenticação/ownership; outras mutações sempre omitem; exportações devem usar projeção explícita mesmo com este cabeçalho.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
+ *       - in: header
+ *         name: X-Revive-Include-Personal-Reason
+ *         required: false
+ *         description: Retorna o motivo privado na resposta autenticada; omitido por padrão
+ *         schema: { type: string, enum: ['true'] }
  *       - in: path
  *         name: id
  *         required: true
@@ -24,6 +30,7 @@
  *               data_inicio: { type: string, format: date, description: Início UTC; correção apenas sem histórico dependente }
  *               valor_economizado_por_dia: { type: number, minimum: 0, maximum: 99999999.99, multipleOf: 0.01 }
  *               ativo: { type: boolean, description: false arquiva e true reativa sem apagar histórico }
+ *               motivo_pessoal: { type: string, nullable: true, maxLength: 1000, description: Texto privado; vazio remove e omissão preserva }
  *     responses:
  *       '200':
  *         description: Alteração confirmada; vicio contém revision incrementada
@@ -92,6 +99,7 @@
  *       properties:
  *         ativo: { type: boolean }
  *         revision: { type: integer, minimum: 1 }
+ *         motivo_pessoal: { type: string, nullable: true, maxLength: 1000, description: Presente apenas com X-Revive-Include-Personal-Reason=true; nunca exportar DTO bruto }
  *         inicio_editavel: { type: boolean, description: Disponível no bootstrap; banco revalida no PATCH }
  *         id:
  *           type: string
@@ -272,6 +280,12 @@
  *   get:
  *     tags: [Mobile v2]
  *     summary: Carrega o snapshot inicial e métricas históricas do usuário
+ *     parameters:
+ *       - in: header
+ *         name: X-Revive-Include-Personal-Reason
+ *         required: false
+ *         description: Capacidade de leitura privada; omitir em clientes que exportam DTO bruto. Não habilita exportação seletiva (#27).
+ *         schema: { type: string, enum: ['true'] }
  *     description: Mantém dias_abstinencia e valor_economizado para clientes antigos; em cada vício, progresso informa sequência atual, recorde, dias distintos com check-in, economia estimada e marcos permanentes com cobertura confirmada, inferida ou desconhecida.
  *     security:
  *       - bearerAuth: []
@@ -286,11 +300,58 @@
  *       - bearerAuth: []
  *     responses:
  *       204:
- *         description: Conta excluida
+ *         description: Conta excluida; cookie HttpOnly web expirado pelo servidor
+ *         headers:
+ *           Set-Cookie:
+ *             description: Expira revive_refresh com o mesmo Path, HttpOnly, SameSite e Secure do adaptador web
+ *             schema: { type: string }
  */
 
 /**
  * @openapi
+ * /api/v2/registros/search:
+ *   post:
+ *     tags: [Mobile Offline v2]
+ *     summary: Busca literal no histórico completo do diário, inclusive hábitos arquivados
+ *     description: >-
+ *       Termo apenas no body, sem ranking. NFD, remoção de marcas U+0300–U+036F,
+ *       minúsculas Unicode com locale raiz e sigma final normalizado; espaços preservados.
+ *       Aspas, barras, HTML, % e _ são literais. Vazio equivale à listagem normal.
+ *       Sem inicio/fim, consulta todo o histórico. Quando informadas, ambas as datas
+ *       são obrigatórias, inclusivas, com intervalo de até 3660 dias. Termos não são
+ *       registrados em logs de acesso. Cursor assinado vinculado a conta, termo
+ *       normalizado, período, hábito e limit; ao mudar consulta, reiniciar sem cursor.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             properties:
+ *               termo: { type: string, maxLength: 100, default: '', description: Até 100 pontos de código Unicode; sem NUL ou surrogates isolados }
+ *               inicio: { type: string, format: date }
+ *               fim: { type: string, format: date }
+ *               vicio_id: { type: string, format: uuid }
+ *               limit: { type: integer, minimum: 1, maximum: 100, default: 50 }
+ *               cursor: { type: string, description: next_cursor da mesma consulta }
+ *     responses:
+ *       200:
+ *         description: Apenas registros da conta, por data_registro desc e ID desc
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [registros, next_cursor]
+ *               properties:
+ *                 registros: { type: array, items: { $ref: '#/components/schemas/RegistroDiario' } }
+ *                 next_cursor: { type: string, nullable: true }
+ *       400: { description: JSON inválido, sem eco do body }
+ *       401: { description: Sessão ausente, expirada ou revogada }
+ *       413: { description: Corpo excede o limite do parser JSON }
+ *       422: { description: DADOS_INVALIDOS ou CURSOR_INCOMPATIVEL; reiniciar sem cursor }
+ *       503: { description: Busca indisponível; GET legado não substitui pesquisa completa }
  * /api/v2/registros:
  *   get:
  *     tags: [Mobile Offline v2]
@@ -977,7 +1038,11 @@
  *                 description: Uma maiúscula e um caractere especial. Limite adicional de 72 bytes UTF-8 do bcrypt.
  *     responses:
  *       200:
- *         description: Senha redefinida; entre novamente
+ *         description: Senha redefinida; entre novamente. Cookie HttpOnly web expirado pelo servidor.
+ *         headers:
+ *           Set-Cookie:
+ *             description: Expira revive_refresh pelo adaptador web, sem retornar sessão
+ *             schema: { type: string }
  *         content:
  *           application/json:
  *             schema:
@@ -1048,4 +1113,409 @@
  *     responses:
  *       200:
  *         description: Meta removida
+ */
+
+/**
+ * @openapi
+ * components:
+ *   securitySchemes:
+ *     webRefresh:
+ *       type: apiKey
+ *       in: cookie
+ *       name: revive_refresh
+ *   schemas:
+ *     WebSession:
+ *       type: object
+ *       required: [access_token, expires_in, usuario]
+ *       additionalProperties: false
+ *       properties:
+ *         access_token: { type: string, description: Bearer mantido somente em memória }
+ *         expires_in: { type: integer, example: 900 }
+ *         usuario:
+ *           type: object
+ *           properties:
+ *             id: { type: string, format: uuid }
+ *             nome: { type: string }
+ *             email: { type: string, format: email }
+ * /api/v2/web-auth/login:
+ *   post:
+ *     summary: Login web com refresh HttpOnly na mesma origem
+ *     description: Requer WEB_AUTH_ENABLED, Origin igual ao Host/esquema e JSON. Cookie host-only, Path=/api/v2/web-auth, HttpOnly, SameSite=Lax, Secure em produção. Nunca retorna refresh_token no JSON.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/LoginRequest' }
+ *     responses:
+ *       '200':
+ *         description: Sessão criada; Set-Cookie armazena refresh por 30 dias
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '401': { description: Credenciais inválidas }
+ *       '403': { description: Origin ausente ou não permitido }
+ *       '422': { description: Dados inválidos }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/cadastro:
+ *   post:
+ *     summary: Cadastro web usando a autenticação própria e cookie de refresh
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/CadastroRequest' }
+ *     responses:
+ *       '201':
+ *         description: Conta e sessão criadas; mesmos requisitos de origem/cookie do login
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '403': { description: Origin não permitido }
+ *       '409': { description: Email já cadastrado }
+ *       '422': { description: Dados inválidos }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/refresh:
+ *   post:
+ *     summary: Rotacionar sessão web usando somente o cookie HttpOnly
+ *     security: [{ webRefresh: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       '200':
+ *         description: Access e cookie renovados; serializar requisições entre abas
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WebSession' }
+ *       '401': { description: Cookie ausente, inválido, expirado, revogado ou reutilizado; servidor limpa cookie }
+ *       '403': { description: Origin não permitido }
+ *       '422': { description: Corpo não é objeto JSON }
+ *       '429': { description: Limite de tentativas }
+ *       '503': { description: Adaptador desabilitado ou serviço indisponível }
+ * /api/v2/web-auth/logout:
+ *   post:
+ *     summary: Revogar família de sessão web e limpar cookie após confirmação
+ *     security: [{ webRefresh: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       '204': { description: Revogação confirmada e cookie limpo; sem corpo }
+ *       '403': { description: Origin não permitido }
+ *       '422': { description: Corpo não é objeto JSON }
+ *       '503': { description: Não confirmou saída; cookie preservado para recuperação }
+ */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     JourneyPreferences:
+ *       type: object
+ *       required: [primary_habit_id, indicator_order, intro, revision]
+ *       properties:
+ *         primary_habit_id: { type: string, format: uuid, nullable: true, description: null usa primeiro hábito ativo disponível; arquivado mantém ID para aviso e fallback local }
+ *         indicator_order:
+ *           type: array
+ *           minItems: 1
+ *           maxItems: 32
+ *           uniqueItems: true
+ *           items: { type: string, pattern: '^[a-z][a-z0-9_]{0,63}$' }
+ *           description: IDs estáveis. Defaults current_streak, historical_record, sequence_savings, accumulated_savings. Cliente filtra desconhecidos apenas na apresentação e acrescenta conhecidos ausentes na ordem padrão; mantém desconhecidos ao editar. Restaurar substitui a ordem pelos defaults atuais.
+ *         intro:
+ *           type: object
+ *           additionalProperties: false
+ *           required: [version, state]
+ *           properties:
+ *             version: { type: integer, minimum: 0, maximum: 1000000, description: Versão do conteúdo; zero exige pending. Não é revisão de concorrência }
+ *             state: { type: string, enum: [pending, completed, dismissed] }
+ *             step: { type: string, enum: [habit, reason, checkin], description: Opcional e exige version maior que zero. Etapa confirmada da introdução; não confirma o envio de check-in }
+ *             habit_id: { type: string, format: uuid, nullable: true, description: Obrigatório em reason/checkin; habit permite somente ausente ou null. Adoção exige hábito da própria conta, inclusive arquivado. ID preservado após remoção para impedir novo cadastro automático }
+ *           description: Campos de progresso são opcionais para compatibilidade. PATCH substitui intro inteiro sob revision; conclusão/dispensa preservam etapa e ID. Nenhum motivo, diário ou credencial pertence a este documento.
+ *         revision: { type: integer, minimum: 0, description: Revisão concorrente por conta; zero antes da primeira alteração; incrementa também quando exclusão do principal limpa a referência }
+ * /api/v2/preferences:
+ *   get:
+ *     summary: Consultar preferências sincronizadas da Jornada
+ *     description: Resposta privada no-store por conta autenticada. Sem configuração retorna defaults virtuais com revision zero, principal null e introdução version zero/pending; não migra seleção local do check-in. Catálogo e defaults são mesclados pelo cliente sem ocultar todos os indicadores. Offline usa somente última cópia confirmada por conta. Requer migration journey_preferences antes do cliente; falha de schema não é confundida com defaults.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200':
+ *         description: Preferências ou defaults da própria conta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [preferences]
+ *               properties:
+ *                 preferences: { $ref: '#/components/schemas/JourneyPreferences' }
+ *       '401': { description: Sessão ausente ou inválida }
+ *       '503': { description: PREFERENCIAS_INDISPONIVEIS; última configuração local não é substituída }
+ *   patch:
+ *     summary: Alterar preferências online com revisão concorrente
+ *     description: PATCH parcial; revision e pelo menos um campo editável obrigatórios. Omissão preserva campos; ordem e intro são substituições completas. Principal não nulo exige ownership e hábito ativo. Desconhecidos sintaticamente válidos são aceitos para compatibilidade futura. Sem fila/retry automático; resposta perdida exige GET e revisão explícita. 409 preserva escolhas locais e não altera estado remoto. A versão de intro é independente da revisão da conta.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             minProperties: 2
+ *             required: [revision]
+ *             properties:
+ *               revision: { type: integer, minimum: 0, maximum: 2147483646 }
+ *               primary_habit_id: { type: string, format: uuid, nullable: true }
+ *               indicator_order: { $ref: '#/components/schemas/JourneyPreferences/properties/indicator_order' }
+ *               intro: { $ref: '#/components/schemas/JourneyPreferences/properties/intro' }
+ *     responses:
+ *       '200':
+ *         description: Alteração confirmada com revisão incrementada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [preferences]
+ *               properties:
+ *                 preferences: { $ref: '#/components/schemas/JourneyPreferences' }
+ *       '401': { description: Sessão ausente ou inválida }
+ *       '409': { description: REVISAO_CONFLITO; consultar e revisar escolhas locais antes de reaplicar }
+ *       '422': { description: DADOS_INVALIDOS; principal de outra conta, ausente ou arquivado recebe a mesma resposta }
+ *       '503': { description: Confirmação indisponível; consultar antes de tentar novamente }
+ */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     WeeklyInterval:
+ *       type: object
+ *       required: [inicio, fim, inicio_instant, fim_exclusivo, observado_ate]
+ *       properties:
+ *         inicio: { type: string, format: date, description: Segunda-feira civil no fuso solicitado }
+ *         fim: { type: string, format: date, description: Domingo civil inclusive }
+ *         inicio_instant: { type: string, format: date-time }
+ *         fim_exclusivo: { type: string, format: date-time, description: Primeira ocorrência da segunda-feira seguinte no fuso; semanas com DST podem ter 167 ou 169 horas }
+ *         observado_ate: { type: string, format: date-time, description: Corte capturado no início da consulta; episódios posteriores não entram }
+ *     WeeklyCount:
+ *       type: object
+ *       required: [quantidade, ids]
+ *       properties:
+ *         quantidade: { type: integer, minimum: 0 }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyCheckins:
+ *       type: object
+ *       required: [valor, denominador, ids]
+ *       properties:
+ *         valor: { type: integer, minimum: 0, maximum: 7, description: Dias civis distintos com pelo menos um check-in }
+ *         denominador: { type: integer, minimum: 0, maximum: 7, description: Dias civis observados incluindo o dia atual em semana parcial }
+ *         ids: { type: array, description: Todos os check-ins que sustentam os dias distintos, items: { type: string, format: uuid } }
+ *     WeeklyIntensity:
+ *       type: object
+ *       required: [media, soma, denominador, total, ids]
+ *       properties:
+ *         media: { type: number, nullable: true, minimum: 0, maximum: 10, description: Soma dividida pela quantidade de intensidades inteiras 0 a 10; duas casas decimais; null quando denominador zero }
+ *         soma: { type: integer, minimum: 0 }
+ *         denominador: { type: integer, minimum: 0 }
+ *         total: { type: integer, minimum: 0, description: Todos os episódios de vontade, inclusive os sem intensidade válida }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyDistribution:
+ *       type: object
+ *       required: [codigo, rotulo, quantidade, denominador, ids]
+ *       properties:
+ *         codigo: { type: string }
+ *         rotulo: { type: string }
+ *         quantidade: { type: integer, minimum: 0 }
+ *         denominador: { type: integer, minimum: 0, description: Total de check-ins para humor; total de episódios para gatilhos. Um episódio conta uma vez por código de gatilho }
+ *         ids: { type: array, items: { type: string, format: uuid } }
+ *     WeeklyCoverage:
+ *       type: object
+ *       required: [carregamento, registros, episodios, recaidas, dias_observados, dias_sem_checkin, intensidade_informada, gatilhos_estruturados, humor_categorizado]
+ *       properties:
+ *         carregamento: { type: string, enum: [completo, incompleto], description: O endpoint só entrega 200 após carregar todas as páginas; falha em qualquer página retorna 503 }
+ *         registros: { type: integer, minimum: 0 }
+ *         episodios: { type: integer, minimum: 0 }
+ *         recaidas: { type: integer, minimum: 0 }
+ *         dias_observados: { type: integer, minimum: 0, maximum: 7 }
+ *         dias_sem_checkin: { type: integer, minimum: 0, maximum: 7, description: Lacuna não comprova abstinência ou ausência de eventos }
+ *         intensidade_informada: { type: integer, minimum: 0 }
+ *         gatilhos_estruturados: { type: integer, minimum: 0, description: Episódios com array de códigos, inclusive array vazio; nunca extrai gatilhos do texto do diário }
+ *         humor_categorizado: { type: integer, minimum: 0 }
+ *     WeeklyOrigins:
+ *       type: object
+ *       required: [filtros, registros, vontades, recaidas]
+ *       properties:
+ *         filtros:
+ *           type: object
+ *           required: [vicio_id, inicio, fim, timezone]
+ *           properties:
+ *             vicio_id: { type: string, format: uuid }
+ *             inicio: { type: string, format: date }
+ *             fim: { type: string, format: date, description: Último dia observado }
+ *             timezone: { type: string }
+ *         registros:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, format: date }
+ *         vontades:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, format: date-time }
+ *         recaidas:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [id, data]
+ *             properties:
+ *               id: { type: string, format: uuid }
+ *               data: { type: string, description: Instante UTC; timestamps legados sem sufixo são interpretados como UTC }
+ *     WeeklySummary:
+ *       type: object
+ *       required: [versao, vicio_id, timezone, intervalo, parcial, dias_checkin, episodios, recaidas, intensidade, gatilhos, humores, cobertura, frases, origens, atualizado_em, comparacao]
+ *       properties:
+ *         versao: { type: integer, enum: [1] }
+ *         vicio_id: { type: string, format: uuid }
+ *         timezone: { type: string }
+ *         intervalo: { $ref: '#/components/schemas/WeeklyInterval' }
+ *         parcial: { type: boolean, description: true enquanto o domingo local ainda não terminou }
+ *         dias_checkin: { $ref: '#/components/schemas/WeeklyCheckins' }
+ *         episodios: { $ref: '#/components/schemas/WeeklyCount' }
+ *         recaidas: { $ref: '#/components/schemas/WeeklyCount' }
+ *         intensidade: { $ref: '#/components/schemas/WeeklyIntensity' }
+ *         gatilhos: { type: array, items: { $ref: '#/components/schemas/WeeklyDistribution' } }
+ *         humores:
+ *           type: array
+ *           description: Catálogo web excelente/bom/neutro/ruim/péssimo, mobile Bem/Confiante/Ansioso/Desanimado e aliases legados explícitos documentados em docs/web-weekly-summary.md. Texto livre é não categorizado; vazio é não informado. Sem IA ou equivalência clínica entre catálogos.
+ *           items: { $ref: '#/components/schemas/WeeklyDistribution' }
+ *         cobertura: { $ref: '#/components/schemas/WeeklyCoverage' }
+ *         frases:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required: [codigo, texto, numerador, denominador, origem]
+ *             properties:
+ *               codigo: { type: string, description: Identificador da fórmula determinística }
+ *               texto: { type: string, example: Estresse apareceu em 4 de 6 episódios registrados. }
+ *               numerador: { type: integer, minimum: 0 }
+ *               denominador: { type: integer, minimum: 0 }
+ *               origem:
+ *                 type: object
+ *                 required: [tipo, ids]
+ *                 properties:
+ *                   tipo: { type: string, enum: [registros, vontades, recaidas] }
+ *                   ids: { type: array, items: { type: string, format: uuid } }
+ *         origens: { $ref: '#/components/schemas/WeeklyOrigins' }
+ *         atualizado_em: { type: string, format: date-time }
+ *         comparacao:
+ *           type: object
+ *           required: [status, texto, anterior]
+ *           properties:
+ *             status: { type: string, enum: [disponivel, dados_insuficientes] }
+ *             texto: { type: string, description: Apenas contagens descritivas; exige ambas as semanas encerradas de sete dias, totalmente carregadas e ao menos um registro em cada uma. Semana parcial nunca é comparada com semana inteira }
+ *             anterior:
+ *               type: object
+ *               required: [intervalo, cobertura, dias_checkin, episodios, recaidas, intensidade, origens]
+ *               properties:
+ *                 intervalo: { $ref: '#/components/schemas/WeeklyInterval' }
+ *                 cobertura: { $ref: '#/components/schemas/WeeklyCoverage' }
+ *                 dias_checkin: { $ref: '#/components/schemas/WeeklyCheckins' }
+ *                 episodios: { $ref: '#/components/schemas/WeeklyCount' }
+ *                 recaidas: { $ref: '#/components/schemas/WeeklyCount' }
+ *                 intensidade: { $ref: '#/components/schemas/WeeklyIntensity' }
+ *                 origens: { $ref: '#/components/schemas/WeeklyOrigins' }
+ * /api/v2/weekly-summary:
+ *   get:
+ *     summary: Resumo semanal canônico por hábito, incluindo arquivados
+ *     description: Sessão web v2 atual (access Bearer emitido pelo transporte web); ownership verificado no hábito e em todas as páginas. Segunda a domingo civil no fuso IANA explícito. Check-ins usam a data civil registrada; vontades/recaídas usam o instante convertido no fuso. IDs deduplicados por coleção. Consulta completa por cursor interno, inclusive semana anterior; não agrega bootstrap parcial. Somente episódios de vontade entram em intensidade/gatilhos, recaídas são contadas separadamente. Nenhum texto privado é incluído no resumo. Sem previsão, tendência, causalidade ou prescrição.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: vicio_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: semana
+ *         required: true
+ *         description: Segunda-feira YYYY-MM-DD (ano a partir de 1900), não futura no fuso informado
+ *         schema: { type: string, format: date, example: '2026-10-19' }
+ *       - in: query
+ *         name: timezone
+ *         required: true
+ *         description: Fuso IANA reconhecido por Intl/ICU; UTC e aliases nomeados aceitos, offsets numéricos recusados
+ *         schema: { type: string, maxLength: 100, example: America/Sao_Paulo }
+ *     responses:
+ *       '200':
+ *         description: Todas as páginas autorizadas foram carregadas; cobertura de campos pode ser incompleta e ausência de registros não prova ausência de eventos
+ *         headers:
+ *           Cache-Control: { schema: { type: string, enum: [no-store] } }
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/WeeklySummary' }
+ *       '401': { description: Sessão ausente, inválida, expirada ou revogada }
+ *       '404': { description: Mesmo resultado para hábito inexistente ou de outra conta }
+ *       '422': { description: Filtros inválidos, extras, repetidos, semana futura, data não segunda-feira ou fuso inválido }
+ *       '503': { description: Resumo indisponível; nenhuma contagem parcial é entregue como completa }
+ * /api/v2/weekly-summary/sources/{type}/{id}:
+ *   get:
+ *     summary: Abrir episódio ou recaída que sustenta um indicador semanal
+ *     description: Leitura explícita e autenticada, com ownership revalidado inclusive para arquivados. Retorna campos originais (inclusive texto privado apenas nesta consulta), sem logs de conteúdo. Check-ins são abertos pelo GET /api/v2/registros/{id} existente. O resumo contém filtros e IDs; um ID nunca substitui autenticação. O detalhe é online e não é gravado no cache do resumo.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: type
+ *         required: true
+ *         schema: { type: string, enum: [vontades, recaidas] }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       '200':
+ *         description: Origem autorizada, Cache-Control no-store
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [tipo, registro]
+ *               properties:
+ *                 tipo: { type: string, enum: [vontades, recaidas] }
+ *                 registro:
+ *                   oneOf:
+ *                     - type: object
+ *                       required: [id, vicio_id, occurred_at, timezone, intensidade, gatilhos]
+ *                       properties:
+ *                         id: { type: string, format: uuid }
+ *                         vicio_id: { type: string, format: uuid }
+ *                         occurred_at: { type: string, format: date-time }
+ *                         timezone: { type: string }
+ *                         intensidade: { type: integer, minimum: 0, maximum: 10 }
+ *                         gatilhos: { type: array, items: { type: string } }
+ *                         nota: { type: string, nullable: true }
+ *                         acao_realizada: { type: string, nullable: true }
+ *                         resultado: { type: string, nullable: true }
+ *                     - type: object
+ *                       required: [id, vicio_id, data_recaida]
+ *                       properties:
+ *                         id: { type: string, format: uuid }
+ *                         vicio_id: { type: string, format: uuid }
+ *                         data_recaida: { type: string, description: Instante legado UTC mesmo quando sem sufixo }
+ *                         motivo: { type: string, nullable: true }
+ *                         dias_abstinencia_perdidos: { type: integer, nullable: true }
+ *       '401': { description: Sessão inválida }
+ *       '404': { description: Origem inexistente ou de outra conta; mesma resposta }
+ *       '503': { description: Consulta de origem indisponível }
  */

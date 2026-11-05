@@ -1,0 +1,24 @@
+{
+  "database": "PostgreSQL 17.11",
+  "transport": "HTTP Express and local PostgREST",
+  "fixture": "synthetic fresh and legacy databases",
+  "standardCommand": "npm run test:db",
+  "standardCommandResult": "unavailable: docker not installed",
+  "localCommand": "bash /tmp/revive-run-local-db.sh",
+  "localCommandResult": "passed",
+  "verified": {
+    "freshMigrations": true,
+    "legacyUpgrade": true,
+    "negativeSqlPermissions": true,
+    "concurrentCreateSameKey": true,
+    "concurrentCompletionSameKey": true,
+    "serverBaseline": true,
+    "prospectiveRatePreservesOldGoal": true,
+    "noResetPreservesSequence": true,
+    "resetPreservesRecordAndAwards": true,
+    "relapseReplay": true,
+    "archivePreservesGoalsAndBlocksNew": true,
+    "v2SessionLegacyReadsAndDeleteOwnership": true,
+    "revokedSessionRejected": true
+  }
+}

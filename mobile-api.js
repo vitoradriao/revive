@@ -1,9 +1,13 @@
 const crypto = require('crypto');
+const { createWeeklySummaryHandler, createWeeklySourceHandler } = require('./weekly-summary');
+const { validSearchTerm, searchScope, encodeSearchCursor, decodeSearchCursor } = require('./diary-search');
+const { defaultPreferences, validatePreferences } = require('./journey-preferences');
+const { createWebAuthTransport } = require('./web-auth-transport');
 const { validateRecordFields, parseRecordCursor } = require('./diary-records');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { buildProgressSnapshot, observedAccountAwards, observedAwards } = require('./progress-metrics');
-const { validateHabitPatch, listEditableHabits, habitEditMessages } = require('./habit-edit');
+const { privateHabitResponse, validateHabitPatch, listEditableHabits, habitEditMessages } = require('./habit-edit');
 const { readCredentialVersion } = require('./credential-auth');
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
@@ -89,15 +93,23 @@ function calculateStats(addiction) {
     };
 }
 
-function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true' }) {
+function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true', webSecureCookies = process.env.NODE_ENV === 'production', webAuthEnabled = process.env.WEB_AUTH_ENABLED === 'true', weeklySummaryClock }) {
     if (!jwtSecret) throw new Error('JWT_SECRET e obrigatorio para a API mobile');
     const router = express.Router();
+    router.use(privateHabitResponse);
+    const webAuth = createWebAuthTransport({ secure: webSecureCookies });
 
     router.use((req, res, next) => {
         const requestId = clean(req.get('X-Request-Id')) || crypto.randomUUID();
         res.locals.requestId = requestId;
         res.set('X-Request-Id', requestId);
         next();
+    });
+
+    router.use('/web-auth', (req, res, next) => {
+        res.set('Cache-Control', 'no-store');
+        if (!webAuthEnabled) return apiError(res, 503, 'WEB_AUTH_DESABILITADO', 'O acesso web está temporariamente indisponível.');
+        return webAuth.guard(req, res, next);
     });
 
     const authenticate = async (req, res, next) => {
@@ -170,6 +182,8 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
     };
 
     const respondSession = (res, session, status = 200) => {
+        res.set('Cache-Control', 'no-store');
+        if (res.locals.webAuth) return webAuth.respond(res, session, status);
         const { sessionId, familyId, ...publicSession } = session;
         return res.status(status).json(publicSession);
     };
@@ -184,7 +198,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
         return campos;
     };
 
-    router.post('/auth/cadastro', async (req, res) => {
+    router.post(['/auth/cadastro', '/web-auth/cadastro'], async (req, res) => {
         try {
             const nome = clean(req.body.nome);
             const email = clean(req.body.email)?.toLowerCase();
@@ -205,17 +219,18 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             if (!session) return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Entre novamente com a senha atual.');
             return respondSession(res, session, 201);
         } catch (error) {
-            console.error('mobile cadastro failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel criar a conta.');
+            console.error('session cadastro failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel criar a conta.');
         }
     });
 
-    router.post('/auth/login', async (req, res) => {
+    router.post(['/auth/login', '/web-auth/login'], async (req, res) => {
         try {
             const email = clean(req.body.email)?.toLowerCase();
             const senha = req.body.senha;
             if (!email || !senha) return apiError(res, 422, 'DADOS_INVALIDOS', 'Email e senha sao obrigatorios.');
             const { data: usuario, error } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
+            if (error && res.locals.webAuth) throw error;
             if (error || !usuario || !(await bcrypt.compare(senha, usuario.senha_hash))) {
                 return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Email ou senha invalidos.');
             }
@@ -223,14 +238,17 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             if (!session) return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Email ou senha invalidos.');
             return respondSession(res, session);
         } catch (error) {
-            console.error('mobile login failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel entrar.');
+            console.error('session login failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel entrar.');
         }
     });
 
-    router.post('/auth/refresh', async (req, res) => {
-        const refreshToken = clean(req.body.refresh_token);
-        if (!refreshToken) return apiError(res, 422, 'REFRESH_AUSENTE', 'Refresh token obrigatorio.');
+    router.post(['/auth/refresh', '/web-auth/refresh'], async (req, res) => {
+        const refreshToken = res.locals.webAuth ? res.locals.webRefreshToken : clean(req.body.refresh_token);
+        if (!refreshToken) {
+            if (res.locals.webAuth) webAuth.clear(res);
+            return apiError(res, res.locals.webAuth ? 401 : 422, 'REFRESH_AUSENTE', res.locals.webAuth ? 'Sessão não fornecida.' : 'Refresh token obrigatorio.');
+        }
         try {
             const hash = tokenHash(refreshToken);
             const replacementId = crypto.randomUUID();
@@ -243,6 +261,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             });
             if (error) throw error;
             if (rotated?.status !== 'rotated') {
+                if (res.locals.webAuth) webAuth.clear(res);
                 const codes = { reused: 'REFRESH_REUTILIZADO', expired: 'REFRESH_EXPIRADO', invalid: 'REFRESH_INVALIDO' };
                 return apiError(res, 401, codes[rotated?.status] || 'REFRESH_INVALIDO', 'Sessao invalida ou encerrada.');
             }
@@ -254,8 +273,22 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
                 usuario
             });
         } catch (error) {
-            console.error('mobile refresh failed', { code: error?.code, message: error?.message });
-            return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel renovar a sessao.');
+            console.error('session refresh failed', { code: error?.code });
+            return apiError(res, res.locals.webAuth ? 503 : 500, 'ERRO_INTERNO', 'Nao foi possivel renovar a sessao.');
+        }
+    });
+
+    router.post('/web-auth/logout', async (req, res) => {
+        try {
+            const token = res.locals.webRefreshToken;
+            if (token) {
+                const { data, error } = await supabase.rpc('revoke_mobile_session_family', { p_refresh_token_hash: tokenHash(token) });
+                if (error || data?.status !== 'revoked') throw error || new Error('Invalid revocation response');
+            }
+            webAuth.clear(res);
+            return res.status(204).send();
+        } catch {
+            return apiError(res, 503, 'SESSAO_INDISPONIVEL', 'Não foi possível encerrar a sessão.');
         }
     });
 
@@ -307,6 +340,35 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             throw new Error('Invalid habit edit response');
         } catch {
             return apiError(res, 503, 'EDICAO_INDISPONIVEL', 'Não foi possível confirmar a edição. Recarregue o hábito antes de tentar novamente.');
+        }
+    });
+
+    router.get('/preferences', authenticate, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        try {
+            const { data, error } = await supabase.from('journey_preferences')
+                .select('primary_habit_id, indicator_order, intro, revision').eq('usuario_id', req.usuarioId).maybeSingle();
+            if (error) throw error;
+            return res.json({ preferences: data || defaultPreferences() });
+        } catch {
+            return apiError(res, 503, 'PREFERENCIAS_INDISPONIVEIS', 'Não foi possível consultar as preferências.');
+        }
+    });
+    router.patch('/preferences', authenticate, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        if (!validatePreferences(req.body)) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências informadas.');
+        const { revision, ...patch } = req.body;
+        try {
+            const { data, error } = await supabase.rpc('edit_journey_preferences', {
+                p_usuario_id: req.usuarioId, p_revision: revision, p_patch: patch,
+            });
+            if (error) throw error;
+            if (data?.status === 200 && data.preferences) return res.json({ preferences: data.preferences });
+            if (data?.status === 409) return apiError(res, 409, 'REVISAO_CONFLITO', 'As preferências mudaram. Consulte a versão atual e revise suas escolhas locais.');
+            if (data?.status === 422) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise as preferências e as referências a hábitos desta conta; o principal deve estar ativo.');
+            throw new Error('Invalid preferences response');
+        } catch {
+            return apiError(res, 503, 'PREFERENCIAS_INDISPONIVEIS', 'Não foi possível confirmar a alteração. Consulte a versão atual antes de tentar novamente.');
         }
     });
 
@@ -385,7 +447,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
                 mensagem: messages.length ? messages[Math.floor(Math.random() * messages.length)] : null
             });
         } catch (error) {
-            console.error('mobile bootstrap failed', { code: error?.code, message: error?.message });
+            console.error('mobile bootstrap failed', { code: error?.code });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel carregar seus dados.');
         }
     });
@@ -394,6 +456,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
         try {
             const { error } = await supabase.rpc('delete_revive_account', { p_usuario_id: req.usuarioId });
             if (error) throw error;
+            webAuth.clear(res);
             return res.status(204).send();
         } catch (error) {
             console.error('mobile account deletion failed', { code: error?.code, message: error?.message });
@@ -439,6 +502,40 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             console.error('mobile push token removal failed', { code: error?.code, message: error?.message });
             return apiError(res, 500, 'ERRO_INTERNO', 'Nao foi possivel remover o dispositivo.');
         }
+    });
+
+    router.get('/weekly-summary', authenticate, createWeeklySummaryHandler({ supabase, clock: weeklySummaryClock }));
+    router.get('/weekly-summary/sources/:type/:id', authenticate, createWeeklySourceHandler({ supabase }));
+
+    router.post('/registros/search', authenticate, async (req, res) => {
+        const input = req.body;
+        const allowed = ['termo', 'inicio', 'fim', 'vicio_id', 'limit', 'cursor'];
+        if (!input || typeof input !== 'object' || Array.isArray(input)
+            || Object.keys(input).some(key => !allowed.includes(key))) {
+            return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise os filtros da busca.');
+        }
+        const { inicio, fim, vicio_id, cursor, termo = '', limit = 50 } = input;
+        const hasPeriod = inicio !== undefined || fim !== undefined;
+        if (!validSearchTerm(termo) || !Number.isInteger(limit) || limit < 1 || limit > 100
+            || (hasPeriod && (!isValidLocalDate(inicio) || !isValidLocalDate(fim) || fim < inicio
+                || (new Date(fim) - new Date(inicio)) / MS_PER_DAY > 3660))
+            || (vicio_id !== undefined && (typeof vicio_id !== 'string' || !UUID_PATTERN.test(vicio_id)))) {
+            return apiError(res, 422, 'DADOS_INVALIDOS', 'Use até 100 caracteres e filtros válidos.');
+        }
+        const scope = searchScope(req.usuarioId, input, jwtSecret);
+        const after = cursor === undefined ? null : decodeSearchCursor(cursor, scope, jwtSecret);
+        if (cursor !== undefined && !after) return apiError(res, 422, 'CURSOR_INCOMPATIVEL', 'A consulta mudou. Reinicie a busca sem cursor.');
+        try {
+            const { data, error } = await supabase.rpc('search_diary_records', {
+                p_usuario_id: req.usuarioId, p_termo: termo, p_vicio_id: vicio_id || null,
+                p_inicio: inicio || null, p_fim: fim || null, p_limit: limit + 1,
+                p_cursor_date: after?.date || null, p_cursor_id: after?.id || null,
+            });
+            if (error) throw error;
+            const rows = data || [], records = rows.slice(0, limit);
+            return res.json({ registros: records, next_cursor: rows.length > limit
+                ? encodeSearchCursor(records.at(-1), scope, jwtSecret) : null });
+        } catch { return apiError(res, 503, 'CONSULTA_INDISPONIVEL', 'Não foi possível buscar no diário.'); }
     });
 
     router.get('/registros', authenticate, async (req, res) => {

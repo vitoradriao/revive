@@ -11,7 +11,7 @@ function validateHabitPatch(body) {
     const fields = {};
     if (!body || typeof body !== 'object' || Array.isArray(body)) return { fields: { revision: 'Informe a revisão do hábito.' } };
     const { revision, ...patch } = body;
-    const allowed = new Set(['nome_vicio', 'data_inicio', 'valor_economizado_por_dia', 'ativo']);
+    const allowed = new Set(['nome_vicio', 'data_inicio', 'valor_economizado_por_dia', 'ativo', 'motivo_pessoal']);
     if (!Number.isInteger(revision) || revision < 1 || revision > 2147483647) fields.revision = 'Recarregue o hábito antes de editar.';
     if (!Object.keys(patch).length || Object.keys(patch).some(key => !allowed.has(key))) fields.patch = 'Selecione somente os campos editáveis.';
     if ('nome_vicio' in patch) {
@@ -27,6 +27,14 @@ function validateHabitPatch(body) {
         const value = patch.valor_economizado_por_dia;
         if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 99999999.99 || Math.abs(value * 100 - Math.round(value * 100)) > 0.00001) fields.valor_economizado_por_dia = 'Informe um valor entre zero e R$99.999.999,99, com até duas casas decimais.';
     }
+    if ('motivo_pessoal' in patch) {
+        const value = patch.motivo_pessoal;
+        if (value !== null && typeof value !== 'string') fields.motivo_pessoal = 'Informe um texto de até 1000 caracteres ou vazio para remover.';
+        else {
+            patch.motivo_pessoal = normalizePersonalReason(value);
+            if ([...(patch.motivo_pessoal || '')].length > 1000 || (patch.motivo_pessoal || '').includes('\0') || /[\uD800-\uDFFF]/u.test(patch.motivo_pessoal || '')) fields.motivo_pessoal = 'Use até 1000 caracteres válidos, sem truncamento.';
+        }
+    }
     if ('ativo' in patch && typeof patch.ativo !== 'boolean') fields.ativo = 'Informe ativo ou arquivado.';
     return { revision, patch, fields };
 }
@@ -37,4 +45,28 @@ async function listEditableHabits(supabase, userId) {
     if (['PGRST204', '42703'].includes(result.error?.code) && String(result.error?.message).includes('habit_start_editable')) return query('*');
     return result;
 }
-module.exports = { validateHabitPatch, listEditableHabits, habitEditMessages: messages };
+// Mesma lista explícita de espaços no painel e no PostgreSQL; conta pontos de código.
+function normalizePersonalReason(value) {
+    return value?.replace(/\r\n?/g, '\n').trim() || null;
+}
+function omitPersonalReasons(value) {
+    if (Array.isArray(value)) return value.map(omitPersonalReasons);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+        .filter(([key]) => key !== 'motivo_pessoal').map(([key, item]) => [key, omitPersonalReasons(item)]));
+    return value;
+}
+// Clientes antigos exportam o bootstrap bruto. A leitura privada exige capacidade explícita.
+function privateHabitResponse(req, res, next) {
+    res.vary('X-Revive-Include-Personal-Reason');
+    res.set('Cache-Control', 'no-store');
+    const json = res.json;
+    res.json = function (body) {
+        // Erros (codigo) precisam manter campos.motivo_pessoal; so omitir DTOs de habito.
+        if (body && typeof body === 'object' && body.codigo) return json.call(this, body);
+        const readsHabit = req.method === 'GET' || req.method === 'PATCH' && /\/vicios\/[^/?]+(?:\?.*)?$/.test(req.originalUrl);
+        const include = readsHabit && req.get('X-Revive-Include-Personal-Reason') === 'true';
+        return json.call(this, include ? body : omitPersonalReasons(body));
+    };
+    next();
+}
+module.exports = { normalizePersonalReason, omitPersonalReasons, privateHabitResponse, validateHabitPatch, listEditableHabits, habitEditMessages: messages };

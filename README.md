@@ -7,7 +7,7 @@
 <p align="center">Acompanhamento de hábitos, metas e progresso na jornada de recuperação.</p>
 
 <p align="center">
-  <a href="https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml"><img src="https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml/badge.svg?branch=main" alt="Status dos testes na main"></a>
+  <a href="https://github.com/vitoradriao/revive/actions/workflows/tests.yml"><img src="https://github.com/vitoradriao/revive/actions/workflows/tests.yml/badge.svg?branch=main" alt="Status dos testes na main"></a>
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@ O objetivo é oferecer uma forma organizada de acompanhar a jornada pessoal. O a
 
 ## Funcionalidades
 
-| Área | Recursos implementados |
+| Área | Recursos presentes no repositório (disponibilidade varia por plataforma) |
 | --- | --- |
 | Conta | Cadastro, login, perfil e encerramento de sessão |
 | Hábitos | Cadastro, acompanhamento de abstinência e estimativa de economia |
@@ -34,7 +34,7 @@ O objetivo é oferecer uma forma organizada de acompanhar a jornada pessoal. O a
 | Progresso | Dashboard, indicadores, calendário e conquistas |
 | Mobile | Cache por usuário, fila de sincronização, lembretes locais e exportação de dados |
 
-A sincronização offline possui [limitações conhecidas](docs/roadmap.md). O APK é destinado a testes internos; a homologação em aparelho físico ainda está pendente.
+Consulte a [matriz de paridade](docs/matriz-paridade.md) para distinguir código integrado, ambiente habilitado e homologação. O mobile possui fila durável; a persistência offline do painel está na issue #58. Há aceites Android específicos com dados sintéticos, mas o [gate integrado #7](https://github.com/vitoradriao/revive/issues/7), iOS e distribuição permanecem pendentes.
 
 ## Arquitetura
 
@@ -53,7 +53,7 @@ Os clientes acessam o banco pela API. Credenciais privilegiadas ficam no servido
 Requisitos: **Node.js 22**, npm, Git e um projeto Supabase com o esquema base configurado.
 
 ```bash
-git clone https://github.com/VitorYunguiar/revive.git
+git clone https://github.com/vitoradriao/revive.git
 cd revive
 npm ci
 npm ci --prefix revive-painel
@@ -67,7 +67,7 @@ npm run dev:stack
 
 O painel abre normalmente em `http://localhost:5173`, com API em `http://localhost:3000/api`. Para o aplicativo, siga o [guia mobile](revive-mobile/README.md).
 
-**Banco novo:** as migrações atuais dependem de um esquema base ainda não versionado. A [Issue #6](https://github.com/VitorYunguiar/revive/issues/6) acompanha essa pendência. A suíte automatizada pode ser executada sem banco e sem credenciais reais.
+**Banco novo:** o baseline e as migrations incrementais estão versionados; a issue #6 foi concluída pelo PR #30. Siga os caminhos de [instalação nova e adoção de banco legado](supabase/README.md), conferindo o histórico antes de aplicar SQL. Testes unitários/HTTP isolados não precisam de credenciais reais; a suíte PostgreSQL usa banco descartável e valida instalação, upgrade e transações.
 
 ## Qualidade e validação
 
@@ -83,7 +83,7 @@ npm ci --prefix revive-mobile
 npm run validate --prefix revive-mobile
 ```
 
-O [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml) executa a validação da API/painel, a conferência dos links e a validação do mobile. Os comandos, o escopo e os limites de cada suíte estão no [guia de testes](docs/testes.md).
+O [GitHub Actions](https://github.com/vitoradriao/revive/actions/workflows/tests.yml) executa a validação da API/painel, a conferência dos links e a validação do mobile. Os comandos, o escopo e os limites de cada suíte estão no [guia de testes](docs/testes.md).
 
 ## Organização do repositório
 
@@ -103,6 +103,6 @@ O [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tes
 - [Central de documentação](docs/README.md): instalação, arquitetura, publicação e entregas acadêmicas.
 - [Próximas melhorias](docs/roadmap.md): pendências reais vinculadas às Issues.
 - [Como contribuir](CONTRIBUTING.md): tarefas, branches, commits, validação e revisão.
-- [Releases](https://github.com/VitorYunguiar/revive/releases): distribuição de arquivos, incluindo o instalador Node.js, com origem e checksum.
+- [Releases](https://github.com/vitoradriao/revive/releases): distribuição de arquivos, incluindo o instalador Node.js, com origem e checksum.
 
-As alterações são registradas em [Issues](https://github.com/VitorYunguiar/revive/issues) e integradas por [Pull Requests](https://github.com/VitorYunguiar/revive/pulls?q=is%3Apr+is%3Amerged), preservando o histórico de desenvolvimento.
+As alterações são registradas em [Issues](https://github.com/vitoradriao/revive/issues) e integradas por [Pull Requests](https://github.com/vitoradriao/revive/pulls?q=is%3Apr+is%3Amerged), preservando o histórico de desenvolvimento.

@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const { createRecoveryEmail } = require('./recovery-email');
+const { createWebAuthTransport } = require('./web-auth-transport');
 
 const NEUTRAL_MESSAGE = 'Se houver uma conta com este e-mail, você receberá um código. Verifique também a pasta de spam.';
 const normalizeEmail = value => typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -14,6 +15,7 @@ function createPasswordRecovery({ supabase, bcrypt, jwtSecret, email = createRec
     enabled = process.env.PASSWORD_RECOVERY_ENABLED === 'true',
     observe = event => console.warn('password_recovery', { event }) }) {
     const router = express.Router();
+    const webAuth = createWebAuthTransport();
     const fail = (res, status, codigo, mensagem) => res.status(status).json({ codigo, mensagem });
     router.post('/request', async (req, res) => {
         const started = Date.now();
@@ -73,6 +75,7 @@ function createPasswordRecovery({ supabase, bcrypt, jwtSecret, email = createRec
             if (error) throw new Error('DATABASE_UNAVAILABLE');
             if (data?.status === 'limited') return fail(res, 429, 'RECUPERACAO_LIMITADA', 'Muitas tentativas. Aguarde uma hora antes de tentar novamente.');
             if (data?.status !== 'changed') return fail(res, 400, 'CODIGO_INVALIDO', 'Código inválido, expirado ou já utilizado. Solicite um novo código.');
+            webAuth.clear(res);
             return res.json({ mensagem: 'Senha redefinida. Entre novamente com a nova senha.' });
         } catch {
             observe('recovery_confirmation_unavailable');

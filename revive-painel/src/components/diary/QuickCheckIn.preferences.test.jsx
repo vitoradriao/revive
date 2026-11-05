@@ -1,0 +1,26 @@
+import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import QuickCheckIn from './QuickCheckIn';
+const state = vi.hoisted(() => ({ offline: {} }));
+vi.mock('../../contexts/OfflineContext', () => ({ useOffline: () => state.offline }));
+vi.mock('../../services/registros.service', () => ({ listDiaryRecords: vi.fn(async () => ({ records: [] })), createDiaryRecord: vi.fn() }));
+afterEach(cleanup);
+it('aplica principal como default e preserva seleção manual quando outra sessão muda ou arquiva principal', () => {
+    state.offline = { accountKey: 'a:epoch', loading: true, preferences: { primary_habit_id: 'b' } };
+    const habits = [{ id: 'a', nome_vicio: 'Primeiro' }, { id: 'b', nome_vicio: 'Segundo' }, { id: 'c', nome_vicio: 'Terceiro' }];
+    const view = render(<MemoryRouter><QuickCheckIn habits={habits} /></MemoryRouter>);
+    expect(screen.getByLabelText('Hábito do check-in')).toHaveValue('b');
+    fireEvent.change(screen.getByLabelText('Hábito do check-in'), { target: { value: 'c' } });
+    state.offline.preferences = { primary_habit_id: 'a' };
+    view.rerender(<MemoryRouter><QuickCheckIn habits={habits.slice(1)} /></MemoryRouter>);
+    expect(screen.getByLabelText('Hábito do check-in')).toHaveValue('c');
+    expect(screen.getByText(/Sua seleção manual foi preservada/)).toBeInTheDocument();
+    state.offline = { ...state.offline, accountKey: 'b:epoch', preferences: { primary_habit_id: 'b' } };
+    view.rerender(<MemoryRouter><QuickCheckIn habits={habits} /></MemoryRouter>);
+    expect(screen.getByLabelText('Hábito do check-in')).toHaveValue('b');
+    view.rerender(<MemoryRouter><QuickCheckIn habits={[habits[0]]} full /></MemoryRouter>);
+    expect(screen.queryByText(/O hábito principal está indisponível/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Hábito: Primeiro/)).toBeInTheDocument();
+});

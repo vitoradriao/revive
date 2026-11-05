@@ -18,6 +18,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, BookOpen, Repeat, Star } from 'lucide-react';
+import { useOffline } from '../contexts/OfflineContext';
+import UrgeHistory from '../components/urges/UrgeHistory';
+import UrgeContent from '../components/urges/UrgeContent';
+import { dateInZone, deviceTimezone } from '../utils/urge-time';
 import { useData } from '../contexts/DataContext';
 import PageHeader from '../components/ui/PageHeader';
 import { glassSurface, screenTransition, moodColors } from '../utils/constants';
@@ -32,7 +36,13 @@ import { glassSurface, screenTransition, moodColors } from '../utils/constants';
  * @returns {JSX.Element} Calendario mensal interativo com detalhes por dia
  */
 export default function CalendarPage() {
-  const { allRecords, relapses, goals } = useData();
+  const { allRecords, relapses, goals, addictions = [] } = useData();
+  const { accountKey } = useOffline();
+  const [habitId, setHabitId] = useState('');
+  const [urgeState, setUrgeState] = useState({ accountKey, events: [] });
+  const receiveUrges = React.useCallback(events => setUrgeState({ accountKey, events }), [accountKey]);
+  const urges = useMemo(() => urgeState.accountKey === accountKey ? urgeState.events : [], [urgeState, accountKey]);
+  const selectedHabitId = addictions.some(habit => habit.id === habitId) ? habitId : addictions[0]?.id || '';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
 
@@ -69,12 +79,13 @@ export default function CalendarPage() {
         registros: dayRegistros,
         recaidas: dayRecaidas,
         metas: dayMetas,
+        urges: urges.filter(event => dateInZone(event.occurred_at, deviceTimezone()) === dateStr),
         mood,
         isToday: dateStr === new Date().toISOString().split('T')[0]
       });
     }
     return days;
-  }, [year, month, daysInMonth, firstDayOfWeek, allRecords, relapses, goals]);
+  }, [year, month, daysInMonth, firstDayOfWeek, allRecords, relapses, goals, urges]);
 
   const selectedDayData = selectedDay ? calendarDays.find(d => d && d.dateStr === selectedDay) : null;
 
@@ -87,19 +98,24 @@ export default function CalendarPage() {
         <PageHeader
           eyebrow="Histórico"
           title="Calendário"
-          description="Visualize registros, recaídas e metas concluídas por dia."
+          description="Visualize registros, vontades, recaídas e metas concluídas por dia."
         />
         <div className="flex items-center gap-3">
-          <button onClick={prevMonth} className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/60 text-white/70 hover:text-white hover:bg-slate-800 transition">
+          <button aria-label="Mês anterior" onClick={prevMonth} className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/60 text-white/70 hover:text-white hover:bg-slate-800 transition">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <span className="text-lg font-semibold text-app capitalize min-w-[180px] text-center">{monthName}</span>
-          <button onClick={nextMonth} className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/60 text-white/70 hover:text-white hover:bg-slate-800 transition">
+          <button aria-label="Próximo mês" onClick={nextMonth} className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/60 text-white/70 hover:text-white hover:bg-slate-800 transition">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
+      <label>Hábito para consultar vontades<select className="block border rounded-xl p-3 bg-[var(--surface)]" value={selectedHabitId} onChange={event => { setHabitId(event.target.value); setUrgeState({ accountKey, events: [] }); }}>
+        {!addictions.length && <option value="">Nenhum hábito disponível</option>}
+        {addictions.map(habit => <option key={habit.id} value={habit.id}>{habit.nome_vicio}{habit.ativo === false ? ' (arquivado)' : ''}</option>)}
+      </select></label>
+      <UrgeHistory key={accountKey + ':' + selectedHabitId} accountKey={accountKey} habitId={selectedHabitId} period={{ inicio: `${year}-${String(month + 1).padStart(2, '0')}-01`, fim: `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}` }} onEvents={receiveUrges} showEvents={false} />
       <div className={`${glassSurface} rounded-3xl p-6`}>
         <div className="grid grid-cols-7 gap-1 mb-2">
           {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(d => (
@@ -113,6 +129,8 @@ export default function CalendarPage() {
             return (
               <button
                 key={dayData.dateStr}
+                aria-label={`${dayData.dateStr}: ${dayData.registros.length} registros, ${dayData.urges.length} vontades, ${dayData.recaidas.length} recaídas, ${dayData.metas.length} metas concluídas`}
+                aria-pressed={isSelected}
                 onClick={() => setSelectedDay(isSelected ? null : dayData.dateStr)}
                 className={`aspect-square rounded-xl p-1 flex flex-col items-center justify-center gap-1 transition relative ${
                   isSelected ? 'bg-[#7CF6C4]/20 border border-[#7CF6C4]/50' :
@@ -121,7 +139,11 @@ export default function CalendarPage() {
                 }`}
               >
                 <span className={`text-sm font-medium ${dayData.isToday ? 'text-teal-300' : 'text-app'}`}>{dayData.day}</span>
-                <div className="flex gap-0.5">
+                <div className="flex flex-wrap justify-center gap-1 text-[10px]">
+                  {!!dayData.urges.length && <span className="text-app">Vontade {dayData.urges.length}</span>}
+                  {!!dayData.registros.length && <span>Registro</span>}
+                  {!!dayData.recaidas.length && <span>Recaída</span>}
+                  {!!dayData.metas.length && <span>Meta</span>}
                   {dayData.mood && (
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: moodColors[dayData.mood] || '#6b7280' }} />
                   )}
@@ -135,6 +157,7 @@ export default function CalendarPage() {
 
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-white/10">
+          <div className="text-xs text-app">Vontade · episódio descritivo</div>
           <div className="flex items-center gap-2 text-xs text-muted">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Bom humor
           </div>
@@ -158,6 +181,7 @@ export default function CalendarPage() {
             {new Date(selectedDayData.dateStr + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
           </h3>
 
+          <div className="space-y-3">{selectedDayData.urges.map(event => <UrgeContent key={event.id} event={event} />)}</div>
           {selectedDayData.registros.length > 0 ? (
             <div className="space-y-3">
               {selectedDayData.registros.map((reg, i) => (

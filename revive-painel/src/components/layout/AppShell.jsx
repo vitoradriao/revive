@@ -35,6 +35,9 @@ import Alert from '../ui/Alert';
 import NovoVicioWizard from '../modals/NovoVicioWizard';
 import { useUI } from '../../contexts/UIContext';
 import { useData } from '../../contexts/DataContext';
+import { useOffline } from '../../contexts/OfflineContext';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Layout principal que envolve todas as paginas autenticadas da aplicacao.
@@ -50,29 +53,35 @@ const AppShell = () => {
     confirmModal,
     alert,
     setAlert,
-    loading,
     isNewAddictionOpen,
     closeNewAddictionWizard
   } = useUI();
-  const { createAddiction } = useData();
+  const { createAddiction, checkCreatedAddictions } = useData();
+  const { token, user, restoreSession } = useAuth();
+  const offline = useOffline();
 
   return (
     <div className="min-h-screen text-app relative">
       <ConfirmModal {...confirmModal} />
-      <NovoVicioWizard
-        isOpen={isNewAddictionOpen}
+      {isNewAddictionOpen && <NovoVicioWizard
+        key={user?.id || token}
+        isOpen
         onClose={closeNewAddictionWizard}
-        onSubmit={async (payload) => {
-          await createAddiction(payload);
-          closeNewAddictionWizard();
-        }}
-        loading={loading}
-      />
-      <div className="revive-app-frame">
+        onSubmit={createAddiction}
+        onCheckHabits={checkCreatedAddictions}
+      />}
+      <div className="revive-app-frame" inert={isNewAddictionOpen}>
         <NavBar variant="sidebar" />
         <main className="revive-shell">
           <Header />
           <div className="revive-content">
+            <aside role="status" className="surface-sand rounded-xl p-3 mb-4">
+              {offline.localOnly ? 'Modo local: os dados podem estar incompletos.' : 'Cópia local e sincronização'}
+              {' · '}{offline.queue.length} pendência(s).{' '}
+              <Link to="/sincronizacao" className="underline">Ver sincronização</Link>
+              {offline.error && <p role="alert">{offline.error.message}</p>}
+              {!token && <button className="underline ml-3" onClick={restoreSession}>Restaurar sessão</button>}
+            </aside>
             {alert && <Alert type={alert.type} onClose={() => setAlert(null)}>{alert.message}</Alert>}
             <NavBar />
             <ErrorBoundary>

@@ -1,73 +1,47 @@
+import JourneyPreferences from '../components/journey/JourneyPreferences';
+import FirstHabitIntroduction from '../components/journey/FirstHabitIntroduction';
+import { useOffline } from '../contexts/OfflineContext';
+import { resolvePrimary } from '../utils/journeyPreferences';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, BookOpen, CheckCircle2, Heart, Plus, Repeat, Sparkles, Target } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
+import RelapseHistory from '../components/modals/RelapseHistory';
 import RecaidaModal from '../components/modals/RecaidaModal';
 import EmptyState from '../components/ui/EmptyState';
 import HeroKpis from '../components/dashboard/HeroKpis';
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap';
 import VicioCard from '../components/dashboard/VicioCard';
 import RecentTimeline from '../components/dashboard/RecentTimeline';
-import SelectHumor from '../components/ui/SelectHumor';
-import { SelectField } from '../components/ui/Field';
+import QuickCheckIn from '../components/diary/QuickCheckIn';
 import Button from '../components/ui/Button';
-import { glassSurface, moodOptions } from '../utils/constants';
+import { glassSurface } from '../utils/constants';
 import { calculateGoalProgress } from '../utils/goalProgress';
+import { useProgress } from '../contexts/useProgress';
+import ProgressNotice from '../components/dashboard/ProgressNotice';
+import { activityDays } from '../utils/progressMetrics';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { preferences } = useOffline();
   const { loading, openNewAddictionWizard } = useUI();
   const {
-    addictions,
     motivationalMessage,
-    relapses,
-    allRecords,
-    goals,
     deleteAddiction,
-    createRecordForAddiction,
     registerRelapse,
     loadAddictionDetails
   } = useData();
 
   const [recaidaVicio, setRecaidaVicio] = useState(null);
-  const [moodCheckIn, setMoodCheckIn] = useState({ humor: '', vicio_id: '' });
 
-  const totalDiasLimpos = useMemo(
-    () => addictions.reduce((acc, v) => acc + (v.dias_abstinencia || 0), 0),
-    [addictions]
-  );
-
-  const totalEconomizado = useMemo(
-    () => addictions.reduce((acc, v) => acc + (Number(v.valor_economizado) || 0), 0),
-    [addictions]
-  );
-
-  const maiorStreak = useMemo(
-    () => addictions.reduce((max, v) => Math.max(max, v.dias_abstinencia || 0), 0),
-    [addictions]
-  );
-
-  const metasConcluidas = useMemo(
-    () => goals.filter(m => m.concluida).length,
-    [goals]
-  );
-
-  const heatmapData = useMemo(() => {
-    const days = [];
-    const today = new Date();
-
-    for (let i = 27; i >= 0; i -= 1) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      const count = allRecords.filter(r => r.data_registro === dateStr).length;
-      const hasRelapse = relapses.some(r => r.data_recaida?.split('T')[0] === dateStr);
-      days.push({ date: dateStr, count, hasRelapse, day: date.getDay() });
-    }
-
-    return days;
-  }, [allRecords, relapses]);
+  const [habitFilter, setHabitFilter] = useState('active');
+  const progress = useProgress();
+  const visibleHabits = progress.habits.filter(habit => habitFilter === 'archived' ? habit.ativo === false : habit.ativo !== false);
+  const addictions = progress.habits.filter(habit => habit.ativo !== false);
+  const { habit: primary } = resolvePrimary(preferences, progress.habits);
+  const { records: allRecords, relapses, goals } = progress;
+  const heatmapData = useMemo(() => activityDays(allRecords, relapses), [allRecords, relapses]);
 
   const recentActivity = useMemo(() => {
     const events = [];
@@ -105,74 +79,41 @@ export default function DashboardPage() {
     return events.sort((a, b) => b.date - a.date).slice(0, 8);
   }, [allRecords, relapses, goals]);
 
-  const moodTrend = useMemo(() => {
-    const moodScore = { excelente: 5, bom: 4, neutro: 3, ruim: 2, pessimo: 1, 'pÃ©ssimo': 1, [`p${'\u00c3\u00a9'}ssimo`]: 1 };
-    const last7 = new Date();
-    last7.setDate(last7.getDate() - 7);
-    const recent = allRecords.filter(r => new Date(r.data_registro) >= last7 && r.humor);
-
-    if (recent.length === 0) return null;
-
-    return recent.reduce((acc, r) => acc + (moodScore[r.humor] || 3), 0) / recent.length;
-  }, [allRecords]);
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const selectedMoodAddictionId = moodCheckIn.vicio_id || (addictions[0]?.id ? String(addictions[0].id) : '');
-  const todayMoodRecord = useMemo(
-    () => allRecords.find(r => r.data_registro === todayStr && r.humor),
-    [allRecords, todayStr]
-  );
-  const todayMoodOption = moodOptions.find(option => option.value === todayMoodRecord?.humor);
   const featuredGoals = useMemo(() => goals.slice(0, 3), [goals]);
-  const addictionOptions = useMemo(
-    () => addictions.map(vicio => ({ value: String(vicio.id), label: vicio.nome_vicio })),
-    [addictions]
-  );
-
   const getGoalProgress = (meta) => {
     if (meta.concluida) return 100;
-    const vicio = addictions.find(item => item.id === meta.vicio_id);
+    const vicio = progress.habits.find(item => item.id === meta.vicio_id);
     return calculateGoalProgress(meta, vicio);
   };
 
-  const handleMoodCheckIn = async (event) => {
-    event.preventDefault();
-    const success = await createRecordForAddiction({ humor: moodCheckIn.humor }, selectedMoodAddictionId);
-    if (success) setMoodCheckIn(prev => ({ ...prev, humor: '' }));
-  };
+  const handleRefletir = (habit, input, intentId) => registerRelapse(habit, input, intentId);
+  const handleResetar = (habit, input, intentId) => registerRelapse(habit, input, intentId);
 
-  const handleRefletir = async (vicio) => {
-    await registerRelapse(vicio);
-    setRecaidaVicio(null);
-  };
-
-  const handleResetar = async (vicio) => {
-    await registerRelapse(vicio, { resetCounter: true });
-    setRecaidaVicio(null);
-  };
 
   return (
     <div className="space-y-5">
+      <FirstHabitIntroduction />
+      <ProgressNotice progress={progress} />
       <RecaidaModal
         isOpen={recaidaVicio !== null}
         onClose={() => setRecaidaVicio(null)}
-        vicio={recaidaVicio}
+        vicio={recaidaVicio && (progress.habits.find(habit => habit.id === recaidaVicio.id) || recaidaVicio)}
         onRefletir={handleRefletir}
         onResetar={handleResetar}
         loading={loading}
       />
 
-      <section className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-5">
+      <section id="journey-content" tabIndex={-1} className="grid grid-cols-1 xl:grid-cols-[1.25fr_.75fr] gap-5">
         <article className="revive-hero min-h-[430px] p-7 sm:p-10">
           <div className="relative z-[1] min-h-[360px] flex flex-col justify-between gap-10">
             <div className="flex items-center justify-between gap-4">
-              <span className="revive-tag">Jornada em tempo real</span>
+              <span className="revive-tag">Sua jornada</span>
               <button
                 type="button"
                 onClick={() => navigate('/analytics')}
                 className="revive-round-icon"
-                aria-label="Abrir insights"
-                title="Abrir insights"
+                aria-label="Abrir evolução"
+                title="Abrir evolução"
               >
                 <ArrowUpRight className="w-6 h-6" />
               </button>
@@ -187,13 +128,8 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <HeroKpis
-              totalDiasLimpos={totalDiasLimpos}
-              totalEconomizado={totalEconomizado}
-              maiorStreak={maiorStreak}
-              metasConcluidas={metasConcluidas}
-              moodTrend={moodTrend}
-            />
+            <p className="text-white/80">Principal da Jornada: {primary?.nome_vicio || 'nenhum hábito ativo disponível'}</p>
+            <HeroKpis progress={progress} order={preferences?.indicator_order} />
           </div>
         </article>
 
@@ -216,62 +152,7 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-[.85fr_1.15fr] gap-5">
-        <article className={`${glassSurface} rounded-[34px] p-6`}>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <p className="eyebrow">Registro de humor</p>
-                <h3 className="mt-2 text-3xl font-black leading-none tracking-[-0.055em] text-app">Como você está hoje?</h3>
-                <p className="mt-2 text-sm text-muted">Esse registro entra na atividade dos últimos 28 dias.</p>
-              </div>
-              {todayMoodRecord && (
-                <span className="self-start rounded-full bg-[#121212] px-3 py-1 text-xs font-black text-[#fbfaf5]">
-                  Hoje: {todayMoodOption?.label || todayMoodRecord.humor}
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleMoodCheckIn} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <span className="text-sm font-black text-app">Humor</span>
-                  <SelectHumor
-                    value={moodCheckIn.humor}
-                    onChange={(valor) => setMoodCheckIn(prev => ({ ...prev, humor: valor }))}
-                    label="Selecione como você está..."
-                  />
-                </div>
-
-                {addictions.length > 1 ? (
-                  <SelectField
-                    label="Hábito"
-                    value={selectedMoodAddictionId}
-                    onChange={(nextValue) => setMoodCheckIn(prev => ({ ...prev, vicio_id: nextValue }))}
-                    options={addictionOptions}
-                    placeholder="Selecione um hábito"
-                  />
-                ) : (
-                  <div className="rounded-[22px] surface-muted p-4">
-                    <span className="text-sm font-black text-app">Hábito</span>
-                    <p className="text-sm text-muted mt-1">
-                      {addictions[0]?.nome_vicio || 'Cadastre um hábito para salvar registros de humor.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading || !moodCheckIn.humor || !selectedMoodAddictionId}
-                variant="accent"
-                size="lg"
-                className="w-full"
-              >
-                Salvar humor de hoje
-              </Button>
-            </form>
-          </div>
-        </article>
+        <div id="introduction-checkin" tabIndex={-1}><QuickCheckIn habits={addictions} preferredHabitId={preferences?.intro?.state === 'pending' ? preferences.intro.habit_id : undefined} /></div>
 
         <article className="surface-dark rounded-[34px] p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -314,17 +195,25 @@ export default function DashboardPage() {
         </article>
       </section>
 
-      {addictions.length === 0 && !loading ? (
+      <JourneyPreferences habits={progress.habits} />
+
+      <label className="block">Exibir hábitos
+        <select className="ml-3 p-2 rounded-xl surface-card" value={habitFilter} onChange={event => setHabitFilter(event.target.value)}>
+          <option value="active">Ativos</option>
+          <option value="archived">Arquivados</option>
+        </select>
+      </label>
+      {visibleHabits.length === 0 && !loading ? (
         <EmptyState
           icon={Heart}
-          title="Nenhum hábito cadastrado"
-          description="Comece sua jornada adicionando o primeiro hábito que deseja controlar."
-          action={openNewAddictionWizard}
-          actionLabel="Cadastrar primeiro hábito"
+          title={habitFilter === 'archived' ? 'Nenhum hábito arquivado' : 'Nenhum hábito ativo disponível'}
+          description={habitFilter === 'archived' ? 'Seus hábitos arquivados aparecerão aqui. Abra os detalhes para reativar.' : 'Cadastre um hábito para acompanhar uma sequência ativa. O histórico dos arquivados permanece nos relatórios.'}
+          action={habitFilter === 'active' ? openNewAddictionWizard : undefined}
+          actionLabel="Cadastrar hábito"
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
-          {addictions.map(vicio => (
+          {visibleHabits.map(vicio => (
             <VicioCard
               key={vicio.id}
               vicio={vicio}
@@ -350,6 +239,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <RelapseHistory />
       <RecentTimeline recentActivity={recentActivity} />
     </div>
   );

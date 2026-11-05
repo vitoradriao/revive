@@ -42,7 +42,7 @@ import { useAuth } from '../../contexts/AuthContext';
  * @returns {JSX.Element} Loading spinner, redirecionamento para /login, ou children
  */
 const ProtectedRoute = ({ children }) => {
-  const { token, user, authLoading } = useAuth();
+  const { token, user, authLoading, localAccess } = useAuth();
 
   // Estado 1: Verificacao de autenticacao em andamento - exibe loading
   if (authLoading) {
@@ -54,7 +54,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // Estado 2: Usuario nao autenticado - redireciona para login com replace
-  if (!token || !user) {
+  if ((!token && !localAccess) || !user) {
     return <Navigate to="/login" replace />;
   }
 

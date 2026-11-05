@@ -1,0 +1,123 @@
+{
+  "date": "2026-10-23",
+  "issue": 66,
+  "scope": [
+    "API",
+    "painel web"
+  ],
+  "fixtures": "sintéticas; sem credenciais, diário, motivos ou dados reais",
+  "node": "22.23.4",
+  "checks": {
+    "apiUnit": {
+      "command": "npm run test:api:unit",
+      "status": "passed",
+      "files": 6,
+      "tests": 41
+    },
+    "webUnit": {
+      "command": "npm run test:web",
+      "status": "passed",
+      "files": 17,
+      "tests": 197
+    },
+    "webComponents": {
+      "command": "npm run test:web",
+      "status": "passed",
+      "files": 16,
+      "tests": 103
+    },
+    "lint": {
+      "command": "npm run lint:web",
+      "status": "passed"
+    },
+    "build": {
+      "command": "npm run build:web",
+      "status": "passed"
+    },
+    "openapi": {
+      "status": "passed",
+      "verification": "swagger-jsdoc com failOnErrors; GET/PATCH e schema presentes"
+    },
+    "docs": {
+      "command": "npm run check:docs",
+      "status": "passed"
+    },
+    "validate": {
+      "command": "npm run validate",
+      "status": "blocked",
+      "reason": "testes HTTP não podem abrir sockets locais: listen EPERM"
+    },
+    "db": {
+      "command": "npm run test:db",
+      "status": "blocked",
+      "reason": "Docker ausente; PostgreSQL com servidor também bloqueado por sockets"
+    },
+    "dbSingle": {
+      "command": "npm run test:db:single",
+      "status": "passed",
+      "postgres": "17.11",
+      "modes": [
+        "fresh",
+        "legacy"
+      ],
+      "verified": [
+        "migrations completas",
+        "schema e permissões",
+        "default",
+        "ownership",
+        "IDs futuros",
+        "introdução",
+        "revisão obsoleta",
+        "arquivo",
+        "restaurar padrão",
+        "FK composta",
+        "cascatas"
+      ],
+      "notVerified": [
+        "concorrência em duas conexões",
+        "HTTP/PostgREST"
+      ]
+    },
+    "browserWrapper": {
+      "command": "/workspace/prompts/browser.sh test:browser:preferences",
+      "status": "blocked",
+      "reason": "fixture HTTP/Vite sem sockets disponíveis"
+    },
+    "browserPreferences": {
+      "command": "npm run test:browser:preferences",
+      "status": "blocked",
+      "reason": "listen EPERM ao reservar porta local",
+      "executedEngines": []
+    },
+    "mobile": {
+      "status": "not_applicable",
+      "reason": "aplicação sem alterações"
+    },
+    "browserHabits": {
+      "command": "npm run test:browser:habits",
+      "status": "blocked",
+      "reason": "listen EPERM ao reservar porta local"
+    }
+  },
+  "coveredByWebTests": [
+    "ordem acessível e foco",
+    "restauração",
+    "conflito com reload",
+    "revisão explícita",
+    "resposta perdida sem repetição",
+    "geração de conta e resposta tardia",
+    "offline",
+    "principal arquivado",
+    "seleção manual",
+    "IDs desconhecidos"
+  ],
+  "pending": [
+    "validação HTTP completa",
+    "PostgREST e concorrência real",
+    "Chromium/Firefox/WebKit",
+    "leitor de tela real",
+    "interface mobile e fluxo bidirecional em aparelho"
+  ],
+  "screenshots": [],
+  "productionChanges": false
+}

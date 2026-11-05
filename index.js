@@ -58,6 +58,7 @@ const { buildProgressSnapshot } = require('./progress-metrics');
 
 /** Instância principal do Express */
 const app = express();
+app.use('/api', require('./habit-edit').privateHabitResponse);
 
 /** Porta em que o servidor HTTP escutará (padrão: 3000) */
 const PORT = process.env.PORT || 3000;
@@ -138,6 +139,13 @@ app.use(cors({
 
 /** Middleware para parsing automático de JSON no corpo das requisições */
 app.use(express.json());
+// Parser diagnostics can contain body fragments. Keep diary search failures private.
+app.use((error, req, res, next) => {
+    if (/^\/api\/v2\/registros\/search\/?$/i.test(req.path)) {
+        return res.set('Cache-Control', 'no-store').status(error.status === 413 ? 413 : 400).json({ codigo: 'DADOS_INVALIDOS', mensagem: 'Corpo da busca inválido.' });
+    }
+    next(error);
+});
 
 app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -148,7 +156,10 @@ app.use('/api', (req, res, next) => {
  * Middleware de logging HTTP no formato 'combined' (Apache-like).
  * Registra: IP remoto, data, método, URL, status, user-agent.
  */
-app.use(morgan('combined'));
+app.use(morgan('combined', { skip: req => {
+    const pathOnly = (req.originalUrl || req.url || '').split('?')[0];
+    return /^\/api\/v2\/registros\/search\/?$/i.test(req.path) || /^\/api\/v2\/registros\/search\/?$/i.test(pathOnly);
+}}));
 
 /* =========================================================================
  * DOCUMENTAÇÃO SWAGGER / OPENAPI
@@ -237,6 +248,9 @@ app.use('/api/auth/cadastro', cadastroLimiter);
 app.use('/api/v2/auth/login', loginLimiter);
 app.use('/api/v2/auth/cadastro', cadastroLimiter);
 app.use('/api/v2/auth/refresh', loginLimiter);
+app.use('/api/v2/web-auth/login', loginLimiter);
+app.use('/api/v2/web-auth/cadastro', cadastroLimiter);
+app.use('/api/v2/web-auth/refresh', loginLimiter);
 
 /** Aplica rate limiter geral em todas as rotas /api */
 app.use('/api', (req, res, next) => {

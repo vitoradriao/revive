@@ -208,3 +208,21 @@ Os testes cobrem formularios, datas, funcoes de dominio, cliente HTTP e sincroni
 O [workflow](../.github/workflows/tests.yml) executa dois jobs independentes: API/painel/documentacao e mobile. O CI usa Node.js 22, instalacao por lockfile e valores ficticios de ambiente para testes. Nao acessa o banco de desenvolvimento nem compila um APK.
 
 As [capturas antigas](evidencias-testes/README.md) sao evidencias historicas. Consulte o commit e os logs da execucao no [GitHub Actions](https://github.com/VitorYunguiar/revive/actions/workflows/tests.yml) para conhecer o resultado atual.
+
+
+## Resumo semanal web/API (#26)
+
+A entrega web primeiro está descrita em [web-weekly-summary.md](web-weekly-summary.md). Mobile não foi alterado.
+
+- `npx vitest run tests/unit/weekly-summary.test.js tests/unit/weekly-summary-route.test.js`: cálculo canônico, DST, mês/ano, duplicatas, catálogos, zero/parcial/legado, páginas e handlers com ownership.
+- `npx vitest run tests/integration/weekly-summary.test.js`: Express real e sessão v2, arquivados, isolamento, ano sintético e origens.
+- `npm run test:web`: serviço/cache e componente, tabela acessível, origens, erro/vazio/offline, troca de conta/hábito/fuso/semana e confirmação.
+- `npm run build:web && npm run test:browser:weekly`: cenário em `tests/browser/weekly-summary.cjs`, também incluído em `test:browser`. Usa a fixture HTTP sintética e IndexedDB real; Chromium/Firefox/WebKit por padrão. `REVIVE_BROWSER_ENGINES=chromium` restringe a execução; `REVIVE_BROWSER_EXECUTABLE` pode indicar um executável compatível; `REVIVE_BROWSER_ARTIFACTS` grava evidências sintéticas.
+- `npm run test:db`: inclui `tests/db/weekly-summary.mjs` em PostgreSQL/PostgREST reais, com 1.105 check-ins numa semana para forçar paginação, ano fora do período, São Paulo/UTC/DST, arquivados, origens e ownership. Não há migration nova.
+- `npm run validate`, `npm run lint:web` e `npm run check:docs` continuam obrigatórios, sem remoção de validações.
+
+A fixture compartilhada `tests/fixtures/weekly-summary.json` exige 3 dias com check-in, 6 vontades, intensidade média 5 (6 intensidades), 1 recaída e a frase exata “Estresse apareceu em 4 de 6 episódios registrados.” Texto livre não é classificado.
+
+Limites desta execução de 27/10/2026: o sandbox bloqueia listeners HTTP com `listen EPERM`, impedindo integração Supertest/browser; Docker não está disponível para PostgreSQL real. Esses testes permanecem no código e precisam ser executados no CI/ambiente suportado. Testes sem listener, componentes e build não substituem essa homologação.
+
+Resultados locais desta entrega: **89 unitários da API, 234 unitários web e 121 testes de integração web aprovados**. Build e lint do painel, parsing do OpenAPI com `failOnErrors` e `check:docs` aprovados. `npm run validate` foi executado; parou nos testes HTTP da API por `listen EPERM`, inclusive cenários anteriores à mudança. `test:browser:weekly` encontrou o mesmo bloqueio; `test:db` não iniciou por `docker: not found`. Nenhuma validação foi removida ou marcada como aprovada sem execução.

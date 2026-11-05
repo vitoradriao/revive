@@ -15,6 +15,7 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 | Executar as verificações | [Testes e qualidade](testes.md) |
 | Contribuir | [Fluxo de contribuição](../CONTRIBUTING.md) e [convenções](coding-conventions.md) |
 | Consultar pendências | [Roadmap](roadmap.md) |
+| Conferir disponibilidade por plataforma | [Matriz de implementação, ambiente e homologação](matriz-paridade.md) |
 
 ## Publicação
 
@@ -29,6 +30,36 @@ Os guias abaixo descrevem a organização atual do projeto. As entregas acadêmi
 - [Contratos da API mobile](../revive-mobile/docs/api-contracts.md).
 - [Estado da implementação](../revive-mobile/docs/implementation-status.md).
 - [Melhorias de uso](../revive-mobile/docs/quality-of-life.md).
+
+## Evidências do painel
+
+- [Resumo semanal canônico](web-weekly-summary.md): API, fórmulas, fuso, cobertura, origens, cache e limites da entrega web #26.
+
+- [Introdução ao primeiro hábito](web-first-habit-introduction.md): orientação não bloqueante, checkpoints, retomada e verificações da #67.
+
+- [Motivo pessoal privado](web-motivo-pessoal.md): edição versionada, leitura offline, compatibilidade e privacidade da #65.
+
+- [Recuperação, exclusão e saída web](web-account-lifecycle.md): contratos, confirmação remota, coordenação de abas, limpeza retomável e evidências da #64.
+
+- [Metas e recaídas duráveis no painel](web-goals-relapses.md): contratos, baseline, fila, reset, testes e recuperação da #63.
+
+- [Vontades e calendário web](web-urges-calendar.md): criação durável, fusos, histórico paginado, arquivamento e recuperação da #62.
+
+- [Check-in e diário web](web-diary.md): criação/correção duráveis, comparação de conflito, paginação e evidências da #61.
+
+- [Edição e arquivamento web](web-habit-management.md): revisão concorrente, rascunhos duráveis, pendências e recuperação da #60.
+
+- [Progresso histórico web](web-progress-history.md): indicadores canônicos, conquistas permanentes, cobertura, fixtures de paridade e verificação da #59.
+
+- [Sessões web v2](web-sessions.md): contrato, concorrência entre abas e verificações da issue #57; [rollout autorizado de 16/10](web-sessions-rollout.md).
+
+- [Cadastro de hábitos no web](web-habit-creation-validation.md): confirmação de envio, validação e recuperação de falhas da issue #56.
+
+- [Offline web](web-offline.md): IndexedDB, fila/recibos, shell, acesso local e Sincronização da #58; PR #73 aguarda integração.
+
+- [Preferências da Jornada](web-journey-preferences.md): contrato versionado, principal, ordem acessível, implantação e limites de verificação da #66.
+
+- [Busca no diário e perguntas opcionais](web-diary-search.md): contrato, offline, privacidade, banco e verificações da entrega web/API #68.
 
 ## Evidências e entregas anteriores
 

@@ -6,8 +6,15 @@ import pg from 'pg';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
+import { verifyWeeklySummary } from './weekly-summary.mjs';
+import { verifyDiarySearch } from './diary-search.mjs';
 import { verifyDiaryRecords } from './diary-records.mjs';
+import { verifyJourneyPreferences } from './journey-preferences.mjs';
+import { verifyIntroduction } from './introduction.mjs';
+import { verifyPersonalReasons } from './personal-reason.mjs';
 import { verifyHabitEdits } from './habit-edit.mjs';
+import { verifyGoalsRelapses } from './goals-relapses.mjs';
+import { verifyWebSessions } from './web-sessions.mjs';
 
 const require = createRequire(import.meta.url);
 const jwtSecret = 'revive-ci-only-jwt-secret-at-least-32-characters';
@@ -68,9 +75,15 @@ async function verifyConnections(a, b) {
   await b.query('delete from public.usuarios where id=$1', [id]);
 }
 
-async function verifyApi(app, sql) {
+async function verifyApi(app, sql, second) {
+  await verifyWebSessions(app, sql, process.env.JWT_SECRET, second);
   await verifyHabitEdits(app, sql, process.env.JWT_SECRET);
+  await verifyPersonalReasons(app, sql, process.env.JWT_SECRET);
+  await verifyJourneyPreferences(app, sql, process.env.JWT_SECRET);
+  await verifyIntroduction(app, sql, process.env.JWT_SECRET);
   await verifyDiaryRecords(app, sql, process.env.JWT_SECRET);
+  await verifyDiarySearch(app, sql, process.env.JWT_SECRET);
+  await verifyWeeklySummary(app, sql, process.env.JWT_SECRET);
   const suffix = randomUUID();
   const password = 'Senha!12345';
   const users = [];
@@ -344,8 +357,49 @@ async function verifyApi(app, sql) {
   assert.equal(habitAfterUrges.rows[0].data_ultima_recaida, null,
     'recording a desire does not reset the abstinence counter');
 
-  bodyAt(await request(app).delete('/api/v2/account')
-    .set('Authorization', `Bearer ${a.mobileToken}`), 204, 'account deletion');
+  const urgeBaseline = bodyAt(await request(app).get('/api/v2/bootstrap')
+    .set('Authorization', `Bearer ${a.mobileToken}`), 200, 'urge baseline');
+  const urgeHabit = urgeBaseline.vicios.find(row => row.id === habitId);
+  const archiveUrgeHabit = bodyAt(await request(app).patch(`/api/v2/vicios/${habitId}`)
+    .set('Authorization', `Bearer ${a.mobileToken}`).send({ revision: urgeHabit.revision, ativo: false }), 200, 'archive urge habit');
+  const blockedKey = randomUUID();
+  const retryArchivedUrge = () => request(app).post('/api/v2/vontades')
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', blockedKey).send({ ...urgePayload, intensidade: 0 });
+  assert.equal(bodyAt(await retryArchivedUrge(), 404, 'archive blocks urge creation').codigo, 'VICIO_NAO_ENCONTRADO');
+  const archivedUrges = bodyAt(await request(app).get(urgeQuery)
+    .set('Authorization', `Bearer ${a.mobileToken}`), 200, 'archived urge history');
+  assert.equal(archivedUrges.cobertura.total, 2);
+  bodyAt(await request(app).patch(`/api/v2/vicios/${habitId}`)
+    .set('Authorization', `Bearer ${a.mobileToken}`).send({ revision: archiveUrgeHabit.vicio.revision, ativo: true }), 200, 'reactivate urge habit');
+  assert.equal(bodyAt(await retryArchivedUrge(), 404, 'replay keeps the definitive archived rejection').codigo, 'VICIO_NAO_ENCONTRADO');
+  assert.equal(bodyAt(await request(app).post('/api/v2/vontades')
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', randomUUID())
+    .send({ ...urgePayload, intensidade: 0 }), 201, 'explicit zero urge after reactivation').vontade.intensidade, 0);
+  assert.equal(bodyAt(await request(app).post('/api/v2/vontades')
+    .set('Authorization', `Bearer ${a.mobileToken}`).set('Idempotency-Key', randomUUID())
+    .send({ ...urgePayload, intensidade: 10 }), 201, 'maximum urge intensity').vontade.intensidade, 10);
+  const urgeAfter = bodyAt(await request(app).get('/api/v2/bootstrap')
+    .set('Authorization', `Bearer ${a.mobileToken}`), 200, 'urge unchanged progress');
+  assert.equal(urgeAfter.vicios.find(row => row.id === habitId).progresso.sequencia_atual_dias,
+    urgeHabit.progresso.sequencia_atual_dias, 'urge creation does not change the streak');
+  assert.equal(urgeAfter.recaidas.length, urgeBaseline.recaidas.length, 'urge creation does not create relapses');
+  console.log('Urges: tied pages, ownership, archive history/block/stable rejection, intensity 0/10 and unchanged streak passed.');
+
+  const webBeforeDelete = await request(app).post('/api/v2/web-auth/login')
+    .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+    .send({ email: a.email, senha: password });
+  bodyAt(webBeforeDelete, 200, 'web login before account deletion');
+  const deletedAccount = await request(app).delete('/api/v2/account')
+    .set('Authorization', `Bearer ${webBeforeDelete.body.access_token}`);
+  bodyAt(deletedAccount, 204, 'web account deletion');
+  assert.equal(deletedAccount.text, '');
+  assert.ok(deletedAccount.headers['set-cookie'][0].includes('Expires=Thu, 01 Jan 1970'));
+  assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${a.mobileToken}`)).status, 401);
+  assert.equal((await request(app).post('/api/v2/web-auth/refresh')
+    .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
+    .set('Cookie', webBeforeDelete.headers['set-cookie'][0].split(';')[0]).send({})).status, 401);
+  assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${b.mobileToken}`)).status, 200);
+
   const gone = await sql.query(`select
     (select count(*) from public.usuarios where id=$1) as users,
     (select count(*) from public.vicios where usuario_id=$1) as habits,
@@ -402,10 +456,12 @@ try {
   process.env.JWT_SECRET = 'revive-ci-only-app-jwt-secret';
   process.env.SMTP_HOST = '127.0.0.1';
   process.env.PASSWORD_RECOVERY_ENABLED = 'true';
+  process.env.WEB_AUTH_ENABLED = 'true';
   process.env.SMTP_PORT = '55434';
   process.env.RECOVERY_EMAIL_FROM = 'Revive CI <noreply@example.invalid>';
   const { app } = require('../../index.js');
-  await verifyApi(app, first);
+  await verifyApi(app, first, second);
+  await verifyGoalsRelapses(app, first, process.env.JWT_SECRET);
   await verifyPasswordRecovery(app, first, second);
   await verifyPublicRoles(proxy.url);
   console.log('Two SQL connections, API ownership, cascade and role denial passed.');

@@ -3,7 +3,7 @@
  * @description Servico de CRUD de vicios na API REVIVE.
  *
  * Fornece funcoes para listar, buscar, criar e excluir vicios do usuario
- * autenticado, alem de registrar recaidas associadas a um vicio especifico.
+ * autenticado. A exclusão confirmada usa a coordenação da conta.
  *
  * Todas as funcoes delegam a comunicacao HTTP para {@link module:services/api~apiCall}.
  *
@@ -61,11 +61,22 @@ export async function buscarVicio(id, token) {
  * const novoVicio = await criarVicio({ nome: 'Cigarro', gasto_diario: 15 }, token);
  * // POST /api/vicios
  */
-export async function criarVicio(payload, token) {
-  return apiCall('/vicios', {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  }, token);
+export async function criarVicio(payload, token, request = apiCall) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const result = await request('/vicios', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    }, token);
+    if (!result?.vicio?.id) {
+      throw Object.assign(new Error('O servidor não confirmou qual hábito foi salvo.'), { outcomeUnknown: true });
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**
@@ -84,26 +95,19 @@ export async function excluirVicio(id, token) {
   return apiCall(`/vicios/${id}`, { method: 'DELETE' }, token);
 }
 
-/**
- * Registra uma recaida para um vicio especifico.
- *
- * Permite ao usuario informar o motivo da recaida e decidir se o contador
- * de dias limpos deve ser reiniciado.
- *
- * @param {string|number} vicioId - Identificador unico do vicio.
- * @param {string} motivo - Texto descritivo do motivo da recaida.
- * @param {boolean} resetarContador - Se `true`, o contador de dias limpos e zerado.
- * @param {string} token - Token JWT de autenticacao.
- * @returns {Promise<Object>} Dados da recaida registrada, incluindo data e motivo.
- * @throws {Error} Se o vicio nao for encontrado (404) ou os dados forem invalidos.
- *
- * @example
- * await registrarRecaida(42, 'Estresse no trabalho', true, token);
- * // POST /api/vicios/42/recaida
- */
-export async function registrarRecaida(vicioId, motivo, resetarContador, token) {
-  return apiCall(`/vicios/${vicioId}/recaida`, {
-    method: 'POST',
-    body: JSON.stringify({ motivo, resetarContador })
-  }, token);
+export const deleteConfirmedHabit = (client, accountKey, id) => client.goals('deleteHabit', [id], accountKey);
+
+// O PATCH não entra na fila: a revisão e a recuperação pertencem à edição online.
+export async function patchHabit(id, payload, request = apiCall) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+        const result = await request(`/v2/vicios/${encodeURIComponent(id)}`, {
+            method: 'PATCH', body: JSON.stringify(payload), signal: controller.signal
+        });
+        if (result?.vicio?.id !== id || result.vicio.revision !== payload.revision + 1) {
+            throw Object.assign(new Error('A resposta não confirmou a alteração. Consulte o estado remoto.'), { outcomeUnknown: true });
+        }
+        return result.vicio;
+    } finally { clearTimeout(timeout); }
 }

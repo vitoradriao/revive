@@ -1,0 +1,38 @@
+[
+  {
+    "engine": "chromium",
+    "offlineReopen": true,
+    "durableId": true,
+    "failedLogoutPreserves": true,
+    "storageFailureKeepsDraft": true,
+    "explicitCancel": true,
+    "explicitDiscard": true,
+    "confirmed401Locks": true,
+    "singleRemoteEvent": true,
+    "accountIsolation": true
+  },
+  {
+    "engine": "firefox",
+    "offlineReopen": true,
+    "durableId": true,
+    "failedLogoutPreserves": true,
+    "storageFailureKeepsDraft": true,
+    "explicitCancel": true,
+    "explicitDiscard": true,
+    "confirmed401Locks": true,
+    "singleRemoteEvent": true,
+    "accountIsolation": true
+  },
+  {
+    "engine": "webkit",
+    "offlineReopen": true,
+    "durableId": true,
+    "failedLogoutPreserves": true,
+    "storageFailureKeepsDraft": true,
+    "explicitCancel": true,
+    "explicitDiscard": true,
+    "confirmed401Locks": true,
+    "singleRemoteEvent": true,
+    "accountIsolation": true
+  }
+]
