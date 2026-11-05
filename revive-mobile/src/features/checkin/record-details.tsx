@@ -2,12 +2,13 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import type { DailyRecord } from '@/domain/types';
 import { displayDate } from '@/domain/formats';
+import { describeMood } from '@/domain/moods';
 import { textStyles } from '@/ui/components';
 import { spacing } from '@/ui/theme';
 
 export function RecordDetails({ record }: { record: DailyRecord }) {
   return <View style={{ gap: spacing.xs }}>
-    <Text style={textStyles.body}>Check-in: {record.humor || 'Sem humor informado'}</Text>
+    <Text style={textStyles.body}>Check-in: {describeMood(record.humor)?.label || 'Sem humor informado'}</Text>
     <Text style={textStyles.muted}>{displayDate(record.data_registro)} · {record.pending ? 'Salvo no aparelho · aguardando sincronização' : 'Sincronizado'}</Text>
     {record.sync_error ? <Text accessibilityLiveRegion="polite" style={textStyles.body}>Correção pendente: {record.sync_error.replace(/^REVISAO_CONFLITO: /, '')}</Text> : null}
     {record.gatilhos ? <Text style={textStyles.body}>Gatilhos: {record.gatilhos}</Text> : null}

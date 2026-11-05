@@ -27,4 +27,10 @@ describe('mobile metric parity helpers', () => {
     } as BootstrapData;
     expect(moodDistribution(data)).toEqual([['Bem', 2], ['Ansioso', 1]]);
   });
+
+  it('merges spellings of the same mood, including the web vocabulary', () => {
+    const record = (id: string, humor?: string) => ({ id, vicio_id: 'v', data_registro: '2026-01-01', humor });
+    const data = { registros: [record('1', 'péssimo'), record('2', 'Pessimo'), record('3', 'bom'), record('4', ' ')] } as BootstrapData;
+    expect(moodDistribution(data)).toEqual([['Péssimo', 2], ['Bom', 1], ['Não informado', 1]]);
+  });
 });

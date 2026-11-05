@@ -1,4 +1,5 @@
 import type { Addiction, BootstrapData, Goal, ProgressCoverage } from './types';
+import { describeMood } from './moods';
 
 export const asNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -98,10 +99,14 @@ export const totalSavings = (addictions: Addiction[]) => addictions.reduce((sum,
 export const completedGoals = (goals: Goal[]) => goals.filter((goal) => Boolean(goal.concluida)).length;
 
 export const moodDistribution = (data: BootstrapData) => {
-  const result = new Map<string, number>();
+  // Group by accent/case-insensitive key so "Bom", "bom" and web/mobile
+  // spellings of the same mood are counted together.
+  const result = new Map<string, { label: string; count: number }>();
   for (const record of data.registros) {
-    const mood = record.humor?.trim() || 'Não informado';
-    result.set(mood, (result.get(mood) || 0) + 1);
+    const mood = describeMood(record.humor) ?? { key: '', label: 'Não informado' };
+    const entry = result.get(mood.key) ?? { label: mood.label, count: 0 };
+    entry.count += 1;
+    result.set(mood.key, entry);
   }
-  return [...result.entries()].sort((a, b) => b[1] - a[1]);
+  return [...result.values()].map(({ label, count }) => [label, count] as [string, number]).sort((a, b) => b[1] - a[1]);
 };
