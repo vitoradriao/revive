@@ -24,7 +24,7 @@ A tabela agrupa trabalho, não substitui o grafo de dependências da #10. As dep
 
 ## Ambiente e saída
 
-Recuperação de senha foi implementada/aceita no cenário Westmail/Android de 09/10; [rollout e evidências](password-recovery.md) separam isso da habilitação remota. A consulta documental atual não aplicou SQL nem comprovou configuração de Production.
+Recuperação de senha foi implementada/aceita no cenário Westmail/Android de 09/10; o [rollout de 09/10](recovery-rollout-2026-10-09.md) aplicou as migrations no banco de desenvolvimento, com backup e preservação dos dados, e habilitou o SMTP na API Vercel; outros ambientes exigem validação própria ([procedimento](password-recovery.md)).
 
 Cada PR deve atualizar a matriz com commit, schema, ambiente e cenário. Não limpar fila/histórico para atualizar nem afirmar homologação sem execução. A integração na main dispara o deploy Production configurado na Vercel; publicar exige decisão própria, além do encerramento técnico de uma issue.
 

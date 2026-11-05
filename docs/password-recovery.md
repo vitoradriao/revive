@@ -2,7 +2,7 @@
 
 Implementação da [issue #20](https://github.com/vitoradriao/revive/issues/20) no [PR #45](https://github.com/vitoradriao/revive/pull/45), com aceite externo e Android em 09/10/2026. O projeto mantém `public.usuarios`, bcrypt e JWT próprio; não usa Supabase Auth para redefinir essas contas.
 
-**Entrega externa validada com Westmail:** a solicitação no Moto G52 chegou a uma caixa Gmail externa, o código foi usado no aplicativo e a nova senha abriu a Jornada. O teste usou API/banco descartáveis. A implantação de produção ainda exige o rollout abaixo; nenhum SQL remoto foi aplicado e a recuperação permanece desabilitada por padrão.
+**Recuperação ativa na API publicada de desenvolvimento:** as migrations de recuperação e edição/arquivamento foram aplicadas após backup/restauração, com preservação dos dados anteriores. SMTP Westmail foi configurado como segredo no Vercel; um pedido pela API HTTPS publicada chegou ao Inbox do Gmail externo. O aceite anterior no Moto G52 usou API/banco descartáveis. [Rollout remoto e homologação atual](recovery-rollout-2026-10-09.md).
 
 O painel oferece também [recuperação pública, exclusão e saída coordenada](web-account-lifecycle.md). Após confirmação de reset, a API expira o cookie web pelo adaptador HttpOnly; o corpo continua sem sessão e o login deve ser explícito.
 
@@ -53,7 +53,7 @@ Senhas seguem a política existente de seis caracteres, maiúscula e caractere e
 2. Mantenha `PASSWORD_RECOVERY_ENABLED=false` e aplique a migration antes de habilitar a recuperação. Usuários existentes recebem `credential_version=0`, sem troca de ID, hash, histórico ou sessões. A API anterior pode continuar atendendo durante esta etapa. A API nova também suporta o esquema anterior enquanto a recuperação estiver desativada: somente a ausência SQL da coluna (`42703`) permite versão zero; a criação de sessão antiga exige também RPC ausente (`PGRST202`). Erros de rede, permissão ou cache não permitem esse caminho. Assim que a coluna existir, a verificação de versão e o RPC com lock são obrigatórios, mesmo com o recurso desativado.
 3. Implante a API nova em **todas** as instâncias e encerre/drene as antigas antes de habilitar a recuperação. APIs antigas não verificam a versão dos JWTs web e não têm o novo lock de criação de sessão.
 4. Comprove login legado, login novo e refresh. Configure o SMTP de homologação com remetente autorizado; habilite a recuperação nesse ambiente e valide entrega externa, código inválido/expirado, senha antiga recusada, sessões revogadas e login novo. Registre apenas resultados, sem mensagem/código/credenciais.
-5. Só habilite em produção após o aceite externo. A implantação de produção e a aplicação de SQL remoto não foram realizadas nesta entrega.
+5. Só habilite em produção após o aceite externo. Este procedimento foi executado no banco de desenvolvimento e no domínio estável Vercel em 09/10/2026; [registro do rollout](recovery-rollout-2026-10-09.md). Outros ambientes exigem validação própria.
 
 JWTs web sem `cv` continuam válidos somente enquanto a versão da conta for zero. Tokens novos incluem `cv`. Cada mudança de `senha_hash` incrementa a versão e revoga as sessões mobile, inclusive mudanças feitas por outro caminho no banco. A rota de compatibilidade também verifica a sessão de tokens mobile. A primeira redefinição invalida todos os JWTs web antigos da conta; contas que não redefiniram a senha preservam o acesso existente.
 
@@ -71,7 +71,7 @@ Manutenção pode remover solicitações consumidas/expiradas com mais de sete d
 - Limpeza: APK `.issue20` desinstalado, redirecionamento ADB removido, API local encerrada, containers/volumes descartáveis removidos e arquivos temporários com código/token apagados. Os aplicativos principais e configurações do telefone não foram alterados.
 - Naquela data, provedor externo, remetente autorizado e recebimento real ainda estavam pendentes; o aceite abaixo resolve essa pendência.
 
-## Aceite Westmail e Android — 09/10/2026
+## Aceite Westmail com API descartável — 09/10/2026
 
 - Westmail iniciado com as imagens W08 existentes; núcleo, web, worker e proxy ficaram saudáveis. Criada identidade exclusiva `app-revive-recovery`, com apenas autenticação/envio. SMTP público validou cadeia/hostname TLS e autenticação.
 - O primeiro envio chegou à caixa, mas o prazo de 2,5 segundos venceu durante o caminho de resolução/conexão da biblioteca. O código foi invalidado corretamente. A correção usa o resolvedor do sistema e socket cancelável: o reenvio real foi aceito em **169 ms**, sem ampliar timeouts nem reduzir TLS. Testes com socket real parado e DNS atrasado comprovam fechamento/cancelamento e ausência de conexão posterior ao timeout.
@@ -81,6 +81,6 @@ Manutenção pode remover solicitações consumidas/expiradas com mais de sete d
 - A consulta remota somente de estrutura confirmou a ausência de `credential_version`. A compatibilidade de deploy foi acrescentada sem alterar o banco remoto. A matriz real executa cadastro/login web e mobile, JWT legado, bootstrap, refresh e revogação antes da migration; depois aplica o SQL e comprova as garantias de recuperação. Regressões HTTP impedem o caminho legado após a migration e em falhas de permissão/cache ou com recuperação habilitada.
 - O primeiro CI da integração parou ao baixar Mailpit por timeout na autenticação do Docker Hub. O CI usa o [espelho oficial GHCR](https://mailpit.axllent.org/docs/install/docker/) da mesma versão 1.31.4; as imagens local e espelhada foram comparadas. Nenhum teste foi removido.
 - APK, API, banco/volumes, redirecionamento ADB e arquivos com códigos/tokens descartáveis foram removidos. Westmail permanece saudável; sua credencial exclusiva e configuração local do backend foram preservadas com acesso restrito. Nenhum código, senha, token ou contato integra este documento.
-- SQL remoto, habilitação em produção, áudio TalkBack destas telas e iOS não foram realizados. O gate #7 e o rollout operacional acima continuam aplicáveis.
+- Nesta etapa descartável, SQL remoto e habilitação na API hospedada ainda não tinham sido realizados. O [rollout subsequente](recovery-rollout-2026-10-09.md) concluiu essas operações no desenvolvimento. Áudio TalkBack destas telas, iOS e o gate #7 mantêm seus estados explícitos.
 
 Os requisitos de proteção seguem o [guia de recuperação de senha da OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html). A caixa de CI usa a [API do Mailpit](https://mailpit.axllent.org/docs/api-v1/) para ler a mensagem somente em memória, sem imprimir seu conteúdo.
