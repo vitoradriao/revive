@@ -186,7 +186,9 @@ async function verifyApi(app, sql, second) {
     .send({ refresh_token: c.refreshToken })));
   assert.deepEqual(rotation.map(result => result.status).sort(), [200, 401]);
   const activeFamily = await sql.query(`select count(*) from public.app_sessions
-    where usuario_id=$1 and revoked_at is null`, [c.id]);
+    where usuario_id=$1 and revoked_at is null
+      and family_id=(select family_id from public.app_sessions where id=$2)`,
+    [c.id, jwt.decode(c.mobileToken).sid]);
   assert.equal(Number(activeFamily.rows[0].count), 0,
     'concurrent reuse is detected and revokes the rotated family');
   bodyAt(await request(app).get('/api/v2/bootstrap')

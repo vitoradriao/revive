@@ -18,6 +18,12 @@ function fixture(recoveryEnabled = false) {
     return { state, call };
 }
 describe('web credentials rollout', () => {
+    it('rejects a legacy token older than fifteen minutes even with a seven-day expiry', async () => {
+        const app = express();
+        app.get('/', createCredentialAuth({ supabase: { from: () => { throw new Error('must reject before database'); } }, jwtSecret: 'synthetic-secret' }), (_q,r)=>r.sendStatus(200));
+        const token = jwt.sign({ id: 'user', iat: Math.floor(Date.now()/1000)-901 }, 'synthetic-secret', { expiresIn: '7d' });
+        expect((await request(app).get('/').set('Authorization', `Bearer ${token}`)).status).toBe(401);
+    });
     it('supports the old schema only with recovery disabled and stops fallback after migration', async () => {
         const test = fixture(); test.state.missingColumn = true;
         expect((await test.call({})).status).toBe(200);
