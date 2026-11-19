@@ -461,10 +461,15 @@ try {
   process.env.WEB_AUTH_ENABLED = 'true';
   process.env.SMTP_PORT = '55434';
   process.env.RECOVERY_EMAIL_FROM = 'Revive CI <noreply@example.invalid>';
-  const { app } = require('../../index.js');
-  await verifyApi(app, first, second);
-  await verifyGoalsRelapses(app, first, process.env.JWT_SECRET);
-  await verifyPasswordRecovery(app, first, second);
+  // Each scenario gets a fresh in-memory limiter, just as independent clients
+  // would. Keep the production thresholds intact while isolating test traffic.
+  const freshApp = () => {
+    delete require.cache[require.resolve('../../index.js')];
+    return require('../../index.js').app;
+  };
+  await verifyApi(freshApp(), first, second);
+  await verifyGoalsRelapses(freshApp(), first, process.env.JWT_SECRET);
+  await verifyPasswordRecovery(freshApp(), first, second);
   await verifyPublicRoles(proxy.url);
   console.log('Two SQL connections, API ownership, cascade and role denial passed.');
 } finally {
