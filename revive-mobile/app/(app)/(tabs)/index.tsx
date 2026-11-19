@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Link } from 'expo-router';
 import { Plus, RefreshCw } from 'lucide-react-native';
 import { useBootstrap } from '@/features/bootstrap/use-bootstrap';
@@ -28,6 +28,11 @@ export default function DashboardScreen() {
     <Screen {...pullToRefresh}>
       <AppHeader section="Sua jornada" />
       <OfflineNotice data={data} />
+      <Card>
+        <Text style={textStyles.body}>O REVIVE é um registro pessoal e não substitui atendimento profissional. Precisa conversar? CVV: 188, gratuito, 24 horas.</Text>
+        <Pressable accessibilityRole="link" accessibilityLabel="Ligar para o CVV, 188" onPress={() => { void Linking.openURL('tel:+55188?oai_link_source=model_response_hotline').catch(() => undefined); }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={[textStyles.body, { textDecorationLine: 'underline' }]}>Ligar para 188</Text></Pressable>
+        <Pressable accessibilityRole="link" accessibilityLabel="Abrir chat do CVV" onPress={() => { void Linking.openURL('https://www.cvv.org.br/chat/?oai_link_source=model_response_hotline').catch(() => undefined); }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={[textStyles.body, { textDecorationLine: 'underline' }]}>Conversar pelo chat</Text></Pressable>
+      </Card>
       <View style={editorialStyles.row}>
         <EditorialTitle eyebrow={`Olá, ${user?.nome?.split(' ')[0] || 'você'}`} title="Um dia de" emphasis="cada vez." />
         <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" accessibilityState={{ busy: isFetching }} onPress={() => void refetch()} style={styles.iconButton}><RefreshCw color={colors.text} size={22} /></Pressable>

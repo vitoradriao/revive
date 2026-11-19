@@ -1,0 +1,43 @@
+name: APK de avaliacao
+on:
+  push:
+    branches: ['feature/correcoes-professor']
+    paths: ['revive-mobile/**', '.github/workflows/banca-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: revive-mobile
+    env:
+      EXPO_PUBLIC_API_URL: https://revive-beryl.vercel.app/api
+      EXPO_PUBLIC_APP_ENV: preview
+      REVIVE_REVIEW_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: revive-mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - name: Gerar projeto e assinatura exclusiva de avaliacao
+        run: |
+          npx expo prebuild --platform android --no-install
+          keytool -genkeypair -keystore review.keystore -alias review -storepass review-only-password -keypass review-only-password -dname "CN=REVIVE Academic Review" -keyalg RSA -keysize 2048 -validity 365
+          node -e 'require("fs").writeFileSync("credentials.json",JSON.stringify({android:{keystore:{keystorePath:"review.keystore",keystorePassword:"review-only-password",keyAlias:"review",keyPassword:"review-only-password"}}}))'
+      - name: Compilar APK independente do Metro
+        run: cd android && chmod +x gradlew && ./gradlew :app:assembleRelease --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: revive-banca-apk
+          path: revive-mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

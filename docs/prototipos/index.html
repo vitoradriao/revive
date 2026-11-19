@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>REVIVE — protótipo de avaliação</title>
+<style>body{font:18px/1.5 system-ui;background:#f4f4f4;color:#222;margin:0}main{max-width:480px;margin:30px auto;background:white;padding:28px;border:2px solid #555}nav{display:flex;gap:10px;flex-wrap:wrap}button,a{font:inherit;padding:12px;cursor:pointer}button{background:#fff;border:2px solid #444}label{display:block;margin:18px 0}input{display:block;box-sizing:border-box;width:100%;padding:12px;font:inherit}aside{background:#eee;padding:16px;margin:24px 0}section[hidden]{display:none}h1{font-size:27px}:focus-visible{outline:3px solid #285bc0;outline-offset:3px}</style>
+<main><p>Protótipo de baixa fidelidade • 19/11/2026</p><h1>REVIVE</h1><p>Dados fictícios para avaliação. Nenhuma informação é enviada ou armazenada.</p>
+<nav aria-label="Telas"><button data-page="jornada">Jornada</button><button data-page="habito">Novo hábito</button><button data-page="fila">Sincronização</button></nav>
+<section id="jornada"><h2 tabindex="-1">Sua jornada</h2><p id="habit">Hábito de exemplo</p><p>Sequência: 5 dias • Economia estimada: R$ 25,00</p><button data-page="registro">Registrar acompanhamento</button><p><button data-page="fila">Ver pendências</button></p></section>
+<section id="habito" hidden><h2 tabindex="-1">Novo hábito</h2><form id="habit-form"><label>Nome do hábito<input name="nome" required maxlength="100"></label><label>Data inicial<input name="data" type="date" required></label><label>Economia diária opcional<input name="valor" type="number" min="0" step="0.01"></label><button>Salvar</button><button type="button" data-page="jornada">Cancelar</button></form></section>
+<section id="registro" hidden><h2 tabindex="-1">Acompanhamento</h2><label>Como está seu dia?<select id="humor"><option>Bem</option><option>Neutro</option><option>Difícil</option></select></label><button id="record">Salvar neste aparelho</button><p>Simulação de conexão indisponível.</p></section>
+<section id="fila" hidden><h2 tabindex="-1">Sincronização</h2><p id="status" role="status">Nenhuma pendência.</p><button id="retry">Simular retorno da conexão</button><button data-page="jornada">Voltar</button></section>
+<aside>O REVIVE não substitui atendimento profissional. Apoio emocional: CVV <a href="tel:+55188?oai_link_source=model_response_hotline">188</a> (24 horas, gratuito).</aside>
+</main><script>
+const show=id=>{document.querySelectorAll('section').forEach(s=>s.hidden=s.id!==id);document.querySelector('#'+id+' h2').focus()};
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>show(b.dataset.page));
+document.querySelector('#habit-form').onsubmit=e=>{e.preventDefault();document.querySelector('#habit').textContent=new FormData(e.target).get('nome');show('jornada')};
+let pending=false;document.querySelector('#record').onclick=()=>{pending=true;document.querySelector('#status').textContent='1 registro salvo neste aparelho. Aguardando confirmação do servidor.';show('fila')};
+document.querySelector('#retry').onclick=()=>{document.querySelector('#status').textContent=pending?'Registro confirmado pelo servidor (simulação). Nenhuma pendência.':'Nenhuma pendência.';pending=false};
+</script></html>

@@ -3,7 +3,7 @@ const vercelHandler = require('../../api/[...path]');
 
 describe('vercel api handler', () => {
     it('forwards API requests to the Express app', async () => {
-        const response = await request(vercelHandler).get('/api/health');
+        const response = await request(vercelHandler).get('/api/live');
 
         expect(response.statusCode).toBe(200);
         expect(response.body).toHaveProperty('status');
@@ -11,7 +11,7 @@ describe('vercel api handler', () => {
     });
 
     it('normalizes Vercel dynamic route params before forwarding', async () => {
-        const response = await request(vercelHandler).get('/api/[...path]?path=health');
+        const response = await request(vercelHandler).get('/api/[...path]?path=live');
 
         expect(response.statusCode).toBe(200);
         expect(response.body).toHaveProperty('status');

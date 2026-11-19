@@ -16,7 +16,7 @@ function createCredentialAuth({ supabase, jwtSecret, recoveryEnabled = process.e
         if (scheme !== 'Bearer' || !token) return res.status(401).json({ erro: 'Token nao fornecido' });
         let claims;
         try {
-            claims = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
+            claims = jwt.verify(token, jwtSecret, { algorithms: ['HS256'], maxAge: '15m' });
             if (typeof claims.id !== 'string' || (claims.cv !== undefined && !Number.isSafeInteger(claims.cv))) throw new Error();
         } catch { return res.status(401).json({ erro: 'Token invalido' }); }
         try {

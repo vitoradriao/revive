@@ -55,6 +55,7 @@ const { createMobileApi } = require('./mobile-api');
 const { createPasswordRecovery } = require('./password-recovery');
 const { createCredentialAuth } = require('./credential-auth');
 const { buildProgressSnapshot } = require('./progress-metrics');
+const { distributedLimit, healthCheck, deleteHabit } = require('./operational-safety');
 
 /** Instância principal do Express */
 const app = express();
@@ -241,6 +242,17 @@ const apiLimiter = rateLimit({
     legacyHeaders: false,
     message: { erro: 'Limite de requisicoes excedido. Tente novamente em 1 minuto.' }
 });
+
+// Production/serverless counters must be shared. Fail closed if the database is unavailable.
+if (isProduction || process.env.VERCEL === '1') {
+    const shared = (kind, seconds, max) => distributedLimit({ supabase, secret: process.env.JWT_SECRET, kind, seconds, max });
+    app.use('/api', (req, res, next) => ['/health', '/live'].includes(req.path) ? next() : shared('general', 60, 300)(req, res, next));
+    for (const transport of ['auth', 'web-auth']) {
+        for (const action of ['login', 'refresh', 'cadastro']) {
+            app.use(`/api/v2/${transport}/${action}`, shared(action, 900, action === 'cadastro' ? 100 : 30));
+        }
+    }
+}
 
 /** Aplica rate limiter mais restritivo nas rotas de autenticação */
 app.use('/api/auth/login', loginLimiter);
@@ -441,81 +453,7 @@ function sendCadastroDatabaseError(res, error) {
  * @throws {400} Email já cadastrado
  * @throws {500} Erro interno ao cadastrar usuário
  */
-app.post('/api/auth/cadastro', async (req, res) => {
-    try {
-        // Sanitiza entradas de texto para prevenir XSS
-        const nome = sanitize(req.body.nome);
-        const email = sanitize(req.body.email)?.toLowerCase();
-        const { senha } = req.body;
-
-        // --- Guard Clauses: validação de campos obrigatórios ---
-        if (!nome || !email || !senha) {
-            return res.status(400).json({ erro: 'Todos os campos sao obrigatorios' });
-        }
-
-        // --- Validação de política de senha ---
-        if (senha.length < 6) {
-            return res.status(400).json({ erro: 'Senha deve ter no minimo 6 caracteres' });
-        }
-
-        // Verifica presença de pelo menos uma letra maiúscula (regex: [A-Z])
-        if (!/[A-Z]/.test(senha)) {
-            return res.status(400).json({ erro: 'Senha deve conter pelo menos uma letra maiuscula' });
-        }
-
-        // Verifica presença de pelo menos um caractere especial
-        if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
-            return res.status(400).json({ erro: 'Senha deve conter pelo menos um caractere especial' });
-        }
-
-        // --- Verificação de unicidade do email ---
-        // Consulta o banco para verificar se já existe um usuário com este email
-        const { data: usuarioExistente, error: usuarioExistenteError } = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (usuarioExistenteError) {
-            return sendCadastroDatabaseError(res, usuarioExistenteError);
-        }
-
-        if (usuarioExistente) {
-            return res.status(400).json({ erro: 'Email ja cadastrado' });
-        }
-
-        // --- Geração do hash da senha ---
-        // bcrypt com salt rounds = 10 (custo computacional adequado para 2024)
-        // O salt é gerado automaticamente e embutido no hash resultante
-        const senhaHash = await bcrypt.hash(senha, 10);
-
-        // --- Inserção no banco de dados ---
-        const { data, error } = await supabase
-            .from('usuarios')
-            .insert([{ nome, email, senha_hash: senhaHash }])
-            .select()
-            .single();
-
-        if (error) {
-            return sendCadastroDatabaseError(res, error);
-        }
-
-        const token = jwt.sign(
-            { id: data.id, email: data.email, cv: Number(data.credential_version ?? 0) },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Retorna dados do usuário criado (sem a senha hash por segurança)
-        res.status(201).json({
-            mensagem: 'Usuario cadastrado com sucesso',
-            token,
-            usuario: { id: data.id, nome: data.nome, email: data.email }
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao cadastrar usuario', error);
-    }
-});
+app.post('/api/auth/cadastro', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
 /**
  * Login de usuário existente.
@@ -539,52 +477,7 @@ app.post('/api/auth/cadastro', async (req, res) => {
  * @throws {401} Credenciais inválidas (email não encontrado ou senha incorreta)
  * @throws {500} Erro interno ao fazer login
  */
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const email = sanitize(req.body.email)?.toLowerCase();
-        const { senha } = req.body;
-
-        if (!email || !senha) {
-            return res.status(400).json({ erro: 'Email e senha sao obrigatorios' });
-        }
-
-        // Busca o usuário pelo email (select('*') inclui senha_hash para comparação)
-        const { data: usuario, error } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-        // Mensagem genérica para prevenir enumeração de usuários
-        if (error || !usuario) {
-            return res.status(401).json({ erro: 'Credenciais invalidas' });
-        }
-
-        // bcrypt.compare() compara a senha em texto plano com o hash armazenado
-        // internamente extrai o salt do hash e recalcula para comparação segura
-        const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
-
-        if (!senhaValida) {
-            return res.status(401).json({ erro: 'Credenciais invalidas' });
-        }
-
-        // Gera o JWT com payload contendo id e email do usuário
-        // Expiração: 7 dias (formato aceito pela lib jsonwebtoken)
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, cv: Number(usuario.credential_version ?? 0) },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        res.json({
-            mensagem: 'Login realizado com sucesso',
-            token,
-            usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email }
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao fazer login', error);
-    }
-});
+app.post('/api/auth/login', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
 /* =========================================================================
  * ROTAS DE PERFIL DO USUÁRIO (/api/me)
@@ -838,62 +731,7 @@ app.get('/api/vicios/:id', authMiddleware, async (req, res) => {
  * @throws {404} Vício não encontrado
  * @throws {500} Erro interno ao registrar recaída
  */
-app.post('/api/vicios/:id/recaida', authMiddleware, async (req, res) => {
-    try {
-        const motivo = sanitize(req.body.motivo);
-        const { resetarContador } = req.body;
-
-        // Verifica existência e propriedade do vício
-        const { data: vicio, error: vicioError } = await supabase
-            .from('vicios')
-            .select('*')
-            .eq('id', req.params.id)
-            .eq('usuario_id', req.usuarioId)
-            .single();
-
-        if (vicioError || !vicio) {
-            return res.status(404).json({ erro: 'Vicio nao encontrado' });
-        }
-
-        // Calcula dias de abstinência perdidos:
-        // Usa data_ultima_recaida se existir, senão usa data_inicio
-        const dataBase = vicio.data_ultima_recaida || vicio.data_inicio;
-        const diasAbstinencia = Math.floor((new Date() - new Date(dataBase)) / MS_PER_DAY);
-
-        // Insere o registro de recaída no histórico
-        const { data: recaidaRegistrada, error: recaidaError } = await supabase.from('historico_recaidas').insert([{
-            vicio_id: req.params.id,
-            data_recaida: new Date().toISOString(),
-            motivo,
-            dias_abstinencia_perdidos: diasAbstinencia
-        }]).select().single();
-
-        if (recaidaError) throw recaidaError;
-
-        // Se o usuário optou por resetar o contador, atualiza a data de referência
-        let vicioAtualizado = vicio;
-        if (resetarContador) {
-            const { data: updated, error: updateError } = await supabase
-                .from('vicios')
-                .update({ data_ultima_recaida: new Date().toISOString() })
-                .eq('id', req.params.id)
-                .select()
-                .single();
-
-            if (updateError) throw updateError;
-            vicioAtualizado = updated;
-        }
-
-        res.json({
-            mensagem: 'Recaida registrada.',
-            dias_abstinencia_anteriores: diasAbstinencia,
-            recaida: recaidaRegistrada,
-            vicio: vicioAtualizado
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao registrar recaida', error);
-    }
-});
+app.post('/api/vicios/:id/recaida', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
 /**
  * Exclusão definitiva de um vício e todos os registros dependentes.
@@ -915,48 +753,7 @@ app.post('/api/vicios/:id/recaida', authMiddleware, async (req, res) => {
  * @throws {404} Vício não encontrado ou não pertence ao usuário
  * @throws {500} Erro interno ao excluir vício
  */
-app.delete('/api/vicios/:id', authMiddleware, async (req, res) => {
-    try {
-        const vicioId = req.params.id;
-
-        // Verifica existência e propriedade do vício antes da exclusão
-        const { data: vicio, error: vicioError } = await supabase
-            .from('vicios')
-            .select('id')
-            .eq('id', vicioId)
-            .eq('usuario_id', req.usuarioId)
-            .single();
-
-        if (vicioError || !vicio) {
-            return res.status(404).json({ erro: 'Vicio nao encontrado' });
-        }
-
-        // Cascade Delete manual: remove registros das tabelas dependentes
-        // Itera sobre cada tabela filha e exclui os registros vinculados ao vício
-        const dependentTables = ['registros_diarios', 'historico_recaidas', 'metas'];
-        for (const table of dependentTables) {
-            const { error } = await supabase
-                .from(table)
-                .delete()
-                .eq('vicio_id', vicioId);
-            if (error) throw error;
-        }
-
-        // Remove o vício em si (registro pai)
-        // Filtro duplo (id + usuario_id) como camada adicional de segurança
-        const { error: deleteError } = await supabase
-            .from('vicios')
-            .delete()
-            .eq('id', vicioId)
-            .eq('usuario_id', req.usuarioId);
-
-        if (deleteError) throw deleteError;
-
-        res.json({ mensagem: 'Vicio excluido definitivamente com sucesso' });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao excluir vicio', error);
-    }
-});
+app.delete('/api/vicios/:id', authMiddleware, deleteHabit(supabase));
 
 /**
  * Lista o histórico completo de recaídas do usuário autenticado.
@@ -1476,9 +1273,8 @@ function calculateAddictionStats(addiction) {
  * @route GET /api/health
  * @returns {Object} 200 - { status: string, timestamp: string }
  */
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'API REVIVE esta funcionando!', timestamp: new Date().toISOString() });
-});
+app.get('/api/health', healthCheck(supabase));
+app.get('/api/live', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 /* =========================================================================
  * FRONTEND EM PRODUCAO

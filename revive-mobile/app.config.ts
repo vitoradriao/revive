@@ -2,13 +2,14 @@ import type { ExpoConfig } from 'expo/config';
 
 const appEnvironment = process.env.EXPO_PUBLIC_APP_ENV || 'development';
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || '';
+const reviewBuild = process.env.REVIVE_REVIEW_BUILD === 'true';
 
 if (appEnvironment === 'production' && !apiUrl.startsWith('https://')) {
   throw new Error('EXPO_PUBLIC_API_URL deve usar HTTPS no build de produção.');
 }
 
 const config: ExpoConfig = {
-  name: 'Revive',
+  name: reviewBuild ? 'Revive Banca' : 'Revive',
   slug: 'revive-mobile',
   owner: 'reviveapp',
   version: '0.1.1',
@@ -22,7 +23,7 @@ const config: ExpoConfig = {
   },
   android: {
     versionCode: 2,
-    package: 'com.reviveapp.revive',
+    package: reviewBuild ? 'com.reviveapp.revive.banca' : 'com.reviveapp.revive',
     adaptiveIcon: { backgroundColor: '#F8F3E9' },
     predictiveBackGestureEnabled: true,
   },

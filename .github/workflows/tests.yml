@@ -63,6 +63,14 @@ jobs:
         run: npm ci
       - name: Validar tipos, lint e testes
         run: npm run validate
+      - name: Auditar dependências e medir cobertura
+        run: |
+          npm audit --audit-level=moderate
+          npm run test:coverage -- --coverageReporters=json-summary --coverageReporters=text-summary
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-coverage
+          path: revive-mobile/coverage/coverage-summary.json
 
   postgres:
     name: PostgreSQL 17 e API real

@@ -55,6 +55,7 @@ docker compose -f "$compose_file" exec -T "$postgres_service" \
   psql -X -q -v ON_ERROR_STOP=1 -U postgres -d revive_fixture -c "notify pgrst, 'reload schema';"
 psql_file revive_fixture supabase/verification/assert_base_schema.sql
 psql_file revive_fixture supabase/verification/assert_full_schema.sql
+psql_file revive_fixture supabase/verification/assert_retention_and_deletion.sql
 psql_file revive_fixture supabase/verification/assert_personal_reason.sql
 psql_file revive_fixture supabase/verification/assert_journey_preferences.sql
 psql_file revive_fixture supabase/verification/assert_journey_preferences_behavior.sql
@@ -70,6 +71,7 @@ for file in supabase/migrations/*.sql; do
 done
 psql_file revive_legacy_fixture supabase/verification/assert_base_schema.sql
 psql_file revive_legacy_fixture supabase/verification/assert_full_schema.sql
+psql_file revive_legacy_fixture supabase/verification/assert_retention_and_deletion.sql
 psql_file revive_legacy_fixture supabase/verification/assert_synthetic_upgrade.sql
 psql_file revive_legacy_fixture supabase/verification/assert_personal_reason.sql
 psql_file revive_legacy_fixture supabase/verification/assert_journey_preferences.sql
