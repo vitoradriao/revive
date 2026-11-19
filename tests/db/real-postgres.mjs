@@ -89,10 +89,10 @@ async function verifyApi(app, sql, second) {
   const users = [];
   for (const label of ['a', 'b', 'c']) {
     const email = `ci-${label}-${suffix}@example.invalid`;
-    const registered = await request(app).post('/api/auth/cadastro')
+    const registered = await request(app).post('/api/v2/auth/cadastro')
       .send({ nome: `Synthetic ${label}`, email, senha: password });
     const body = bodyAt(registered, 201, `register ${label}`);
-    users.push({ id: body.usuario.id, email, legacyToken: body.token });
+    users.push({ id: body.usuario.id, email, legacyToken: body.access_token });
   }
   const [a, b, c] = users;
   for (const user of users) {
@@ -231,7 +231,7 @@ async function verifyApi(app, sql, second) {
   bodyAt(contentConflict, 409, 'idempotency content conflict');
   assert.equal(contentConflict.body.codigo, 'IDEMPOTENCY_CONFLITO');
   const receipt = await sql.query('select expires_at::text from public.api_idempotency where usuario_id=$1 and idempotency_key=$2', [a.id, recordKey]);
-  assert.equal(receipt.rows[0].expires_at.startsWith('infinity'), true, 'receipt is not allowed to expire while queued events may replay');
+  assert.equal(receipt.rows[0].expires_at.startsWith('infinity'), false, 'receipt payload has finite retention; the deduplication key remains');
 
   await sql.query(`create function public.test_fail_mobile_record_insert() returns trigger language plpgsql as $$
     begin
