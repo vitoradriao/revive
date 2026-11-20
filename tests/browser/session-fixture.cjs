@@ -13,7 +13,12 @@ let networkUnavailable = false;
 app.post('/__test/network', (req, res) => { networkUnavailable = req.body.offline === true; res.sendStatus(204); });
 app.use((req, res, next) => {
     // Keep server state while making the origin unreachable, including public navigation.
-    if (networkUnavailable && !req.path.startsWith('/__test/')) { res.destroy(); return; }
+    if (networkUnavailable && !req.path.startsWith('/__test/')) {
+        // An explicit unavailable response lets the shell worker fall back
+        // without waiting for browser-specific navigation retries.
+        if (req.get('Sec-Fetch-Mode') === 'navigate') { res.sendStatus(503); return; }
+        res.destroy(); return;
+    }
     next();
 });
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });

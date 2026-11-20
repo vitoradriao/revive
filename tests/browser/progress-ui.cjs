@@ -63,7 +63,7 @@ const login = async (page, email) => {
                 }
                 return route.fulfill({ response, json: data });
             });
-            await page.goto(base);
+            await page.goto(base, { waitUntil: 'domcontentloaded' });
             await login(page, 'a@example.invalid');
             await page.getByText('Maior sequência atual entre hábitos ativos', { exact: true }).waitFor();
             await page.getByText('2 dias', { exact: true }).first().waitFor();
@@ -71,7 +71,7 @@ const login = async (page, email) => {
             const output = process.env.REVIVE_BROWSER_ARTIFACTS;
             if (output) fs.mkdirSync(output, { recursive: true });
             for (const [route, name] of [['/', 'dashboard'], ['/analytics', 'analytics'], ['/conquistas', 'conquistas'], ['/relatorios', 'relatorios'], ['/perfil', 'perfil']]) {
-                await page.goto(base + route);
+                await page.goto(base + route, { waitUntil: 'domcontentloaded' });
                 await page.getByRole('status').filter({ hasText: 'Cópia parcial' }).waitFor();
                 if (name === 'conquistas') await page.getByText('Conquista permanente', { exact: true }).first().waitFor();
                 else {
