@@ -183,6 +183,7 @@ const verifyStorageIsolation = async context => {
             await form.getByRole('button', { name: 'Registrar outra vontade', exact: true }).click();
             await form.getByLabel('Intensidade (0 a 10)').fill('10');
             await form.getByLabel('Nota (opcional)').fill('Rascunho sintético preservado');
+            await until(async () => (await readStore(page, 'meta')).some(row => row.key === 'urgeDraft:' + habitId && row.value.note === 'Rascunho sintético preservado'));
             await page.getByRole('button', { name: 'Arquivar hábito', exact: true }).click();
             await page.getByRole('button', { name: 'Confirmar arquivamento', exact: true }).click();
             await form.getByText(/Hábito arquivado. Seu rascunho/).waitFor();
@@ -220,6 +221,7 @@ const verifyStorageIsolation = async context => {
             await page.getByText(/Cobertura parcial:/).waitFor();
             await network(false);
             await page.getByRole('button', { name: 'Restaurar sessão', exact: true }).click();
+            await page.getByText('Modo local: os dados podem estar incompletos.', { exact: true }).waitFor({ state: 'hidden' });
             await page.evaluate(({ accountId, rejectedDraft, refusedPayload }) => new Promise((resolve, reject) => {
                 const open = indexedDB.open('revive-account-' + accountId);
                 open.onsuccess = () => {

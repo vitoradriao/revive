@@ -106,8 +106,7 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       const stats = await (await fetch(base + '/__test/status')).json();
       assert.equal(stats.events.registros, 1); assert.equal(stats.counts.writes, 1);
-      await page.getByRole('button', { name: 'Jornada', exact: true }).first().click();
-      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+      await page.goto(base + '/vicios/' + habit);
       const diaryForm = page.getByRole('region', { name: 'Novo registro diário', exact: true });
       await fetch(base + '/__test/block-mutations', { method: 'POST' });
       await diaryForm.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
