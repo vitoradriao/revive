@@ -43,11 +43,11 @@ try {
   process.env.JWT_SECRET = appSecret;
   process.env.PASSWORD_RECOVERY_ENABLED = 'false';
   const { app } = require('../../index.js');
-  const registered = expectStatus(await request(app).post('/api/auth/cadastro').send({ nome: 'Synthetic rollout', email, senha: password }), 201);
-  assert.equal(jwt.verify(registered.token, appSecret).cv, 0);
-  const web = expectStatus(await request(app).post('/api/auth/login').send({ email, senha: password }), 200);
-  assert.equal(jwt.verify(web.token, appSecret).cv, 0);
-  for (const token of [registered.token, web.token, jwt.sign({ id: registered.usuario.id }, appSecret, { expiresIn: '5m' })]) {
+  const registered = expectStatus(await request(app).post('/api/v2/auth/cadastro').send({ nome: 'Synthetic rollout', email, senha: password }), 201);
+  assert.equal(jwt.verify(registered.access_token, appSecret).cv, 0);
+  const web = expectStatus(await request(app).post('/api/v2/auth/login').send({ email, senha: password }), 200);
+  assert.equal(jwt.verify(web.access_token, appSecret).cv, 0);
+  for (const token of [registered.access_token, web.access_token, jwt.sign({ id: registered.usuario.id }, appSecret, { expiresIn: '5m' })]) {
     expectStatus(await request(app).get('/api/me').set('Authorization', `Bearer ${token}`), 200);
   }
   const mobile = expectStatus(await request(app).post('/api/v2/auth/login').send({ email, senha: password }), 200);
@@ -68,7 +68,7 @@ try {
   const { createCredentialAuth } = require('../../credential-auth');
   const protectedApp = express();
   protectedApp.get('/', createCredentialAuth({ supabase: client, jwtSecret: appSecret, recoveryEnabled: true }), (_, res) => res.sendStatus(200));
-  expectStatus(await request(protectedApp).get('/').set('Authorization', `Bearer ${web.token}`), 503);
+  expectStatus(await request(protectedApp).get('/').set('Authorization', `Bearer ${web.access_token}`), 503);
   console.log('Pre-recovery PostgreSQL: web/mobile login, refresh, revocation and disabled recovery passed.');
 } finally {
   await sql.query('delete from public.usuarios where email=any($1::text[])', [[email, mobileEmail]]).catch(() => {});

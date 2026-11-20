@@ -45,7 +45,6 @@ const express = require('express');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -55,6 +54,7 @@ const { createMobileApi } = require('./mobile-api');
 const { createPasswordRecovery } = require('./password-recovery');
 const { createCredentialAuth } = require('./credential-auth');
 const { buildProgressSnapshot } = require('./progress-metrics');
+const { distributedLimit, healthCheck, deleteHabit } = require('./operational-safety');
 
 /** Instância principal do Express */
 const app = express();
@@ -207,7 +207,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: t
 
 /**
  * Rate limiter para rotas de autenticação (/api/auth/*).
- * Limite: 15 requisições por IP a cada 15 minutos.
+ * Limite: 30 requisições por IP a cada 15 minutos.
  * Protege contra ataques de força bruta em login e cadastro.
  * @type {import('express-rate-limit').RateLimitRequestHandler}
  */
@@ -230,7 +230,7 @@ const cadastroLimiter = rateLimit({
 
 /**
  * Rate limiter geral para todas as rotas da API (/api/*).
- * Limite: 100 requisições por IP a cada 1 minuto.
+ * Limite: 300 requisições por IP a cada 1 minuto.
  * Previne abuso e sobrecarga do servidor.
  * @type {import('express-rate-limit').RateLimitRequestHandler}
  */
@@ -241,6 +241,21 @@ const apiLimiter = rateLimit({
     legacyHeaders: false,
     message: { erro: 'Limite de requisicoes excedido. Tente novamente em 1 minuto.' }
 });
+
+// Sondas de monitoramento devem continuar acessíveis quando o limite estiver esgotado.
+app.get('/api/health', healthCheck(supabase));
+app.get('/api/live', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Production/serverless counters must be shared. Fail closed if the database is unavailable.
+if (isProduction || process.env.VERCEL === '1') {
+    const shared = (kind, seconds, max) => distributedLimit({ supabase, secret: process.env.JWT_SECRET, kind, seconds, max });
+    app.use('/api', shared('general', 60, 300));
+    for (const transport of ['auth', 'web-auth']) {
+        for (const action of ['login', 'refresh', 'cadastro']) {
+            app.use(`/api/v2/${transport}/${action}`, shared(action, 900, action === 'cadastro' ? 100 : 30));
+        }
+    }
+}
 
 /** Aplica rate limiter mais restritivo nas rotas de autenticação */
 app.use('/api/auth/login', loginLimiter);
@@ -361,15 +376,6 @@ function sendInternalError(res, userMessage, error) {
     return res.status(500).json(payload);
 }
 
-function isSupabaseUniqueViolation(error) {
-    return error?.code === '23505' || /duplicate key/i.test(error?.message || '');
-}
-
-function isSupabasePermissionError(error) {
-    return error?.code === '42501'
-        || /row-level security|permission denied|rls/i.test(error?.message || '');
-}
-
 function isMissingGoalBaselineColumnError(error) {
     const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
     return error?.code === 'PGRST204'
@@ -388,203 +394,10 @@ function parseOptionalNumber(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function sendCadastroDatabaseError(res, error) {
-    logInternalError('Erro ao cadastrar usuario', error);
+// Os contratos v1 antigos informam a necessidade de atualizar o cliente.
+app.post('/api/auth/cadastro', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
-    if (isSupabaseUniqueViolation(error)) {
-        return res.status(400).json({ erro: 'Email ja cadastrado' });
-    }
-
-    if (isSupabasePermissionError(error)) {
-        return res.status(500).json({
-            erro: 'Banco sem permissao para cadastrar usuario. Verifique SUPABASE_SERVICE_ROLE_KEY no Render.',
-            codigo: 'SUPABASE_PERMISSION_DENIED'
-        });
-    }
-
-    const payload = { erro: 'Erro ao cadastrar usuario' };
-    if (!isProduction) {
-        payload.detalhes = error?.message;
-    }
-
-    return res.status(500).json(payload);
-}
-
-/* =========================================================================
- * ROTAS DE AUTENTICAÇÃO (/api/auth)
- *
- * Responsáveis pelo cadastro e login de usuários.
- * Utilizam bcrypt para hashing de senhas e JWT para tokens de sessão.
- * ========================================================================= */
-
-/**
- * Cadastro de novo usuário.
- * Recebe nome, email e senha, valida os campos, verifica unicidade do email,
- * gera hash bcrypt (salt rounds = 10) e insere o registro na tabela 'usuarios' do Supabase.
- *
- * Regras de validação de senha:
- * - Mínimo de 6 caracteres
- * - Pelo menos uma letra maiúscula
- * - Pelo menos um caractere especial
- *
- * Complexidade: O(1) para validações + O(n) para bcrypt hash (onde n = salt rounds).
- *
- * @route POST /api/auth/cadastro
- * @param {string} req.body.nome - Nome completo do usuário
- * @param {string} req.body.email - Email do usuário (deve ser único)
- * @param {string} req.body.senha - Senha em texto plano (mín. 6 chars, 1 maiúscula, 1 especial)
- * @returns {Object} 201 - { mensagem, usuario: { id, nome, email } }
- * @throws {400} Todos os campos são obrigatórios
- * @throws {400} Senha deve ter no mínimo 6 caracteres
- * @throws {400} Senha deve conter pelo menos uma letra maiúscula
- * @throws {400} Senha deve conter pelo menos um caractere especial
- * @throws {400} Email já cadastrado
- * @throws {500} Erro interno ao cadastrar usuário
- */
-app.post('/api/auth/cadastro', async (req, res) => {
-    try {
-        // Sanitiza entradas de texto para prevenir XSS
-        const nome = sanitize(req.body.nome);
-        const email = sanitize(req.body.email)?.toLowerCase();
-        const { senha } = req.body;
-
-        // --- Guard Clauses: validação de campos obrigatórios ---
-        if (!nome || !email || !senha) {
-            return res.status(400).json({ erro: 'Todos os campos sao obrigatorios' });
-        }
-
-        // --- Validação de política de senha ---
-        if (senha.length < 6) {
-            return res.status(400).json({ erro: 'Senha deve ter no minimo 6 caracteres' });
-        }
-
-        // Verifica presença de pelo menos uma letra maiúscula (regex: [A-Z])
-        if (!/[A-Z]/.test(senha)) {
-            return res.status(400).json({ erro: 'Senha deve conter pelo menos uma letra maiuscula' });
-        }
-
-        // Verifica presença de pelo menos um caractere especial
-        if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
-            return res.status(400).json({ erro: 'Senha deve conter pelo menos um caractere especial' });
-        }
-
-        // --- Verificação de unicidade do email ---
-        // Consulta o banco para verificar se já existe um usuário com este email
-        const { data: usuarioExistente, error: usuarioExistenteError } = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (usuarioExistenteError) {
-            return sendCadastroDatabaseError(res, usuarioExistenteError);
-        }
-
-        if (usuarioExistente) {
-            return res.status(400).json({ erro: 'Email ja cadastrado' });
-        }
-
-        // --- Geração do hash da senha ---
-        // bcrypt com salt rounds = 10 (custo computacional adequado para 2024)
-        // O salt é gerado automaticamente e embutido no hash resultante
-        const senhaHash = await bcrypt.hash(senha, 10);
-
-        // --- Inserção no banco de dados ---
-        const { data, error } = await supabase
-            .from('usuarios')
-            .insert([{ nome, email, senha_hash: senhaHash }])
-            .select()
-            .single();
-
-        if (error) {
-            return sendCadastroDatabaseError(res, error);
-        }
-
-        const token = jwt.sign(
-            { id: data.id, email: data.email, cv: Number(data.credential_version ?? 0) },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Retorna dados do usuário criado (sem a senha hash por segurança)
-        res.status(201).json({
-            mensagem: 'Usuario cadastrado com sucesso',
-            token,
-            usuario: { id: data.id, nome: data.nome, email: data.email }
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao cadastrar usuario', error);
-    }
-});
-
-/**
- * Login de usuário existente.
- * Verifica credenciais (email + senha) e retorna um token JWT válido por 7 dias.
- *
- * Fluxo de segurança:
- * 1. Busca usuário pelo email no Supabase
- * 2. Compara senha fornecida com hash armazenado via bcrypt.compare()
- * 3. Gera token JWT com payload { id, email } e expiração de 7 dias
- *
- * Nota de segurança: a mensagem "Credenciais inválidas" é genérica (não revela
- * se o email existe ou não) para evitar enumeração de usuários (User Enumeration).
- *
- * Complexidade: O(n) para bcrypt.compare (onde n = salt rounds).
- *
- * @route POST /api/auth/login
- * @param {string} req.body.email - Email do usuário cadastrado
- * @param {string} req.body.senha - Senha em texto plano
- * @returns {Object} 200 - { mensagem, token, usuario: { id, nome, email } }
- * @throws {400} Email e senha são obrigatórios
- * @throws {401} Credenciais inválidas (email não encontrado ou senha incorreta)
- * @throws {500} Erro interno ao fazer login
- */
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const email = sanitize(req.body.email)?.toLowerCase();
-        const { senha } = req.body;
-
-        if (!email || !senha) {
-            return res.status(400).json({ erro: 'Email e senha sao obrigatorios' });
-        }
-
-        // Busca o usuário pelo email (select('*') inclui senha_hash para comparação)
-        const { data: usuario, error } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-        // Mensagem genérica para prevenir enumeração de usuários
-        if (error || !usuario) {
-            return res.status(401).json({ erro: 'Credenciais invalidas' });
-        }
-
-        // bcrypt.compare() compara a senha em texto plano com o hash armazenado
-        // internamente extrai o salt do hash e recalcula para comparação segura
-        const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
-
-        if (!senhaValida) {
-            return res.status(401).json({ erro: 'Credenciais invalidas' });
-        }
-
-        // Gera o JWT com payload contendo id e email do usuário
-        // Expiração: 7 dias (formato aceito pela lib jsonwebtoken)
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, cv: Number(usuario.credential_version ?? 0) },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        res.json({
-            mensagem: 'Login realizado com sucesso',
-            token,
-            usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email }
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao fazer login', error);
-    }
-});
+app.post('/api/auth/login', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
 /* =========================================================================
  * ROTAS DE PERFIL DO USUÁRIO (/api/me)
@@ -819,144 +632,10 @@ app.get('/api/vicios/:id', authMiddleware, async (req, res) => {
  * Recaídas podem opcionalmente resetar o contador de abstinência.
  * ========================================================================= */
 
-/**
- * Registra uma recaída para um vício específico.
- * Calcula os dias de abstinência perdidos e opcionalmente reseta o contador.
- *
- * Fluxo:
- * 1. Verifica se o vício existe e pertence ao usuário
- * 2. Calcula dias de abstinência desde a última recaída (ou data de início)
- * 3. Insere registro na tabela 'historico_recaidas'
- * 4. Se resetarContador = true, atualiza data_ultima_recaida no vício
- *
- * @route POST /api/vicios/:id/recaida
- * @security bearerAuth
- * @param {string} req.params.id - UUID do vício
- * @param {string} [req.body.motivo] - Motivo ou gatilho da recaída (opcional)
- * @param {boolean} [req.body.resetarContador] - Se true, reseta o contador de abstinência
- * @returns {Object} 200 - { mensagem, dias_abstinencia_anteriores, recaida, vicio }
- * @throws {404} Vício não encontrado
- * @throws {500} Erro interno ao registrar recaída
- */
-app.post('/api/vicios/:id/recaida', authMiddleware, async (req, res) => {
-    try {
-        const motivo = sanitize(req.body.motivo);
-        const { resetarContador } = req.body;
+app.post('/api/vicios/:id/recaida', (_req, res) => res.status(410).json({ codigo: 'ROTA_DESCONTINUADA', erro: 'Atualize o aplicativo para utilizar os contratos /api/v2.' }));
 
-        // Verifica existência e propriedade do vício
-        const { data: vicio, error: vicioError } = await supabase
-            .from('vicios')
-            .select('*')
-            .eq('id', req.params.id)
-            .eq('usuario_id', req.usuarioId)
-            .single();
-
-        if (vicioError || !vicio) {
-            return res.status(404).json({ erro: 'Vicio nao encontrado' });
-        }
-
-        // Calcula dias de abstinência perdidos:
-        // Usa data_ultima_recaida se existir, senão usa data_inicio
-        const dataBase = vicio.data_ultima_recaida || vicio.data_inicio;
-        const diasAbstinencia = Math.floor((new Date() - new Date(dataBase)) / MS_PER_DAY);
-
-        // Insere o registro de recaída no histórico
-        const { data: recaidaRegistrada, error: recaidaError } = await supabase.from('historico_recaidas').insert([{
-            vicio_id: req.params.id,
-            data_recaida: new Date().toISOString(),
-            motivo,
-            dias_abstinencia_perdidos: diasAbstinencia
-        }]).select().single();
-
-        if (recaidaError) throw recaidaError;
-
-        // Se o usuário optou por resetar o contador, atualiza a data de referência
-        let vicioAtualizado = vicio;
-        if (resetarContador) {
-            const { data: updated, error: updateError } = await supabase
-                .from('vicios')
-                .update({ data_ultima_recaida: new Date().toISOString() })
-                .eq('id', req.params.id)
-                .select()
-                .single();
-
-            if (updateError) throw updateError;
-            vicioAtualizado = updated;
-        }
-
-        res.json({
-            mensagem: 'Recaida registrada.',
-            dias_abstinencia_anteriores: diasAbstinencia,
-            recaida: recaidaRegistrada,
-            vicio: vicioAtualizado
-        });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao registrar recaida', error);
-    }
-});
-
-/**
- * Exclusão definitiva de um vício e todos os registros dependentes.
- * Implementa o padrão Cascade Delete manualmente, removendo registros filhos
- * das tabelas dependentes antes de excluir o vício pai.
- *
- * Ordem de exclusão (necessária para manter integridade referencial):
- * 1. registros_diarios (registros diários do vício)
- * 2. historico_recaidas (histórico de recaídas)
- * 3. metas (metas associadas ao vício)
- * 4. vicios (o próprio vício)
- *
- * Complexidade: O(k) onde k é a quantidade de tabelas dependentes (constante = 3).
- *
- * @route DELETE /api/vicios/:id
- * @security bearerAuth
- * @param {string} req.params.id - UUID do vício a ser excluído
- * @returns {Object} 200 - { mensagem: "Vicio excluido definitivamente com sucesso" }
- * @throws {404} Vício não encontrado ou não pertence ao usuário
- * @throws {500} Erro interno ao excluir vício
- */
-app.delete('/api/vicios/:id', authMiddleware, async (req, res) => {
-    try {
-        const vicioId = req.params.id;
-
-        // Verifica existência e propriedade do vício antes da exclusão
-        const { data: vicio, error: vicioError } = await supabase
-            .from('vicios')
-            .select('id')
-            .eq('id', vicioId)
-            .eq('usuario_id', req.usuarioId)
-            .single();
-
-        if (vicioError || !vicio) {
-            return res.status(404).json({ erro: 'Vicio nao encontrado' });
-        }
-
-        // Cascade Delete manual: remove registros das tabelas dependentes
-        // Itera sobre cada tabela filha e exclui os registros vinculados ao vício
-        const dependentTables = ['registros_diarios', 'historico_recaidas', 'metas'];
-        for (const table of dependentTables) {
-            const { error } = await supabase
-                .from(table)
-                .delete()
-                .eq('vicio_id', vicioId);
-            if (error) throw error;
-        }
-
-        // Remove o vício em si (registro pai)
-        // Filtro duplo (id + usuario_id) como camada adicional de segurança
-        const { error: deleteError } = await supabase
-            .from('vicios')
-            .delete()
-            .eq('id', vicioId)
-            .eq('usuario_id', req.usuarioId);
-
-        if (deleteError) throw deleteError;
-
-        res.json({ mensagem: 'Vicio excluido definitivamente com sucesso' });
-    } catch (error) {
-        return sendInternalError(res, 'Erro ao excluir vicio', error);
-    }
-});
+// O banco valida o proprietário e exclui os dados em uma única transação.
+app.delete('/api/vicios/:id', authMiddleware, deleteHabit(supabase));
 
 /**
  * Lista o histórico completo de recaídas do usuário autenticado.
@@ -1461,24 +1140,6 @@ function calculateAddictionStats(addiction) {
         formattedDuration: formatDuration(abstinenceDays)
     };
 }
-
-/* =========================================================================
- * ROTA DE HEALTH CHECK
- * ========================================================================= */
-
-/**
- * Endpoint de verificação de saúde da API (Health Check).
- * Utilizado por ferramentas de monitoramento, load balancers e CI/CD
- * para verificar se o servidor está respondendo corretamente.
- *
- * Não requer autenticação.
- *
- * @route GET /api/health
- * @returns {Object} 200 - { status: string, timestamp: string }
- */
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'API REVIVE esta funcionando!', timestamp: new Date().toISOString() });
-});
 
 /* =========================================================================
  * FRONTEND EM PRODUCAO

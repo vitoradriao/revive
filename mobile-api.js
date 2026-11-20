@@ -190,9 +190,9 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
 
     const validateCredentials = (nome, email, senha) => {
         const campos = {};
-        if (nome !== undefined && (!nome || nome.length > 120)) campos.nome = 'Informe um nome valido com ate 120 caracteres.';
+        if (!nome || [...nome].length > 100) campos.nome = 'Informe um nome valido com ate 100 caracteres.';
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) campos.email = 'Informe um email valido.';
-        if (!senha || senha.length < 6 || !/[A-Z]/.test(senha) || !/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
+        if (typeof senha !== 'string' || senha.length < 6 || !/[A-Z]/.test(senha) || !/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
             campos.senha = 'Use ao menos 6 caracteres, uma maiuscula e um caractere especial.';
         }
         return campos;
@@ -200,9 +200,9 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
 
     router.post(['/auth/cadastro', '/web-auth/cadastro'], async (req, res) => {
         try {
-            const nome = clean(req.body.nome);
-            const email = clean(req.body.email)?.toLowerCase();
-            const senha = req.body.senha;
+            const { nome: nomeRaw, email: emailRaw, senha } = req.body ?? {};
+            const nome = typeof nomeRaw === 'string' ? nomeRaw.trim() : '';
+            const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
             const campos = validateCredentials(nome, email, senha);
             if (Object.keys(campos).length) return apiError(res, 422, 'DADOS_INVALIDOS', 'Revise os campos informados.', campos);
 
@@ -214,6 +214,7 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
             const { data: usuario, error } = await supabase
                 .from('usuarios').insert([{ nome, email, senha_hash: senhaHash }])
                 .select('id, nome, email').single();
+            if (error?.code === '23505') return apiError(res, 409, 'EMAIL_EM_USO', 'Este email ja esta cadastrado.');
             if (error) throw error;
             const session = await createSession(usuario, req, senhaHash);
             if (!session) return apiError(res, 401, 'CREDENCIAIS_INVALIDAS', 'Entre novamente com a senha atual.');
@@ -226,9 +227,9 @@ function createMobileApi({ supabase, bcrypt, jwtSecret, recoveryEnabled = proces
 
     router.post(['/auth/login', '/web-auth/login'], async (req, res) => {
         try {
-            const email = clean(req.body.email)?.toLowerCase();
-            const senha = req.body.senha;
-            if (!email || !senha) return apiError(res, 422, 'DADOS_INVALIDOS', 'Email e senha sao obrigatorios.');
+            const { email: emailRaw, senha } = req.body ?? {};
+            const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
+            if (!email || typeof senha !== 'string' || !senha) return apiError(res, 422, 'DADOS_INVALIDOS', 'Email e senha sao obrigatorios.');
             const { data: usuario, error } = await supabase.from('usuarios').select('*').eq('email', email).maybeSingle();
             if (error && res.locals.webAuth) throw error;
             if (error || !usuario || !(await bcrypt.compare(senha, usuario.senha_hash))) {

@@ -47,7 +47,7 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
       // Stop only this test's server; the production service worker already cached the public shell.
       await stop(fixture); fixture = null;
-      await page.getByRole('button', { name: /Bom/ }).click();
+      await page.getByRole('button', { name: 'Bom', exact: true }).click();
       await page.getByLabel('Observações', { exact: true }).fill('synthetic offline persisted UI');
       await page.evaluate(() => {
         window.originalOutboxAdd = IDBObjectStore.prototype.add;
@@ -106,13 +106,13 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByText('0 pendência(s).', { exact: false }).first().waitFor();
       const stats = await (await fetch(base + '/__test/status')).json();
       assert.equal(stats.events.registros, 1); assert.equal(stats.counts.writes, 1);
-      await page.getByRole('button', { name: 'Jornada', exact: true }).first().click();
-      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+      await page.goto(base + '/vicios/' + habit);
+      const diaryForm = page.getByRole('region', { name: 'Novo registro diário', exact: true });
       await fetch(base + '/__test/block-mutations', { method: 'POST' });
-      await page.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
-      await page.getByRole('button', { name: /Bom/ }).click();
-      await page.getByLabel('Observações', { exact: true }).fill('synthetic explicit discard');
-      await page.getByRole('button', { name: 'Salvar registro', exact: true }).click();
+      await diaryForm.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
+      await diaryForm.getByRole('button', { name: 'Bom', exact: true }).click();
+      await diaryForm.getByLabel('Observações', { exact: true }).fill('synthetic explicit discard');
+      await diaryForm.getByRole('button', { name: 'Salvar registro', exact: true }).click();
       await page.getByText('1 pendência(s).', { exact: false }).first().waitFor();
       await page.getByRole('button', { name: 'Sair', exact: true }).click();
       await page.getByRole('button', { name: 'Descartar pendências e sair', exact: true }).click();

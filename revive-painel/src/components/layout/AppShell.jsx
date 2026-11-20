@@ -74,6 +74,11 @@ const AppShell = () => {
         <NavBar variant="sidebar" />
         <main className="revive-shell">
           <Header />
+          <aside aria-label="Apoio emocional" className="surface-sand rounded-xl p-3 m-4">
+            O REVIVE é um registro pessoal e não substitui atendimento profissional.
+            {' '}Precisa conversar? CVV: <a className="underline" href="tel:+55188?oai_link_source=model_response_hotline">188</a> (24 horas, gratuito).
+            {' '}<a className="underline" href="https://www.cvv.org.br/chat/?oai_link_source=model_response_hotline">Conversar pelo chat</a>.
+          </aside>
           <div className="revive-content">
             <aside role="status" className="surface-sand rounded-xl p-3 mb-4">
               {offline.localOnly ? 'Modo local: os dados podem estar incompletos.' : 'Cópia local e sincronização'}

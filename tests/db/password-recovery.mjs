@@ -55,7 +55,7 @@ export async function verifyPasswordRecovery(app, sql, second) {
   const address = `reset-${randomUUID()}@example.invalid`;
   const password = 'Synthetic!Original1';
   const newPassword = 'Synthetic!Replacement2';
-  const registered = await request(app).post('/api/auth/cadastro').send({ nome: 'Synthetic recovery', email: address, senha: password });
+  const registered = await request(app).post('/api/v2/auth/cadastro').send({ nome: 'Synthetic recovery', email: address, senha: password });
   assert.equal(registered.status, 201);
   const id = registered.body.usuario.id;
   const emailKey = digest(process.env.JWT_SECRET, 'email', address);
@@ -109,7 +109,7 @@ export async function verifyPasswordRecovery(app, sql, second) {
     assert.equal((await sql.query('select count(*) as n from public.password_recovery_requests where usuario_id=$1', [id])).rows[0].n, '1', 'cooldown does not issue another code');
     await sql.query("update public.password_recovery_requests set expires_at=clock_timestamp()-interval '1 second' where id=$1", [first.requestId]);
     assert.equal((await confirm(first)).status, 400);
-    assert.equal((await request(app).post('/api/auth/login').send({ email: address, senha: password })).status, 200);
+    assert.equal((await request(app).post('/api/v2/auth/login').send({ email: address, senha: password })).status, 200);
 
     const exhausted = await issue();
     const wrong = exhausted.code === '00000000' ? '11111111' : '00000000';
@@ -132,19 +132,19 @@ export async function verifyPasswordRecovery(app, sql, second) {
     const result = await Promise.all([confirm(active), confirm(active)]);
     assert.deepEqual(result.map(item => item.status).sort(), [200, 400], 'only one concurrent confirmation changes the password');
     assert.equal((await confirm(active)).status, 400, 'used code cannot be replayed');
-    assert.equal((await request(app).post('/api/auth/login').send({ email: address, senha: password })).status, 401);
-    const webLogin = await request(app).post('/api/auth/login').send({ email: address, senha: newPassword });
+    assert.equal((await request(app).post('/api/v2/auth/login').send({ email: address, senha: password })).status, 401);
+    const webLogin = await request(app).post('/api/v2/auth/login').send({ email: address, senha: newPassword });
     assert.equal(webLogin.status, 200);
     assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${legacy}`)).status, 401);
     assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${browser.body.access_token}`)).status, 401);
     assert.equal((await request(app).post('/api/v2/web-auth/refresh')
       .set('Host', 'web.example.invalid').set('Origin', 'http://web.example.invalid')
       .set('Cookie', browserCookie).send({})).status, 401);
-    assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${registered.body.token}`)).status, 401);
+    assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${registered.body.access_token}`)).status, 401);
     assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${mobile.body.access_token}`)).status, 401);
     assert.equal((await request(app).get('/api/v2/bootstrap').set('Authorization', `Bearer ${mobile.body.access_token}`)).status, 401);
     assert.equal((await request(app).post('/api/v2/auth/refresh').send({ refresh_token: mobile.body.refresh_token })).status, 401);
-    assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${webLogin.body.token}`)).status, 200);
+    assert.equal((await request(app).get('/api/me').set('Authorization', `Bearer ${webLogin.body.access_token}`)).status, 200);
     const freshMobile = await request(app).post('/api/v2/auth/login').send({ email: address, senha: newPassword });
     assert.equal(freshMobile.status, 200);
     assert.equal((await counts()).rows[0].n, before, 'history survives recovery');

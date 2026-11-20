@@ -154,7 +154,9 @@ const verifyStorageIsolation = async context => {
             assert.equal(await form.getByRole('button', { name: 'Salvar vontade', exact: true }).isDisabled(), true);
             const history = page.getByRole('region', { name: 'Histórico de vontades', exact: true });
             await history.getByText(/Cobertura parcial/).waitFor();
-            assert.equal(await history.getByRole('listitem').count(), 1);
+            // Coverage is also displayed while the asynchronous local query is
+            // loading; wait for its result before asserting the pending event.
+            await until(async () => await history.getByRole('listitem').count() === 1);
             await fetch(base + '/__test/hold-urge-responses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
             await page.clock.setFixedTime(new Date('2026-10-22T15:32:42Z'));
             await network(false);
@@ -181,6 +183,7 @@ const verifyStorageIsolation = async context => {
             await form.getByRole('button', { name: 'Registrar outra vontade', exact: true }).click();
             await form.getByLabel('Intensidade (0 a 10)').fill('10');
             await form.getByLabel('Nota (opcional)').fill('Rascunho sintético preservado');
+            await until(async () => (await readStore(page, 'meta')).some(row => row.key === 'urgeDraft:' + habitId && row.value.note === 'Rascunho sintético preservado'));
             await page.getByRole('button', { name: 'Arquivar hábito', exact: true }).click();
             await page.getByRole('button', { name: 'Confirmar arquivamento', exact: true }).click();
             await form.getByText(/Hábito arquivado. Seu rascunho/).waitFor();
@@ -213,9 +216,12 @@ const verifyStorageIsolation = async context => {
             if (output) await day.locator('..').locator('..').screenshot({ path: path.join(output, `urge-calendar-${engine}.png`), animations: 'disabled' });
             await network(true); expectedNetworkFailure = true;
             await page.reload({ waitUntil: 'domcontentloaded' });
+            // Restoration and opening IndexedDB are distinct startup stages.
+            await page.getByRole('button', { name: 'Restaurar sessão', exact: true }).waitFor();
             await page.getByText(/Cobertura parcial:/).waitFor();
             await network(false);
             await page.getByRole('button', { name: 'Restaurar sessão', exact: true }).click();
+            await page.getByText('Modo local: os dados podem estar incompletos.', { exact: true }).waitFor({ state: 'hidden' });
             await page.evaluate(({ accountId, rejectedDraft, refusedPayload }) => new Promise((resolve, reject) => {
                 const open = indexedDB.open('revive-account-' + accountId);
                 open.onsuccess = () => {

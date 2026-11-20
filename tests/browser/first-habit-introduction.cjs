@@ -135,8 +135,16 @@ const peer = (page, patch) => page.evaluate(async patch => {
             assert.equal(await a.getByRole('region', { name: 'Check-in rápido', exact: true }).getByRole('button', { name: 'Salvar check-in', exact: true }).isDisabled(), true);
             assert.equal((await localRows(a, 'outbox')).some(row => row.id === intentId), true);
             await post('drop-record-responses', { enabled: false });
-            // Conflito por outra sessão requer consulta; o ID do hábito e a intenção não mudam.
-            await peer(a, { indicator_order: ['accumulated_savings'] });
+            // A outra sessão grava depois que o cliente já montou a requisição.
+            // Uma atualização assíncrona ainda pode ocorrer antes do clique.
+            let injectConflict = true;
+            await a.route('**/api/v2/preferences', async route => {
+                if (injectConflict && route.request().method() === 'PATCH') {
+                    injectConflict = false;
+                    await peer(b, { indicator_order: ['accumulated_savings'] });
+                }
+                await route.continue();
+            });
             await button(a, 'Concluir introdução').click(); await region(a).getByRole('alert').waitFor();
             assert.equal(await button(a, 'Concluir introdução').isDisabled(), true);
             await button(a, 'Consultar etapas atuais').click(); await enabled(button(a, 'Concluir introdução'));

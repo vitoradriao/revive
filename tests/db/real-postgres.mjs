@@ -89,10 +89,10 @@ async function verifyApi(app, sql, second) {
   const users = [];
   for (const label of ['a', 'b', 'c']) {
     const email = `ci-${label}-${suffix}@example.invalid`;
-    const registered = await request(app).post('/api/auth/cadastro')
+    const registered = await request(app).post('/api/v2/auth/cadastro')
       .send({ nome: `Synthetic ${label}`, email, senha: password });
     const body = bodyAt(registered, 201, `register ${label}`);
-    users.push({ id: body.usuario.id, email, legacyToken: body.token });
+    users.push({ id: body.usuario.id, email, legacyToken: body.access_token });
   }
   const [a, b, c] = users;
   for (const user of users) {
@@ -186,7 +186,9 @@ async function verifyApi(app, sql, second) {
     .send({ refresh_token: c.refreshToken })));
   assert.deepEqual(rotation.map(result => result.status).sort(), [200, 401]);
   const activeFamily = await sql.query(`select count(*) from public.app_sessions
-    where usuario_id=$1 and revoked_at is null`, [c.id]);
+    where usuario_id=$1 and revoked_at is null
+      and family_id=(select family_id from public.app_sessions where id=$2)`,
+    [c.id, jwt.decode(c.mobileToken).sid]);
   assert.equal(Number(activeFamily.rows[0].count), 0,
     'concurrent reuse is detected and revokes the rotated family');
   bodyAt(await request(app).get('/api/v2/bootstrap')
@@ -231,7 +233,7 @@ async function verifyApi(app, sql, second) {
   bodyAt(contentConflict, 409, 'idempotency content conflict');
   assert.equal(contentConflict.body.codigo, 'IDEMPOTENCY_CONFLITO');
   const receipt = await sql.query('select expires_at::text from public.api_idempotency where usuario_id=$1 and idempotency_key=$2', [a.id, recordKey]);
-  assert.equal(receipt.rows[0].expires_at.startsWith('infinity'), true, 'receipt is not allowed to expire while queued events may replay');
+  assert.equal(receipt.rows[0].expires_at.startsWith('infinity'), false, 'receipt payload has finite retention; the deduplication key remains');
 
   await sql.query(`create function public.test_fail_mobile_record_insert() returns trigger language plpgsql as $$
     begin
@@ -459,10 +461,15 @@ try {
   process.env.WEB_AUTH_ENABLED = 'true';
   process.env.SMTP_PORT = '55434';
   process.env.RECOVERY_EMAIL_FROM = 'Revive CI <noreply@example.invalid>';
-  const { app } = require('../../index.js');
-  await verifyApi(app, first, second);
-  await verifyGoalsRelapses(app, first, process.env.JWT_SECRET);
-  await verifyPasswordRecovery(app, first, second);
+  // Each scenario gets a fresh in-memory limiter, just as independent clients
+  // would. Keep the production thresholds intact while isolating test traffic.
+  const freshApp = () => {
+    delete require.cache[require.resolve('../../index.js')];
+    return require('../../index.js').app;
+  };
+  await verifyApi(freshApp(), first, second);
+  await verifyGoalsRelapses(freshApp(), first, process.env.JWT_SECRET);
+  await verifyPasswordRecovery(freshApp(), first, second);
   await verifyPublicRoles(proxy.url);
   console.log('Two SQL connections, API ownership, cascade and role denial passed.');
 } finally {

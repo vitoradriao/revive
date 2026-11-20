@@ -15,7 +15,7 @@ Confirme que o repositorio remoto contem estes arquivos:
 - `index.js`
 - `package.json`
 - `package-lock.json`
-- `render.yaml`
+- `docs/deployment/render.example.yaml`
 - `revive-painel/package.json`
 - `revive-painel/package-lock.json`
 - `revive-painel/src/**`
@@ -47,7 +47,7 @@ ALLOWED_ORIGINS=https://SEU-SERVICO.onrender.com
 
 1. Acesse o Render e conecte a conta do GitHub.
 2. Crie um novo Blueprint usando o repositorio do REVIVE.
-3. O Render vai detectar `render.yaml`.
+3. Se optar pelo Render, copie `docs/deployment/render.example.yaml` para `render.yaml` na raiz e selecione esse arquivo ao configurar o Blueprint.
 4. Preencha as variaveis marcadas como secret/sync false.
 5. Inicie o deploy.
 
