@@ -108,11 +108,12 @@ const login = async (page, email = 'a@example.invalid') => {
       assert.equal(stats.events.registros, 1); assert.equal(stats.counts.writes, 1);
       await page.getByRole('button', { name: 'Jornada', exact: true }).first().click();
       await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+      const diaryForm = page.getByRole('region', { name: 'Novo registro diário', exact: true });
       await fetch(base + '/__test/block-mutations', { method: 'POST' });
-      await page.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
-      await page.getByRole('button', { name: 'Bom', exact: true }).press('Enter');
-      await page.getByLabel('Observações', { exact: true }).fill('synthetic explicit discard');
-      await page.getByRole('button', { name: 'Salvar registro', exact: true }).click();
+      await diaryForm.getByRole('button', { name: 'Adicionar outro registro hoje' }).click();
+      await diaryForm.getByRole('button', { name: 'Bom', exact: true }).click();
+      await diaryForm.getByLabel('Observações', { exact: true }).fill('synthetic explicit discard');
+      await diaryForm.getByRole('button', { name: 'Salvar registro', exact: true }).click();
       await page.getByText('1 pendência(s).', { exact: false }).first().waitFor();
       await page.getByRole('button', { name: 'Sair', exact: true }).click();
       await page.getByRole('button', { name: 'Descartar pendências e sair', exact: true }).click();
