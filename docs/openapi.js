@@ -89,6 +89,7 @@
  *       properties:
  *         nome:
  *           type: string
+ *           maxLength: 100
  *         email:
  *           type: string
  *           format: email
@@ -223,6 +224,20 @@
 
 /**
  * @openapi
+ * /api/v2/auth/cadastro:
+ *   post:
+ *     tags: [Mobile Auth v2]
+ *     summary: Cria uma conta e inicia uma sessão revogável
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/CadastroRequest' }
+ *     responses:
+ *       '201': { description: Conta criada com credenciais de acesso e renovação }
+ *       '409': { description: E-mail já cadastrado }
+ *       '422': { description: Campos inválidos }
+ *       '500': { description: Cadastro indisponível }
  * /api/v2/auth/login:
  *   post:
  *     tags: [Mobile Auth v2]
@@ -238,6 +253,8 @@
  *         description: Access token de 15 minutos e refresh token rotativo
  *       401:
  *         description: Credenciais invalidas
+ *       422:
+ *         description: Email ou senha ausente ou com tipo inválido
  * /api/v2/auth/refresh:
  *   post:
  *     tags: [Mobile Auth v2]

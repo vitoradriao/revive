@@ -17,4 +17,20 @@ describe('api routes', () => {
         expect(response.status).toBe(410);
         expect(response.body.codigo).toBe('ROTA_DESCONTINUADA');
     });
+
+    it('rejects invalid v2 credentials before accessing the database', async () => {
+        const email = 'synthetic@example.invalid';
+        const missingName = await request(app).post('/api/v2/auth/cadastro').send({ email, senha: 'Synthetic!123' });
+        expect(missingName.status).toBe(422);
+        expect(missingName.body.campos).toHaveProperty('nome');
+        const longName = await request(app).post('/api/v2/auth/cadastro').send({ nome: 'a'.repeat(101), email, senha: 'Synthetic!123' });
+        expect(longName.status).toBe(422);
+        expect(longName.body.campos).toHaveProperty('nome');
+
+        for (const route of ['cadastro', 'login']) {
+            const response = await request(app).post('/api/v2/auth/' + route).send({ nome: 'Synthetic', email, senha: ['Synthetic!123'] });
+            expect(response.status).toBe(422);
+            expect(response.body.codigo).toBe('DADOS_INVALIDOS');
+        }
+    });
 });
