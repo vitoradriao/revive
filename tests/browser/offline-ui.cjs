@@ -47,7 +47,7 @@ const login = async (page, email = 'a@example.invalid') => {
       await page.getByRole('heading', { name: 'Novo registro diário' }).waitFor();
       // Stop only this test's server; the production service worker already cached the public shell.
       await stop(fixture); fixture = null;
-      await page.getByRole('button', { name: /Bom/ }).click();
+      await page.getByRole('button', { name: 'Bom', exact: true }).press('Enter');
       await page.getByLabel('Observações', { exact: true }).fill('synthetic offline persisted UI');
       await page.evaluate(() => {
         window.originalOutboxAdd = IDBObjectStore.prototype.add;
