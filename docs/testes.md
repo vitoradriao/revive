@@ -93,9 +93,9 @@ Eles exercitam a aplicacao Express de verdade usando `supertest`, sem precisar s
 
 Exemplos atuais:
 
-- `GET /api/health`;
-- validacao do payload em `POST /api/auth/login`;
-- validacao do payload em `POST /api/auth/cadastro`.
+- `GET /api/live` verifica se o processo responde;
+- as três rotas v1 descontinuadas retornam HTTP 410;
+- a suíte operacional verifica os estados de `GET /api/health`, e a suíte PostgreSQL exercita o cadastro e o login v2.
 
 Arquivo principal:
 

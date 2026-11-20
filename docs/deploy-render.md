@@ -47,7 +47,7 @@ ALLOWED_ORIGINS=https://SEU-SERVICO.onrender.com
 
 1. Acesse o Render e conecte a conta do GitHub.
 2. Crie um novo Blueprint usando o repositorio do REVIVE.
-3. Copie o exemplo para render.yaml na raiz apenas se optar pelo Render. O Render vai detectar `docs/deployment/render.example.yaml`.
+3. Se optar pelo Render, copie `docs/deployment/render.example.yaml` para `render.yaml` na raiz e selecione esse arquivo ao configurar o Blueprint.
 4. Preencha as variaveis marcadas como secret/sync false.
 5. Inicie o deploy.
 

@@ -7,6 +7,7 @@ describe('api routes', () => {
 
         expect(response.statusCode).toBe(200);
         expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['ratelimit-limit']).toBeUndefined();
         expect(response.body).toHaveProperty('status');
         expect(response.body).toHaveProperty('timestamp');
     });

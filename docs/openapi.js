@@ -629,10 +629,10 @@
  * /api/health:
  *   get:
  *     tags: [Health]
- *     summary: Verifica disponibilidade da API
+ *     summary: Confere o acesso da API ao banco
  *     responses:
- *       200:
- *         description: API operacional
+ *       '200': { description: Banco acessível }
+ *       '503': { description: Banco indisponível ou sem resposta em três segundos }
  */
 
 /**
@@ -640,24 +640,10 @@
  * /api/auth/cadastro:
  *   post:
  *     tags: [Auth]
- *     summary: Cadastra um usuario
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CadastroRequest'
+ *     deprecated: true
+ *     summary: Rota descontinuada. Use /api/v2/auth/cadastro
  *     responses:
- *       201:
- *         description: Usuario cadastrado
- *       400:
- *         description: Dados invalidos
- *       500:
- *         description: Erro interno
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *       '410': { description: Atualize o aplicativo para usar a API v2 }
  */
 
 /**
@@ -665,20 +651,10 @@
  * /api/auth/login:
  *   post:
  *     tags: [Auth]
- *     summary: Realiza login do usuario
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/LoginRequest'
+ *     deprecated: true
+ *     summary: Rota descontinuada. Use /api/v2/auth/login
  *     responses:
- *       200:
- *         description: Login concluido
- *       401:
- *         description: Credenciais invalidas
- *       500:
- *         description: Erro interno
+ *       '410': { description: Atualize o aplicativo para usar a API v2 }
  */
 
 /**
@@ -805,29 +781,12 @@
  * /api/vicios/{id}/recaida:
  *   post:
  *     tags: [Vicios]
- *     summary: Registra recaida de um vicio
- *     security:
- *       - bearerAuth: []
+ *     deprecated: true
+ *     summary: Rota descontinuada. Use /api/v2/vicios/{id}/recaida
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               motivo:
- *                 type: string
- *               resetarContador:
- *                 type: boolean
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
- *       200:
- *         description: Recaida registrada
+ *       '410': { description: Atualize o aplicativo para usar a API v2 }
  */
 
 /**
@@ -1518,4 +1477,14 @@
  *       '401': { description: Sessão inválida }
  *       '404': { description: Origem inexistente ou de outra conta; mesma resposta }
  *       '503': { description: Consulta de origem indisponível }
+ */
+
+/**
+ * @openapi
+ * /api/live:
+ *   get:
+ *     tags: [Health]
+ *     summary: Verifica se o processo responde
+ *     responses:
+ *       '200': { description: Processo acessível }
  */
