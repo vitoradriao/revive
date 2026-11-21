@@ -2,7 +2,7 @@ name: Testes
 
 on:
   push:
-    branches: [main, master, develop, 'feature/**', 'fix/**', 'docs/**', 'chore/**']
+    branches: [main, master, develop, 'feature/**', 'fix/**', 'docs/**', 'chore/**', '!feature/validacao-apk-banca']
   pull_request:
 
 permissions:
