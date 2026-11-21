@@ -1,0 +1,72 @@
+name: Validar APK da banca em emulador
+on:
+  push:
+    branches: [feature/validacao-apk-banca]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - name: Preparar Android 15
+        shell: bash
+        run: |
+          test -e /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          sdkmanager --install "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
+          echo no | avdmanager create avd -n revive-banca -k "system-images;android-35;google_apis;x86_64" --force
+      - name: Conferir instalacao e abertura com e sem rede
+        shell: bash
+        run: |
+          mkdir evidence
+          apk="$RUNNER_TEMP/revive-banca.apk"
+          curl --fail --location --silent --show-error --retry 3 https://github.com/vitoradriao/revive/releases/download/banca-2026-11-19/app-release.apk -o "$apk"
+          echo "02f5c62ba6d39118969509a147f6dacfaa92df5162168d8070b0f555f1ca6eec  $apk" | sha256sum --check
+          emulator -avd revive-banca -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          timeout 180 adb wait-for-device
+          for i in $(seq 1 90); do
+            if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
+            sleep 2
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb shell input keyevent 82
+          adb install "$apk" | tee evidence/install.txt
+          app=com.reviveapp.revive.banca
+          {
+            adb shell getprop ro.product.model
+            adb shell getprop ro.build.version.release
+            adb shell getprop ro.build.version.sdk
+            adb shell dumpsys package "$app" | grep -E 'versionCode=|versionName='
+          } > evidence/environment.txt
+          adb logcat -c
+          activity="$(adb shell cmd package resolve-activity --brief "$app" | tail -n 1 | tr -d '\r')"
+          [[ "$activity" = "$app/"* ]]
+          open_login() {
+            local label="$1"
+            adb shell am force-stop "$app"
+            adb shell am start -W -n "$activity" | tee "evidence/start-$label.txt"
+            for i in $(seq 1 20); do
+              adb shell uiautomator dump /sdcard/revive-view.xml >/dev/null || continue
+              adb pull /sdcard/revive-view.xml "$RUNNER_TEMP/revive-view.xml" >/dev/null
+              if grep -q 'Volte para sua jornada' "$RUNNER_TEMP/revive-view.xml"; then
+                adb exec-out screencap -p > "evidence/login-$label.png"
+                return 0
+              fi
+              sleep 1
+            done
+            return 1
+          }
+          open_login online
+          adb shell settings put system font_scale 2.0
+          open_login fonte-200
+          adb shell svc wifi disable
+          adb shell svc data disable
+          open_login offline
+      - name: Guardar evidencias do emulador
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revive-apk-smoke
+          path: evidence/
+          if-no-files-found: ignore
