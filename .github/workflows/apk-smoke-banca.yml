@@ -27,8 +27,14 @@ jobs:
           apk="$RUNNER_TEMP/revive-banca.apk"
           curl --fail --location --silent --show-error --retry 3 https://github.com/vitoradriao/revive/releases/download/banca-2026-11-19/app-release.apk -o "$apk"
           echo "02f5c62ba6d39118969509a147f6dacfaa92df5162168d8070b0f555f1ca6eec  $apk" | sha256sum --check
-          emulator -avd revive-banca -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          timeout 180 adb wait-for-device
+          adb start-server
+          emulator -accel-check
+          emulator -avd revive-banca -no-window -no-audio -no-boot-anim -gpu swiftshader -no-snapshot > evidence/emulator.log 2>&1 &
+          pid=$!
+          trap 'tail -n 120 evidence/emulator.log' ERR
+          sleep 5
+          kill -0 "$pid"
+          timeout 120 adb wait-for-device
           for i in $(seq 1 90); do
             if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
             sleep 2
@@ -74,5 +80,3 @@ jobs:
           name: revive-apk-smoke
           path: evidence/
           if-no-files-found: ignore
-
-

@@ -24,7 +24,7 @@ export async function verifyReviewBenchmark(app, db) {
     const durations = [];
     const page = async ({ token, habit }, measure) => {
       const start = performance.now();
-      const response = await request(app).get('/api/v2/registros').query({ vicio_id: habit, limit: 100 })
+      const response = await request(app).get('/api/v2/registros').query({ vicio_id: habit, inicio: '2020-01-01', fim: '2022-12-31', limit: 100 })
         .set('Authorization', 'Bearer ' + token);
       if (measure) durations.push(performance.now() - start);
       assert.equal(response.status, 200);
