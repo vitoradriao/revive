@@ -14,6 +14,9 @@ jobs:
         run: |
           test -e /dev/kvm
           sudo chmod a+rw /dev/kvm
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          export PATH="$tools:$PATH"
+          printf '%s\n' "$ANDROID_HOME/emulator" "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           sdkmanager --install "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
           echo no | avdmanager create avd -n revive-banca -k "system-images;android-35;google_apis;x86_64" --force
       - name: Conferir instalacao e abertura com e sem rede
@@ -70,3 +73,4 @@ jobs:
           name: revive-apk-smoke
           path: evidence/
           if-no-files-found: ignore
+
