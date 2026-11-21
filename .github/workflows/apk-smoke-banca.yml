@@ -2,6 +2,7 @@ name: Validar APK da banca em emulador
 on:
   push:
     branches: [feature/validacao-apk-banca]
+    paths: ['.github/workflows/apk-smoke-banca.yml']
 permissions:
   contents: read
 jobs:
@@ -73,4 +74,5 @@ jobs:
           name: revive-apk-smoke
           path: evidence/
           if-no-files-found: ignore
+
 

@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import pg from 'pg';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { verifyReviewBenchmark } from './benchmark-review.mjs';
 import { verifyPasswordRecovery } from './password-recovery.mjs';
 import { verifyWeeklySummary } from './weekly-summary.mjs';
 import { verifyDiarySearch } from './diary-search.mjs';
@@ -471,8 +472,10 @@ try {
   await verifyGoalsRelapses(freshApp(), first, process.env.JWT_SECRET);
   await verifyPasswordRecovery(freshApp(), first, second);
   await verifyPublicRoles(proxy.url);
+  await verifyReviewBenchmark(freshApp(), first);
   console.log('Two SQL connections, API ownership, cascade and role denial passed.');
 } finally {
   await Promise.allSettled([first.end(), second.end()]);
   await new Promise(resolve => proxy.server.close(resolve));
 }
+
