@@ -19,7 +19,12 @@ jobs:
           export PATH="$tools:$PATH"
           printf '%s\n' "$ANDROID_HOME/emulator" "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           sdkmanager --install "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
-          echo no | avdmanager create avd -n revive-banca -k "system-images;android-35;google_apis;x86_64" --force
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avds"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          printf 'no\n' | avdmanager create avd -n revive-banca -p "$ANDROID_AVD_HOME/revive-banca.avd" -k "system-images;android-35;google_apis;x86_64" --force
+          test -f "$ANDROID_AVD_HOME/revive-banca.avd/config.ini"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx revive-banca
       - name: Conferir instalacao e abertura com e sem rede
         shell: bash
         run: |
